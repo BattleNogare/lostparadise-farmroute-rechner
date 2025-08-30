@@ -14,7 +14,7 @@
       margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
       position:relative;
     }
-    /* Börsen-Raster klar unter dem Inhalt */
+    /* Börsen-Raster unter Inhalt */
     body::before{
       content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
       background:
@@ -112,7 +112,7 @@
     <main class="wrap grid">
       <section class="card" id="builder">
         <h2>Route zusammenstellen</h2>
-        <div class="sub">LKW-/Rucksack-Logik, automatische Fahrzeiten per Popup beim Verlassen der Ortsfelder, Drag &amp; Drop.</div>
+        <div class="sub">Gib beim Verarbeitungsschritt nur das Grundrezept (Inputs je Batch) und die Dauer an. Outputmengen werden automatisch hergeleitet.</div>
 
         <div class="hr"></div>
         <!-- Basisdaten -->
@@ -145,7 +145,7 @@
           </select>
           <button id="addBtn" type="button">Schritt hinzufügen</button>
         </div>
-        <div class="mini">Hinweis: Gewichte der Zwischenprodukte in „Verarbeitung“ pflegen. Fahrzeit wird erfragt, sobald du das Ortsfeld verlässt und der vorherige Ort abweicht.</div>
+        <div class="mini">Fahrzeiten werden beim Verlassen eines Ortsfelds per Popup abgefragt (wenn sich der Ort ändert).</div>
       </section>
 
       <aside class="card">
@@ -208,11 +208,11 @@
         <input data-key="duration" placeholder="Dauer pro Batch (Minuten)" type="number" step="1">
       </div>
 
-      <div class="mini" style="margin:4px 0">Inputs (pro Batch):</div>
+      <div class="mini" style="margin:4px 0">Inputs (pro Batch – Grundrezept):</div>
       <div class="input-list" data-key="inputs"></div>
       <div class="actions"><button class="addInput" type="button">+ Input</button></div>
 
-      <div class="mini" style="margin:4px 0">Outputs (pro Batch):</div>
+      <div class="mini" style="margin:4px 0">Outputs (Name + Gewicht/Einheit – Menge wird automatisch ermittelt, außer du trägst sie ein):</div>
       <div class="output-list" data-key="outputs"></div>
       <div class="actions"><button class="addOutput" type="button">+ Output</button></div>
 
@@ -239,7 +239,7 @@
   <template id="tpl-input-row">
     <div class="input-row" style="display:grid;grid-template-columns:2fr .8fr .8fr 1.2fr auto;gap:6px">
       <input data-k="name" placeholder="Item-Name">
-      <input data-k="qty" placeholder="Menge" type="number" step="0.01">
+      <input data-k="qty" placeholder="Menge / Batch" type="number" step="0.01">
       <label style="display:flex;align-items:center;gap:6px"><input data-k="purchased" type="checkbox"> einkaufen?</label>
       <input data-k="price" placeholder="Preis / Einheit (&euro;)" type="number" step="0.01" title="Nur relevant, wenn 'einkaufen?' aktiv ist">
       <button class="delInput" type="button">✕</button>
@@ -249,7 +249,7 @@
   <template id="tpl-output-row">
     <div class="output-row" style="display:grid;grid-template-columns:2fr .8fr .8fr auto;gap:6px">
       <input data-k="name" placeholder="Output-Name">
-      <input data-k="qty" placeholder="Menge / Batch" type="number" step="0.01">
+      <input data-k="qty" placeholder="(optional) Menge / Batch" type="number" step="0.01">
       <input data-k="unitWeight" placeholder="Gewicht / Einheit (kg)" type="number" step="0.01">
       <button class="delOutput" type="button">✕</button>
     </div>
@@ -312,7 +312,7 @@
       // Drag
       stepEl.addEventListener('dragstart', function(e){ stepEl.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','drag'); });
       stepEl.addEventListener('dragend', function(){ stepEl.classList.remove('dragging'); recalc(); });
-      // Fahrzeit-Abfrage beim Verlassen des Ortsfeldes
+      // Fahrzeit-Abfrage bei Ortswechsel (beim Verlassen des Feldes)
       var where=qs('[data-key="where"]', stepEl);
       if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
     }
@@ -365,10 +365,10 @@
           var outputs=qsa('[data-key="outputs"] .output-row',step).map(function(row){
             return {
               name: qs('[data-k="name"]',row).value.trim(),
-              qty: num(qs('[data-k="qty"]',row).value),
+              qty: num(qs('[data-k="qty"]',row).value), // optional
               unitWeight: num(qs('[data-k="unitWeight"]',row).value)
             };
-          }).filter(function(o){return o.name && o.qty>0;});
+          }).filter(function(o){return o.name;});
           steps.push({type:type,
             where: qs('[data-key="where"]',step).value.trim(),
             duration: num(qs('[data-key="duration"]',step).value),
@@ -426,7 +426,7 @@
             addOutputRow(el);
             var row=listO.lastElementChild;
             qs('[data-k="name"]',row).value=out.name||'';
-            qs('[data-k="qty"]',row).value=out.qty||'';
+            qs('[data-k="qty"]',row).value=out.qty||''; // optional
             qs('[data-k="unitWeight"]',row).value=out.unitWeight||'';
           });
           qs('[data-key="licenseName"]',el).value=s.licenseName||'';
@@ -438,7 +438,7 @@
       recalc();
     }
 
-    // ===== Fahrzeit per Popup beim Verlassen der Ortsfelder =====
+    // ===== Fahrzeit-Popup beim Verlassen der Ortsfelder =====
     function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
     function openTravelModal(from,to, cb){
       var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
@@ -449,7 +449,6 @@
     }
     function handlePlaceBlur(stepEl){
       try{
-        var route=getRoute();
         var stepsNodes=qsa('#steps .step');
         var idx=stepsNodes.findIndex(function(n){return n===stepEl;});
         if(idx<=0) return;
@@ -467,7 +466,7 @@
       }catch(e){}
     }
 
-    // ===== Compute (inkl. mehrere Outputs & gekaufte Input-Gewichte im Rucksack) =====
+    // ===== Berechnung =====
     function compute(route){
       var baseKg = route.lkwSize>0? route.lkwSize : 2000; // LKW-Größe
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
@@ -478,7 +477,7 @@
       var purchaseCost=0, licenseCost=0;
       var log=[];
 
-      // Abbau: Einheiten aus LKW-kg, Zeit direkt für LKW-Größe
+      // Abbau
       route.steps.forEach(function(s,idx){
         if(s.type==='abbau'){
           var perUnit=Math.max(0, num(s.unitWeight));
@@ -492,7 +491,7 @@
         }
       });
 
-      // Fahrten (bekannte Zeiten aus Store; neue werden beim Blur gesammelt)
+      // Fahrten (nur bekannte Zeiten; neue werden beim Blur aufgenommen)
       var store=readStore();
       var lastPlace=null;
       route.steps.forEach(function(s){
@@ -507,13 +506,15 @@
         }
       });
 
-      // Verarbeitung: mehrere Outputs; Batchgröße je Run durch Rucksack; GEKAUFTE Inputs zählen beim Gewicht mit
+      // Verarbeitung
       route.steps.forEach(function(s,idx){
         if(s.type!=='verarbeitung') return;
-        var inputs=s.inputs||[]; var outputs=s.outputs||[];
+
+        var inputs=s.inputs||[];
+        var outputs=s.outputs||[];
         if(inputs.length===0 || outputs.length===0){ log.push('Verarbeitung @'+(s.where||'?')+': Input/Output unvollständig – übersprungen.'); return; }
 
-        // Gewichte für Outputs sichern
+        // Output-Gewichte fixieren
         outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
         var dur = Math.max(0, num(s.duration));
@@ -526,15 +527,38 @@
         function kgPerBatchAllInputs(){
           var sum=0;
           inputs.forEach(function(i){
-            var w = weights[i.name] || 1;
+            var w = weights[i.name] || 1; // falls unbekannt, 1kg annehmen
             sum += Math.max(0, num(i.qty)) * w;
           });
           return sum;
         }
 
+        // Hilfsfunktion: automatische Output-Mengen (falls nicht gesetzt)
+        function deriveOutputQuantities(){
+          var anySet = outputs.some(function(o){ return num(o.qty)>0; });
+          if(anySet) return outputs.map(function(o){ return Math.max(0,num(o.qty)); });
+
+          var totalInputKg = kgPerBatchAllInputs();
+          var count = outputs.length;
+          var outQ = [];
+
+          if(count===1){
+            var ow = Math.max(0.0001, weights[outputs[0].name]||1);
+            outQ[0] = Math.max(0, Math.floor(totalInputKg / ow));
+          } else {
+            // gleichmäßige Gewichtsverteilung über alle Outputs
+            var shareKg = totalInputKg / count;
+            for(var i=0;i<count;i++){
+              var ow2 = Math.max(0.0001, weights[outputs[i].name]||1);
+              outQ[i] = Math.max(0, Math.floor(shareKg / ow2));
+            }
+          }
+          return outQ;
+        }
+
         var runs=0, batchesTotal=0;
         while(true){
-          // Limit 1: Inventar nur für NICHT gekaufte
+          // Limit 1: Inventar für NICHT gekaufte Inputs
           var batchesByInventory = Infinity;
           if(nonPurchased.length>0){
             batchesByInventory = nonPurchased.reduce(function(min,i){
@@ -543,7 +567,7 @@
               var can=Math.floor(avail/need);
               return Math.min(min, can);
             }, Infinity);
-          } else { batchesByInventory = 999999; }
+          } else { batchesByInventory=999999; }
           if(batchesByInventory<=0) break;
 
           // Limit 2: Rucksackgewicht (alle Inputs)
@@ -564,11 +588,12 @@
             purchaseCost += need*batchesThisRun*price;
           });
 
-          // Outputs produzieren (alle Outputs)
-          outputs.forEach(function(o){
-            var q=Math.max(0, num(o.qty));
-            inventory[o.name]=(inventory[o.name]||0) + q*batchesThisRun;
-          });
+          // Outputs produzieren
+          var autoOut = deriveOutputQuantities(); // pro Batch
+          for(var k=0;k<outputs.length;k++){
+            var qPerBatch = autoOut[k] || 0;
+            inventory[outputs[k].name]=(inventory[outputs[k].name]||0) + qPerBatch*batchesThisRun;
+          }
 
           procTime += dur*batchesThisRun;
           runs++; batchesTotal+=batchesThisRun;
@@ -580,8 +605,13 @@
           if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
           return t;
         }).join(' + ');
-        var outputsTxt = outputs.map(function(o){ return fmt(num(o.qty))+'× '+o.name; }).join(' + ');
-        log.push((runs||0)+' Runs, '+fmt(batchesTotal||0)+' Batches @'+(s.where||'?')+': '+inputsTxt+' → '+outputsTxt+' je Batch'+(lic?(', Lizenz +'+cf.format(lic)):'')+'.');
+
+        var autoOutDbg = (function(){
+          var arr=deriveOutputQuantities();
+          return outputs.map(function(o,ix){ return fmt(arr[ix]||0)+'× '+o.name; }).join(' + ');
+        })();
+
+        log.push((runs||0)+' Runs, '+fmt(batchesTotal||0)+' Batches @'+(s.where||'?')+': '+inputsTxt+' → '+autoOutDbg+' je Batch'+(lic?(', Lizenz +'+cf.format(lic)):'')+'.');
       });
 
       // Ergebnis
@@ -727,19 +757,16 @@
             {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', timeLkw: 180},
             {type:'verarbeitung', where:'Ingenieurbüro', duration: 8,
               inputs:[{name:'Rohes Bauxit', qty:10, purchased:false}],
-              outputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, unitWeight:3}],
-              licenseName:'', licensePrice:0},
+              outputs:[{name:'Feingemahlenes Bauxitpulver', unitWeight:3}]},
             {type:'verarbeitung', where:'Ingenieurbüro', duration: 12,
               inputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, purchased:false},{name:'Schwefelsäure', qty:3, purchased:true, price:85}],
-              outputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, unitWeight:2}],
-              licenseName:'', licensePrice:0},
+              outputs:[{name:'Verunreinigtes Aluminiumoxid', unitWeight:2}]},
             {type:'verarbeitung', where:'Metallschmelze', duration: 15,
               inputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, purchased:false},{name:'Schlacke', qty:1, purchased:true, price:0}],
-              outputs:[{name:'Unreiner Aluminiumschrott', qty:8, unitWeight:2}],
-              licenseName:'', licensePrice:0},
+              outputs:[{name:'Unreiner Aluminiumschrott', unitWeight:2}]},
             {type:'verarbeitung', where:'Metallschmelze', duration: 10,
-              inputs:[{name:'Unreiner Aluminiumschrott', qty:4, purchased:true, price:0},{name:'Schlacke', qty:1, purchased:true, price:0}],
-              outputs:[{name:'Aluminiumbarren', qty:5, unitWeight:1}],
+              inputs:[{name:'Unreiner Aluminiumschrott', qty:4, purchased:false},{name:'Schlacke', qty:1, purchased:true, price:0}],
+              outputs:[{name:'Aluminiumbarren', unitWeight:1}],
               licenseName:'Schmelz-Lizenz', licensePrice:10000},
             {type:'verkauf', where:'Großhändler'}
           ]
