@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Farmrouten‑Preisrechner</title>
+  <style>
+    :root{
+      --bg:#0b0f14;            /* dunkles Börsen-Schwarz */
+      --panel:#0f141b;         /* Kartenhintergrund */
+      --muted:#161c24;         /* Inputs */
+      --text:#e6f0ff;          /* Primärtext */
+      --soft:#b7c2d0;          /* Sekundärtext */
+      --green:#00e676;         /* Börsen-Grün */
+      --red:#ff4d4f;
+      --accent:#1aff95;
+      --grid:#0d2a1f;
+      --border:#1f2a36;
+      --yellow:#ffd666;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0; background:radial-gradient(1200px 1200px at 100% 0%,rgba(0,230,118,.06),transparent 40%),
+                         radial-gradient(1200px 1200px at 0% 100%,rgba(0,230,118,.06),transparent 40%),
+                         linear-gradient(transparent,transparent), var(--bg);
+      color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
+    }
+    /* subtile Börsen-Gitterlinien */
+    body:before{content:""; position:fixed; inset:0; pointer-events:none; background:
+      linear-gradient(var(--grid) 1px,transparent 1px) 0 0/ 100% 24px,
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/ 24px 100%; opacity:.4;}
+
+    header{
+      position:sticky; top:0; z-index:50; backdrop-filter: blur(8px);
+      background:linear-gradient(180deg,rgba(11,15,20,.9),rgba(11,15,20,.65));
+      border-bottom:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+    .wrap{max-width:1200px; margin:0 auto; padding:16px;}
+    .brand{display:flex; align-items:center; gap:12px;}
+    .logo{width:28px; height:28px; border-radius:8px; background:conic-gradient(from 180deg,var(--green),#0ff,var(--green)); box-shadow:0 0 0 3px rgba(0,230,118,.15);}
+    h1{font-size:18px; margin:0; letter-spacing:.3px}
+
+    .toolbar{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; margin-top:10px;}
+    .menu{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+
+    select, input, button, textarea{background:var(--muted); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font:inherit; outline:none}
+    input[type="number"]{width:120px}
+    input::placeholder, textarea::placeholder{color:#708499}
+    button{cursor:pointer; transition:.2s transform ease, .2s background ease;}
+    button:hover{transform:translateY(-1px)}
+    .primary{background:linear-gradient(180deg,var(--green),#09c966); color:#00160a; font-weight:700; border:none}
+    .danger{background:linear-gradient(180deg,#ff7676,#ff4d4f); color:#2b0004; font-weight:700; border:none}
+    .ghost{background:transparent; border:1px dashed var(--border)}
+
+    .grid{display:grid; grid-template-columns: 1.2fr .8fr; gap:16px; margin-top:16px}
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
+    .card h2{margin:0 0 6px; font-size:16px}
+    .sub{color:var(--soft); font-size:13px}
+
+    .step{border:1px dashed var(--border); border-radius:14px; padding:12px; margin:10px 0; position:relative}
+    .step-type{display:flex; gap:8px; align-items:center; margin-bottom:8px}
+    .step-body{display:grid; gap:8px}
+    .two{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+    .three{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
+    .actions{display:flex; gap:8px; flex-wrap:wrap}
+
+    .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f}
+    .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
+    .tag.yellow{border-color:#5a4; background:#2b2410}
+
+    .ticker{display:block; white-space:nowrap; overflow:hidden; mask-image:linear-gradient(90deg,transparent,rgba(0,0,0,1) 8%, rgba(0,0,0,1) 92%, transparent)}
+    .ticker-inner{display:inline-block; animation:ticker 30s linear infinite}
+    @keyframes ticker{from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+    .summary{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:13px}
+    .summary .row{display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px solid var(--border)}
+    .summary .row:last-child{border-bottom:none}
+
+    details{border:1px solid var(--border); border-radius:12px; padding:10px; background:#0d141b}
+    details>summary{cursor:pointer}
+
+    .notice{padding:10px 12px; background:#0a1a12; border:1px solid #0a3; border-radius:12px}
+
+    .footer{margin-top:18px; color:#8aa2b6; font-size:12px}
+
+    .kpi{display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-top:8px}
+    .kpi .box{background:#0c171f; border:1px solid var(--border); border-radius:12px; padding:10px}
+    .kpi .box .label{color:#9bb2c9; font-size:12px}
+    .kpi .box .val{font-size:18px; font-weight:700}
+
+    .hr{height:1px; background:linear-gradient(90deg,transparent, var(--border), transparent); margin:12px 0}
+    .mini{font-size:12px; color:#9bb2c9}
+
+    .input-list .input-row{display:grid; grid-template-columns:2fr .8fr .8fr 1.2fr auto; gap:6px; margin:6px 0}
+    .input-list .input-row input[type="checkbox"]{transform:translateY(2px)}
+
+    .pill{padding:4px 8px; border-radius:999px; background:#11222c; border:1px solid var(--border); font-size:12px}
+
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <h1>Farmrouten‑Preisrechner</h1>
+        <span class="tag green" title="Alle Daten bleiben im Browser">Lokal gespeichert</span>
+      </div>
+
+      <div class="toolbar">
+        <div class="menu">
+          <label class="pill">Gesamt‑Basis: <input id="baseKg" type="number" min="1" step="1" value="2000" style="width:90px"> kg</label>
+          <label class="pill">Endprodukt: <input id="endProduct" type="text" placeholder="z. B. Aluminiumbarren" style="width:220px"></label>
+          <label class="pill">Eigenen Preis (€ / Einheit): <input id="customPrice" type="text" placeholder="optional" style="width:140px"></label>
+          <label class="pill"><input id="includeLicenses" type="checkbox" checked> Lizenzkosten einrechnen</label>
+          <button id="recalc" class="primary">Neu berechnen</button>
+        </div>
+        <div class="menu">
+          <select id="savedRoutesSelect"></select>
+          <button id="saveBtn">Speichern</button>
+          <button id="saveAsBtn">Speichern als …</button>
+          <button id="deleteBtn" class="danger">Löschen</button>
+          <button id="exportBtn">Export</button>
+          <label for="importFile" class="ghost" style="padding:10px 12px; cursor:pointer">Import<input id="importFile" type="file" accept="application/json" class="hidden"></label>
+          <button id="demoBtn" title="Beispielroute einfügen">Demo laden</button>
+        </div>
+      </div>
+      <div class="ticker" aria-hidden="true">
+        <div class="ticker-inner">
+          <span class="tag">Tipp: Du kannst Schritte beliebig hinzufügen, verschieben und mehrfach verwenden.</span>
+          <span class="tag">Verkaufspreis‑Vorschlag hält den Stundengewinn ≤ 500.000 €.</span>
+          <span class="tag">Export/Import überträgt gespeicherte Routen zwischen Geräten.</span>
+          &nbsp;&nbsp;•&nbsp;&nbsp;
+          <span class="tag">Alle Werte können später geändert werden; die Berechnung passt sich an.</span>
+          &nbsp;&nbsp;•&nbsp;&nbsp;
+          <span class="tag">Kommazahlen: 1,5 oder 1.5 – beides wird erkannt.</span>
+          &nbsp;&nbsp;•&nbsp;&nbsp;
+          <span class="tag">Lizenzkosten können optional einbezogen werden.</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap grid">
+    <section class="card" id="builder">
+      <h2>Route zusammenstellen</h2>
+      <div class="sub">Lege die Schritte fest. Du kannst jeden Abschnitt mehrfach verwenden.</div>
+
+      <div id="steps"></div>
+
+      <div class="actions">
+        <select id="addType">
+          <option value="abbau">➕ Abbau</option>
+          <option value="fahrzeit">➕ Fahrzeit</option>
+          <option value="verarbeitung">➕ Verarbeitung</option>
+          <option value="verkauf">➕ Verkaufsort</option>
+        </select>
+        <button id="addBtn">Schritt hinzufügen</button>
+      </div>
+
+      <div class="footer mini">Orte‑Vorschläge: Bauxitmine, Chemiewerk, Ingenieurbüro, Metallschmelze, Großhändler</div>
+    </section>
+
+    <aside class="card">
+      <h2>Ergebnis & Struktur</h2>
+      <div class="kpi">
+        <div class="box"><div class="label">Gesamtdauer</div><div id="kpiTime" class="val">–</div></div>
+        <div class="box"><div class="label">Gesamtkosten</div><div id="kpiCost" class="val">–</div></div>
+        <div class="box"><div class="label">Ausbeute</div><div id="kpiYield" class="val">–</div></div>
+      </div>
+      <div class="hr"></div>
+
+      <div class="summary" id="summary"></div>
+
+      <div class="hr"></div>
+      <details>
+        <summary>Preis & Gewinn</summary>
+        <div style="margin-top:8px">
+          <div class="row"><span>Endprodukt</span> <strong id="sumEndProduct">–</strong></div>
+          <div class="row"><span>Einheiten (verkaufbar)</span> <strong id="sumUnits">–</strong></div>
+          <div class="row"><span>Break‑even‑Preis (€ / Einheit)</span> <strong id="sumBreakeven">–</strong></div>
+          <div class="row"><span>Vorschlag (≤ 500.000 €/h)</span> <strong id="sumSuggested">–</strong></div>
+          <div class="row"><span>Stundengewinn bei eigenem Preis</span> <strong id="sumHourly">–</strong></div>
+        </div>
+      </details>
+
+      <div class="footer mini">
+        Annahmen: Verarbeitung dauert pro <em>Batch</em>. Der erste nicht gekaufte Input eines Verarbeitungsschritts bestimmt die Anzahl der Batches (limitierender Faktor). Gekaufte Inputs werden nicht als Bestand geführt, verursachen aber Kosten.
+      </div>
+    </aside>
+  </main>
+
+  <template id="tpl-abbau">
+    <div class="step" data-type="abbau">
+      <div class="step-type"><span class="tag green">Abbau</span><span class="sub">Ursprung: Rohstoff</span></div>
+      <div class="step-body three">
+        <input data-key="what" placeholder="Was wird abgebaut? (z. B. Rohes Bauxit)">
+        <input data-key="unitWeight" placeholder="Gewicht pro Einheit (kg)" type="text">
+        <input list="places" data-key="where" placeholder="Wo (Ort)">
+      </div>
+      <div class="step-body two">
+        <input data-key="time2000" placeholder="Zeit für Basis‑Menge (Minuten)" type="text">
+        <div class="actions">
+          <button class="moveUp">↑</button>
+          <button class="moveDown">↓</button>
+          <button class="duplicate">Duplizieren</button>
+          <button class="remove danger">Entfernen</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-fahrzeit">
+    <div class="step" data-type="fahrzeit">
+      <div class="step-type"><span class="tag">Fahrzeit</span><span class="sub">Transportabschnitt</span></div>
+      <div class="step-body three">
+        <input list="places" data-key="start" placeholder="Start">
+        <input list="places" data-key="end" placeholder="Ziel">
+        <input data-key="minutes" placeholder="Fahrzeit (Minuten)" type="text">
+      </div>
+      <div class="actions">
+        <button class="moveUp">↑</button>
+        <button class="moveDown">↓</button>
+        <button class="duplicate">Duplizieren</button>
+        <button class="remove danger">Entfernen</button>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-verarbeitung">
+    <div class="step" data-type="verarbeitung">
+      <div class="step-type"><span class="tag yellow">Verarbeitung</span><span class="sub">Rezept & Batches</span></div>
+      <div class="step-body two">
+        <input list="places" data-key="where" placeholder="Wo wird verarbeitet?">
+        <input data-key="duration" type="text" placeholder="Dauer pro Batch (Minuten)">
+      </div>
+
+      <div class="mini" style="margin:6px 0">Benötigte Inputs (pro Batch):</div>
+      <div class="input-list" data-key="inputs"></div>
+      <div class="actions"><button class="addInput">+ Input</button></div>
+
+      <div class="mini" style="margin:6px 0">Ausgabe (pro Batch):</div>
+      <div class="step-body three">
+        <input data-key="outputName" placeholder="Was wird hergestellt?">
+        <input data-key="outputQty" placeholder="Menge / Batch" type="text">
+        <input data-key="outputUnitWeight" placeholder="Gewicht / Einheit (kg)" type="text">
+      </div>
+
+      <div class="mini" style="margin:6px 0">Lizenz (optional):</div>
+      <div class="step-body two">
+        <input data-key="licenseName" placeholder="Lizenzname (optional)">
+        <input data-key="licensePrice" placeholder="Preis der Lizenz (€)" type="text">
+      </div>
+
+      <div class="actions">
+        <button class="moveUp">↑</button>
+        <button class="moveDown">↓</button>
+        <button class="duplicate">Duplizieren</button>
+        <button class="remove danger">Entfernen</button>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-input-row">
+    <div class="input-row">
+      <input data-k="name" placeholder="Item‑Name">
+      <input data-k="qty" placeholder="Menge" type="text">
+      <label style="display:flex; align-items:center; gap:6px"><input data-k="purchased" type="checkbox"> einkaufen?</label>
+      <input data-k="price" placeholder="Preis / Einheit (€)" type="text" title="Nur relevant, wenn 'einkaufen?' aktiv ist">
+      <button class="delInput">✕</button>
+    </div>
+  </template>
+
+  <template id="tpl-verkauf">
+    <div class="step" data-type="verkauf">
+      <div class="step-type"><span class="tag">Verkaufsort</span><span class="sub">Zielmarkt</span></div>
+      <div class="step-body">
+        <input list="places" data-key="where" placeholder="Wo wird verkauft?">
+      </div>
+      <div class="actions">
+        <button class="moveUp">↑</button>
+        <button class="moveDown">↓</button>
+        <button class="duplicate">Duplizieren</button>
+        <button class="remove danger">Entfernen</button>
+      </div>
+    </div>
+  </template>
+
+  <datalist id="places">
+    <option value="Bauxitmine"></option>
+    <option value="Chemiewerk"></option>
+    <option value="Ingenieurbüro"></option>
+    <option value="Metallschmelze"></option>
+    <option value="Großhändler"></option>
+  </datalist>
+
+  <script>
+    // —— Helpers ——
+    const € = new Intl.NumberFormat('de-DE', { style:'currency', currency:'EUR', maximumFractionDigits: 2 });
+    const fmt = n => new Intl.NumberFormat('de-DE').format(n);
+    const parseNum = (v)=>{ if(v==null) return 0; if(typeof v==='number') return v; v=String(v).trim().replace(/\./g,'').replace(',', '.'); const n=parseFloat(v); return isNaN(n)?0:n; };
+
+    const qs = (sel, el=document)=> el.querySelector(sel);
+    const qsa = (sel, el=document)=> Array.from(el.querySelectorAll(sel));
+
+    function uid(){ return Math.random().toString(36).slice(2,9); }
+
+    // —— State ——
+    let currentRouteId = null; // key in localStorage map
+
+    // —— Step creators ——
+    const TPLS = {
+      abbau: ()=> qs('#tpl-abbau').content.firstElementChild.cloneNode(true),
+      fahrzeit: ()=> qs('#tpl-fahrzeit').content.firstElementChild.cloneNode(true),
+      verarbeitung: ()=> {
+        const el = qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true);
+        // add one input by default
+        addInputRow(el);
+        return el;
+      },
+      verkauf: ()=> qs('#tpl-verkauf').content.firstElementChild.cloneNode(true)
+    };
+
+    function addInputRow(stepEl){
+      const row = qs('#tpl-input-row').content.firstElementChild.cloneNode(true);
+      qs('[data-key="inputs"]', stepEl).appendChild(row);
+      row.querySelector('.delInput').addEventListener('click', ()=> row.remove());
+    }
+
+    function attachStepControls(stepEl){
+      qs('.remove', stepEl)?.addEventListener('click', ()=>{ stepEl.remove(); recalc(); });
+      qs('.duplicate', stepEl)?.addEventListener('click', ()=>{ const clone = stepEl.cloneNode(true); wireStep(clone); stepEl.after(clone); });
+      qs('.moveUp', stepEl)?.addEventListener('click', ()=>{ const prev = stepEl.previousElementSibling; if(prev) prev.before(stepEl); recalc(); });
+      qs('.moveDown', stepEl)?.addEventListener('click', ()=>{ const next = stepEl.nextElementSibling; if(next) next.after(stepEl); recalc(); });
+      qs('.addInput', stepEl)?.addEventListener('click', ()=> addInputRow(stepEl));
+      stepEl.addEventListener('input', debounce(recalc, 200));
+    }
+
+    function wireStep(stepEl){
+      // attach listeners to new / cloned steps
+      attachStepControls(stepEl);
+    }
+
+    function addStep(type){
+      const el = TPLS[type]();
+      el.dataset.type = type;
+      wireStep(el);
+      qs('#steps').appendChild(el);
+      el.scrollIntoView({behavior:'smooth', block:'center'});
+      return el;
+    }
+
+    // —— Build route object from UI ——
+    function getRoute(){
+      const steps = [];
+      qsa('#steps .step').forEach(step=>{
+        const type = step.dataset.type;
+        if(type==='abbau'){
+          steps.push({type,
+            what: qs('[data-key="what"]', step).value.trim(),
+            unitWeight: parseNum(qs('[data-key="unitWeight"]', step).value),
+            where: qs('[data-key="where"]', step).value.trim(),
+            time2000: parseNum(qs('[data-key="time2000"]', step).value),
+          });
+        } else if(type==='fahrzeit'){
+          steps.push({type,
+            start: qs('[data-key="start"]', step).value.trim(),
+            end: qs('[data-key="end"]', step).value.trim(),
+            minutes: parseNum(qs('[data-key="minutes"]', step).value),
+          });
+        } else if(type==='verarbeitung'){
+          const inputs = qsa('[data-key="inputs"] .input-row', step).map(row=>({
+            name: qs('[data-k="name"]', row).value.trim(),
+            qty: parseNum(qs('[data-k="qty"]', row).value),
+            purchased: qs('[data-k="purchased"]', row).checked,
+            price: parseNum(qs('[data-k="price"]', row).value),
+          })).filter(x=>x.name && x.qty>0);
+          steps.push({type,
+            where: qs('[data-key="where"]', step).value.trim(),
+            duration: parseNum(qs('[data-key="duration"]', step).value),
+            inputs,
+            outputName: qs('[data-key="outputName"]', step).value.trim(),
+            outputQty: parseNum(qs('[data-key="outputQty"]', step).value),
+            outputUnitWeight: parseNum(qs('[data-key="outputUnitWeight"]', step).value),
+            licenseName: qs('[data-key="licenseName"]', step).value.trim(),
+            licensePrice: parseNum(qs('[data-key="licensePrice"]', step).value),
+          });
+        } else if(type==='verkauf'){
+          steps.push({type, where: qs('[data-key="where"]', step).value.trim()});
+        }
+      });
+      return {
+        id: currentRouteId || uid(),
+        name: qs('#savedRoutesSelect').selectedOptions[0]?.textContent || 'Unbenannt',
+        endProduct: qs('#endProduct').value.trim(),
+        baseKg: parseNum(qs('#baseKg').value),
+        customPrice: parseNum(qs('#customPrice').value) || null,
+        includeLicenses: qs('#includeLicenses').checked,
+        steps
+      };
+    }
+
+    // —— Render UI from route object ——
+    function setRoute(route){
+      currentRouteId = route.id || uid();
+      qs('#endProduct').value = route.endProduct || '';
+      qs('#baseKg').value = route.baseKg || 2000;
+      qs('#customPrice').value = route.customPrice ?? '';
+      qs('#includeLicenses').checked = route.includeLicenses !== false;
+      qs('#steps').innerHTML = '';
+      route.steps?.forEach(s=>{
+        const el = addStep(s.type);
+        if(s.type==='abbau'){
+          qs('[data-key="what"]', el).value = s.what || '';
+          qs('[data-key="unitWeight"]', el).value = s.unitWeight || '';
+          qs('[data-key="where"]', el).value = s.where || '';
+          qs('[data-key="time2000"]', el).value = s.time2000 || '';
+        } else if(s.type==='fahrzeit'){
+          qs('[data-key="start"]', el).value = s.start || '';
+          qs('[data-key="end"]', el).value = s.end || '';
+          qs('[data-key="minutes"]', el).value = s.minutes || '';
+        } else if(s.type==='verarbeitung'){
+          qs('[data-key="where"]', el).value = s.where || '';
+          qs('[data-key="duration"]', el).value = s.duration || '';
+          // inputs
+          const list = qs('[data-key="inputs"]', el);
+          list.innerHTML = '';
+          (s.inputs||[]).forEach(inp=>{
+            addInputRow(el);
+            const row = list.lastElementChild;
+            qs('[data-k="name"]', row).value = inp.name || '';
+            qs('[data-k="qty"]', row).value = inp.qty || '';
+            qs('[data-k="purchased"]', row).checked = !!inp.purchased;
+            qs('[data-k="price"]', row).value = inp.price || '';
+          });
+          qs('[data-key="outputName"]', el).value = s.outputName || '';
+          qs('[data-key="outputQty"]', el).value = s.outputQty || '';
+          qs('[data-key="outputUnitWeight"]', el).value = s.outputUnitWeight || '';
+          qs('[data-key="licenseName"]', el).value = s.licenseName || '';
+          qs('[data-key="licensePrice"]', el).value = s.licensePrice || '';
+        } else if(s.type==='verkauf'){
+          qs('[data-key="where"]', el).value = s.where || '';
+        }
+      });
+      recalc();
+    }
+
+    // —— Calculation Engine ——
+    function compute(route){
+      const baseKg = route.baseKg>0? route.baseKg : 2000;
+      const inventory = {};        // { itemName: units }
+      const weights = {};          // { itemName: kg per unit }
+      let miningTime = 0, driveTime = 0, procTime = 0;
+      let purchaseCost = 0, licenseCost = 0;
+      const log = [];
+
+      // 1) Abbau initialisiert Rohstoffe
+      route.steps.forEach((s, idx)=>{
+        if(s.type==='abbau'){
+          const perUnit = Math.max(0, parseNum(s.unitWeight));
+          const time = Math.max(0, parseNum(s.time2000));
+          const what = s.what || `Rohstoff_${idx+1}`;
+          const units = perUnit>0 ? Math.floor(baseKg / perUnit) : 0;
+          inventory[what] = (inventory[what]||0) + units;
+          weights[what] = perUnit || weights[what] || 1;
+          miningTime += time;
+          log.push({kind:'abbau', text:`Abbau ${what} @${s.where||'?'}: ${fmt(units)} Einheiten (à ${perUnit} kg). Zeit +${fmt(time)} min.`});
+        }
+      });
+
+      // 2) Fahrzeiten aufsummieren
+      route.steps.forEach(s=>{
+        if(s.type==='fahrzeit'){
+          const m = Math.max(0, parseNum(s.minutes));
+          driveTime += m;
+          log.push({kind:'fahr', text:`Fahrt ${s.start||'?'} → ${s.end||'?'}: +${fmt(m)} min.`});
+        }
+      });
+
+      // 3) Verarbeitung schrittweise
+      route.steps.forEach((s, idx)=>{
+        if(s.type==='verarbeitung'){
+          const inputs = s.inputs || [];
+          const nonPurchased = inputs.filter(i=>!i.purchased);
+          const primary = nonPurchased[0] || inputs[0];
+          if(!primary){
+            log.push({kind:'proc', text:`Verarbeitung @${s.where||'?'}: Kein Input definiert – übersprungen.`});
+            return;
+          }
+          const primAvail = inventory[primary.name] || 0;
+          const primNeed = Math.max(1, parseNum(primary.qty));
+          let batches = Math.floor(primAvail / primNeed);
+
+          // weitere nicht gekaufte Inputs können Batchzahl weiter begrenzen
+          nonPurchased.slice(1).forEach(inp=>{
+            const avail = inventory[inp.name] || 0;
+            const need = Math.max(1, parseNum(inp.qty));
+            batches = Math.min(batches, Math.floor(avail/need));
+          });
+          if(batches<=0){
+            log.push({kind:'proc', text:`Verarbeitung @${s.where||'?'}: Zu wenig Bestand für einen Batch – übersprungen.`});
+            return;
+          }
+
+          // Kosten für zugekaufte Inputs
+          inputs.filter(i=>i.purchased).forEach(i=>{
+            const need = Math.max(0, parseNum(i.qty));
+            const price = Math.max(0, parseNum(i.price));
+            purchaseCost += need * batches * price;
+          });
+
+          // Bestand an nicht gekauften Inputs abziehen
+          nonPurchased.forEach(i=>{
+            const need = Math.max(0, parseNum(i.qty));
+            inventory[i.name] = (inventory[i.name]||0) - need*batches;
+          });
+
+          // Output hinzufügen
+          const outQty = Math.max(0, parseNum(s.outputQty));
+          const outName = s.outputName || `Produkt_${idx+1}`;
+          inventory[outName] = (inventory[outName]||0) + outQty*batches;
+          if(parseNum(s.outputUnitWeight)>0) weights[outName] = parseNum(s.outputUnitWeight);
+
+          const dur = Math.max(0, parseNum(s.duration));
+          procTime += dur * batches;
+          const lic = Math.max(0, parseNum(s.licensePrice));
+          licenseCost += lic;
+
+          const inputsTxt = inputs.map(i=>`${fmt(parseNum(i.qty))}× ${i.name}${i.purchased?` (gekauft ${€.format(parseNum(i.price))})`:''}`).join(' + ');
+          log.push({kind:'proc', text:`${batches}× @${s.where||'?'}: ${inputsTxt} → ${fmt(outQty)}× ${outName}. Zeit +${fmt(dur*batches)} min${lic?`, Lizenz +${€.format(lic)}`:''}.`});
+        }
+      });
+
+      // 4) Verkaufsort nur ins Log
+      route.steps.forEach(s=>{ if(s.type==='verkauf'){ log.push({kind:'sale', text:`Verkauf @${s.where||'?'}.`}); } });
+
+      // Ergebnis ableiten
+      const totalMinutes = miningTime + driveTime + procTime;
+      const endName = route.endProduct || inferEndProduct(route);
+      const sellableUnits = Math.max(0, Math.floor(inventory[endName]||0));
+      const includeLicenses = route.includeLicenses!==false;
+      const totalCost = purchaseCost + (includeLicenses? licenseCost: 0);
+      const hours = totalMinutes/60;
+      const customPrice = route.customPrice;
+      const revenueAtCustom = customPrice? (customPrice * sellableUnits) : 0;
+      const hourlyProfit = customPrice? ((revenueAtCustom - totalCost) / Math.max(0.0001, hours)) : null;
+
+      const breakEvenPerUnit = sellableUnits>0? (totalCost / sellableUnits) : 0;
+      const suggestedPerUnit = sellableUnits>0? Math.max(breakEvenPerUnit, (500000*hours + totalCost) / sellableUnits) : 0;
+
+      return {
+        inventory, weights,
+        miningTime, driveTime, procTime, totalMinutes,
+        purchaseCost, licenseCost, totalCost,
+        endName, sellableUnits,
+        hours,
+        breakEvenPerUnit, suggestedPerUnit,
+        hourlyProfit,
+        log
+      };
+    }
+
+    function inferEndProduct(route){
+      // letzte Verarbeitung mit Output, sonst letzter Abbau, sonst manuell
+      for(let i=route.steps.length-1;i>=0;i--){ const s=route.steps[i]; if(s.type==='verarbeitung' && s.outputName) return s.outputName; }
+      for(let i=route.steps.length-1;i>=0;i--){ const s=route.steps[i]; if(s.type==='abbau' && s.what) return s.what; }
+      return route.endProduct || 'Endprodukt';
+    }
+
+    // —— Render summary ——
+    function renderSummary(calc){
+      qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
+      qs('#kpiCost').textContent = €.format(calc.totalCost);
+      qs('#kpiYield').textContent = `${fmt(calc.sellableUnits)} × ${calc.endName}`;
+
+      const box = qs('#summary');
+      box.innerHTML = '';
+      const rows = [
+        ['Mining', `${minutesToH(calc.miningTime)} (${fmt(calc.miningTime)} min)`],
+        ['Fahrten', `${minutesToH(calc.driveTime)} (${fmt(calc.driveTime)} min)`],
+        ['Verarbeitung', `${minutesToH(calc.procTime)} (${fmt(calc.procTime)} min)`],
+        ['Kosten (Einkauf)', €.format(calc.purchaseCost)],
+        ['Lizenzkosten', €.format(calc.licenseCost)],
+        ['Gesamtkosten', €.format(calc.totalCost)],
+      ];
+      rows.forEach(([k,v])=>{ const r=document.createElement('div'); r.className='row'; r.innerHTML=`<span>${k}</span><strong>${v}</strong>`; box.appendChild(r); });
+
+      // Struktur/Log
+      const det = document.createElement('details');
+      det.open = true;
+      det.innerHTML = `<summary>Routenstruktur</summary>`;
+      const ul = document.createElement('ul'); ul.style.marginTop='8px';
+      calc.log.forEach(l=>{ const li=document.createElement('li'); li.textContent=l.text; ul.appendChild(li); });
+      det.appendChild(ul);
+      box.appendChild(det);
+
+      qs('#sumEndProduct').textContent = calc.endName;
+      qs('#sumUnits').textContent = fmt(calc.sellableUnits);
+      qs('#sumBreakeven').textContent = calc.sellableUnits>0? €.format(calc.breakEvenPerUnit) : '–';
+      qs('#sumSuggested').textContent = calc.sellableUnits>0? €.format(calc.suggestedPerUnit) : '–';
+      qs('#sumHourly').textContent = (calc.hourlyProfit==null)? '–' : €.format(calc.hourlyProfit);
+    }
+
+    const minutesToH = (m)=>{
+      const h = Math.floor(m/60), min = Math.round(m%60);
+      if(h<=0) return `${min} min`;
+      return `${h} h ${min} min`;
+    }
+
+    function recalc(){
+      const route = getRoute();
+      const calc = compute(route);
+      renderSummary(calc);
+      // persist draft
+      sessionStorage.setItem('draftRoute', JSON.stringify(route));
+    }
+
+    const debounce=(fn,ms)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); } };
+
+    // —— Storage (localStorage) ——
+    function listSaved(){
+      const map = JSON.parse(localStorage.getItem('farmRoutes')||'{}');
+      return map; // {id: {id,name,...}}
+    }
+    function saveRoute(route){
+      const map = listSaved();
+      map[route.id] = Object.assign({}, route, {name: route.name || prompt('Name der Route?') || 'Unbenannt'});
+      localStorage.setItem('farmRoutes', JSON.stringify(map));
+      currentRouteId = route.id;
+      refreshSavedSelect(route.id);
+    }
+    function deleteRoute(id){
+      const map = listSaved();
+      delete map[id];
+      localStorage.setItem('farmRoutes', JSON.stringify(map));
+      refreshSavedSelect(null);
+    }
+    function loadRoute(id){
+      const map = listSaved();
+      return map[id] || null;
+    }
+    function refreshSavedSelect(selectedId){
+      const sel = qs('#savedRoutesSelect');
+      const map = listSaved();
+      sel.innerHTML = '';
+      const opt0 = document.createElement('option'); opt0.value=''; opt0.textContent='— Gespeicherte Routen —'; sel.appendChild(opt0);
+      Object.values(map).forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=r.name || r.id; if(r.id===selectedId) o.selected=true; sel.appendChild(o); });
+    }
+
+    // —— Export / Import ——
+    function exportAll(){
+      const data = localStorage.getItem('farmRoutes')||'{}';
+      const blob = new Blob([data], {type:'application/json'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'farmrouten.json'; a.click(); URL.revokeObjectURL(a.href);
+    }
+    function importAll(file){
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        try{
+          const incoming = JSON.parse(reader.result);
+          const map = listSaved();
+          Object.values(incoming||{}).forEach(r=>{ if(!r.id) r.id = uid(); map[r.id]=r; });
+          localStorage.setItem('farmRoutes', JSON.stringify(map));
+          refreshSavedSelect(null);
+          alert('Import abgeschlossen.');
+        }catch(e){ alert('Import fehlgeschlagen: '+e.message); }
+      };
+      reader.readAsText(file);
+    }
+
+    // —— Demo (Bauxit) ——
+    function demoRoute(){
+      return {
+        id: uid(),
+        name: 'Bauxit → Aluminiumbarren (Demo)',
+        endProduct: 'Aluminiumbarren',
+        baseKg: 2000,
+        customPrice: 0,
+        includeLicenses: true,
+        steps: [
+          {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', time2000: 180},
+          {type:'verarbeitung', where:'Ingenieurbüro', duration: 8,
+            inputs:[{name:'Rohes Bauxit', qty:10, purchased:false}],
+            outputName:'Feingemahlenes Bauxitpulver', outputQty:10, outputUnitWeight:3,
+            licenseName:'', licensePrice:0},
+          {type:'verarbeitung', where:'Ingenieurbüro', duration: 12,
+            inputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, purchased:false},{name:'Schwefelsäure', qty:3, purchased:true, price:85}],
+            outputName:'Verunreinigtes Aluminiumoxid', outputQty:10, outputUnitWeight:2,
+            licenseName:'', licensePrice:0},
+          {type:'verarbeitung', where:'Metallschmelze', duration: 15,
+            inputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, purchased:false},{name:'Schlacke', qty:1, purchased:true, price:0}],
+            outputName:'Unreiner Aluminiumschrott', outputQty:8, outputUnitWeight:2,
+            licenseName:'', licensePrice:0},
+          {type:'verarbeitung', where:'Metallschmelze', duration: 10,
+            inputs:[{name:'Unreiner Aluminiumschrott', qty:4, purchased:false},{name:'Schlacke', qty:1, purchased:true, price:0}],
+            outputName:'Aluminiumbarren', outputQty:5, outputUnitWeight:1,
+            licenseName:'Schmelz-Lizenz', licensePrice:10000},
+          {type:'verkauf', where:'Großhändler'},
+        ]
+      };
+    }
+
+    // —— Event wiring ——
+    window.addEventListener('DOMContentLoaded', ()=>{
+      qs('#addBtn').addEventListener('click', ()=> addStep(qs('#addType').value));
+      qs('#recalc').addEventListener('click', recalc);
+
+      qs('#saveBtn').addEventListener('click', ()=>{
+        const r = getRoute();
+        // if exists, keep name; if new, ask
+        if(!r.name || r.name==='Unbenannt'){
+          const n = prompt('Name der Route?'); if(n) r.name = n;
+        }
+        saveRoute(r);
+        alert('Gespeichert.');
+      });
+      qs('#saveAsBtn').addEventListener('click', ()=>{
+        const r = getRoute();
+        r.id = uid();
+        r.name = prompt('Name für Kopie?') || (r.name+' (Kopie)');
+        saveRoute(r);
+        alert('Als neue Route gespeichert.');
+      });
+      qs('#deleteBtn').addEventListener('click', ()=>{
+        const id = qs('#savedRoutesSelect').value; if(!id){ alert('Bitte zuerst eine gespeicherte Route auswählen.'); return; }
+        if(confirm('Diese gespeicherte Route wirklich löschen?')){ deleteRoute(id); }
+      });
+      qs('#savedRoutesSelect').addEventListener('change', (e)=>{
+        const id = e.target.value; if(!id) return; const r = loadRoute(id); if(r){ setRoute(r); currentRouteId = r.id; }
+      });
+      qs('#exportBtn').addEventListener('click', exportAll);
+      qs('#importFile').addEventListener('change', (e)=>{ if(e.target.files?.[0]) importAll(e.target.files[0]); e.target.value=''; });
+      qs('#demoBtn').addEventListener('click', ()=>{ const r = demoRoute(); setRoute(r); });
+
+      refreshSavedSelect(null);
+
+      // Restore draft if any
+      try{
+        const draft = JSON.parse(sessionStorage.getItem('draftRoute')||'null');
+        if(draft){ setRoute(draft); }
+        else { addStep('abbau'); }
+      }catch{ addStep('abbau'); }
+
+      // Auto-recalc on top controls
+      ['baseKg','endProduct','customPrice','includeLicenses'].forEach(id=> qs('#'+id).addEventListener('input', debounce(recalc, 180)) );
+    });
+  </script>
+</body>
+</html>
