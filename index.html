@@ -5,93 +5,51 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Farmrouten-Preisrechner</title>
   <style>
-    :root{
-      --bg:#0b0f14; --panel:#161c24; --muted:#0f141b; --text:#e6f0ff; --soft:#9bb2c9;
-      --green:#00e676; --red:#ff4d4f; --border:#1f2a36;
-    }
-    html,body{height:100%}
-    body{background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;margin:0}
-    header{background:#0f141b;padding:10px 0;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border)}
+    body{background:#0b0f14;color:#e6f0ff;font-family:system-ui,sans-serif;margin:0;padding:0}
+    header{background:#0f141b;padding:10px;position:sticky;top:0;z-index:10}
     h1{margin:0;font-size:18px}
     .wrap{max-width:1100px;margin:auto;padding:10px}
-    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
-    input,select,button{background:var(--muted);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font:inherit}
-    input::placeholder{color:#87a0b7}
+    .card{background:#161c24;border:1px solid #1f2a36;border-radius:12px;padding:16px;margin-bottom:16px}
+    input,select,button{background:#0f141b;border:1px solid #1f2a36;border-radius:8px;padding:8px;color:#e6f0ff}
     button{cursor:pointer}
-    button.primary{background:linear-gradient(180deg,var(--green),#0bc96e);border:none;color:#062816;font-weight:700}
-    button.danger{background:linear-gradient(180deg,#ff7676,#ff4d4f);border:none;color:#2b0004;font-weight:700}
-    .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-    .mini{font-size:12px;color:var(--soft)}
-    .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-    .kpi .box{background:var(--muted);border:1px solid var(--border);border-radius:10px;padding:10px}
-    .kpi .label{color:var(--soft);font-size:12px}
-    .kpi .val{font-size:18px;font-weight:700}
-    .summary .row{display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
-    .summary .row:last-child{border-bottom:none}
-    .hr{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:12px 0}
-    .step{border:1px dashed var(--border);border-radius:12px;padding:10px;margin:10px 0}
-    .step h3{margin:0 0 6px 0;font-size:14px;color:#b7c2d0}
-    details{border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--muted)}
-    details>summary{cursor:pointer}
-    .input-list .input-row{display:grid;grid-template-columns:2fr .8fr .8fr 1.2fr auto;gap:6px;margin:6px 0}
-    .input-list .input-row input[type="checkbox"]{transform:translateY(2px)}
+    .step{border:1px dashed #1f2a36;border-radius:12px;padding:10px;margin:10px 0}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .row label{display:flex;gap:6px;align-items:center}
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
       <h1>Farmrouten-Preisrechner</h1>
-      <div class="actions" style="justify-content:space-between;margin-top:8px">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <select id="routeSelect" title="Routen in dieser Seite"></select>
-          <button id="saveBtn" type="button">Route speichern</button>
-          <button id="deleteBtn" type="button" class="danger">Route löschen</button>
-          <button id="downloadPageBtn" type="button" class="primary" title="Neue HTML mit eingebetteten Routen herunterladen">Seite mit Routen herunterladen</button>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button id="exportBtn" type="button">Export (JSON)</button>
-          <label for="importFile" style="cursor:pointer;border:1px dashed var(--border);border-radius:8px;padding:8px">Import (JSON)
-            <input id="importFile" type="file" accept="application/json" style="display:none">
-          </label>
-          <span id="routeCountTag" class="mini">0 Routen in dieser Seite</span>
-        </div>
+      <div class="row">
+        <select id="routeSelect" title="In dieser Sitzung gespeicherte Routen"></select>
+        <button id="saveBtn" type="button">Aktuelle Route speichern</button>
       </div>
     </div>
   </header>
 
-  <main class="wrap grid">
+  <main class="wrap">
     <section class="card" id="builder">
       <h2>Route zusammenstellen</h2>
-      <div class="mini">Basisdaten und Schritte festlegen. Verarbeitung nutzt LKW-/Rucksack-Limit automatisch.</div>
-      <div class="hr"></div>
 
-      <!-- Basisdaten -->
-      <div class="two">
-        <label>Endprodukt<br/>
+      <div class="row" style="margin-bottom:10px">
+        <label>Endprodukt:
           <input id="endProduct" type="text" placeholder="z. B. Aluminiumbarren">
         </label>
-        <label>Eigener Preis (EUR / Einheit)<br/>
-          <input id="customPrice" type="text" placeholder="optional">
+        <label>Eigener Preis (€ / Einheit):
+          <input id="customPrice" type="number" step="0.01" placeholder="optional">
         </label>
-        <label>LKW-Größe / Basis-kg<br/>
-          <input id="baseKg" type="number" min="1" step="1" value="2000">
+        <label>LKW-Größe (kg):
+          <input id="baseKg" type="number" value="2000" min="1" step="1">
         </label>
-        <label>Rucksack-Größe (kg)<br/>
-          <input id="backpackKg" type="number" min="1" step="1" value="150">
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:8px">
-          <input id="includeLicenses" type="checkbox" checked> Lizenzkosten einrechnen
+        <label>Rucksack-Größe (kg):
+          <input id="rucksackKg" type="number" value="100" min="1" step="1">
         </label>
       </div>
 
-      <div class="hr"></div>
-
       <div id="steps"></div>
 
-      <div class="actions">
+      <div class="row">
         <select id="addType">
           <option value="abbau">➕ Abbau</option>
           <option value="fahrzeit">➕ Fahrzeit</option>
@@ -100,47 +58,23 @@
         </select>
         <button id="addBtn" type="button">Schritt hinzufügen</button>
       </div>
-      <div class="mini">Hinweis: Gewichte der Zwischenprodukte bitte in „Verarbeitung“ (Gewicht/Einheit) pflegen, damit die Rucksack-Logik korrekt greift.</div>
     </section>
 
-    <aside class="card">
-      <h2>Ergebnis & Struktur</h2>
-      <div class="kpi">
-        <div class="box"><div class="label">Gesamtdauer</div><div id="kpiTime" class="val">–</div></div>
-        <div class="box"><div class="label">Gesamtkosten</div><div id="kpiCost" class="val">–</div></div>
-        <div class="box"><div class="label">Ausbeute</div><div id="kpiYield" class="val">–</div></div>
-      </div>
-      <div class="hr"></div>
-      <div class="summary" id="summary"></div>
-      <div class="hr"></div>
-      <details>
-        <summary>Preis & Gewinn</summary>
-        <div style="margin-top:8px">
-          <div class="row"><span>Endprodukt</span> <strong id="sumEndProduct">–</strong></div>
-          <div class="row"><span>Einheiten (verkaufbar)</span> <strong id="sumUnits">–</strong></div>
-          <div class="row"><span>Break-even (EUR / Einheit)</span> <strong id="sumBreakeven">–</strong></div>
-          <div class="row"><span>Vorschlag (≤ 500000 EUR/h)</span> <strong id="sumSuggested">–</strong></div>
-          <div class="row"><span>Stundengewinn bei eigenem Preis</span> <strong id="sumHourly">–</strong></div>
-        </div>
-      </details>
-      <div class="mini">Batch-Annahme: Rucksack limitiert pro Run die nicht gekauften Input-Gewichte; es werden automatisch mehrere Runs gefahren, bis die Basis-kg verarbeitet sind (sofern Bestand reicht).</div>
-    </aside>
+    <section class="card">
+      <h2>Ergebnis</h2>
+      <div id="summary">Noch keine Berechnung.</div>
+    </section>
   </main>
 
   <!-- Schritt-Vorlagen -->
   <template id="tpl-abbau">
     <div class="step" data-type="abbau">
       <h3>Abbau</h3>
-      <div class="three">
-        <input data-key="what" placeholder="Was wird abgebaut? (z. B. Rohes Bauxit)">
-        <input data-key="unitWeight" placeholder="Gewicht pro Einheit (kg)" type="number">
-        <input data-key="where" placeholder="Abbauort">
-      </div>
-      <div>
-        <input data-key="time2000" placeholder="Zeit für Basis-Menge (Minuten)" type="number">
-      </div>
-      <div class="actions">
-        <button class="remove" type="button">Entfernen</button>
+      <div class="row">
+        <input data-key="what" placeholder="Was wird abgebaut?">
+        <input data-key="unitWeight" placeholder="Gewicht pro Einheit (kg)" type="number" min="0" step="0.01">
+        <input data-key="where" placeholder="Wo wird abgebaut?">
+        <input data-key="time2000" placeholder="Zeit für 2000kg (Minuten)" type="number" min="0" step="1">
       </div>
     </div>
   </template>
@@ -148,13 +82,10 @@
   <template id="tpl-fahrzeit">
     <div class="step" data-type="fahrzeit">
       <h3>Fahrzeit</h3>
-      <div class="three">
+      <div class="row">
         <input data-key="start" placeholder="Startpunkt">
         <input data-key="end" placeholder="Endpunkt">
-        <input data-key="minutes" placeholder="Fahrzeit (Minuten)" type="number">
-      </div>
-      <div class="actions">
-        <button class="remove" type="button">Entfernen</button>
+        <input data-key="minutes" placeholder="Fahrzeit (Minuten)" type="number" min="0" step="1">
       </div>
     </div>
   </template>
@@ -162,204 +93,150 @@
   <template id="tpl-verarbeitung">
     <div class="step" data-type="verarbeitung">
       <h3>Verarbeitung</h3>
-      <div class="two">
+      <div class="row">
         <input data-key="where" placeholder="Wo wird verarbeitet?">
-        <input data-key="duration" placeholder="Dauer pro Batch (Minuten)" type="number">
+        <input data-key="duration" placeholder="Dauer pro Batch (Minuten)" type="number" min="0" step="1">
       </div>
-
-      <div class="mini" style="margin-top:6px">Inputs (pro Batch):</div>
-      <div class="input-list" data-key="inputs"></div>
-      <div class="actions">
-        <button class="addInput" type="button">+ Input</button>
-      </div>
-
-      <div class="mini" style="margin-top:6px">Ausgabe (pro Batch):</div>
-      <div class="three">
+      <div class="row">
         <input data-key="outputName" placeholder="Was wird hergestellt?">
-        <input data-key="outputQty" placeholder="Menge / Batch" type="number">
-        <input data-key="outputUnitWeight" placeholder="Gewicht / Einheit (kg)" type="number">
+        <input data-key="outputQty" placeholder="Menge / Batch" type="number" min="0" step="1">
+        <input data-key="outputUnitWeight" placeholder="Gewicht / Einheit (kg)" type="number" min="0" step="0.01">
       </div>
-
-      <div class="mini" style="margin-top:6px">Lizenz (optional):</div>
-      <div class="two">
-        <input data-key="licenseName" placeholder="Lizenzname (optional)">
-        <input data-key="licensePrice" placeholder="Preis der Lizenz (EUR)" type="number">
+      <div class="row">
+        <input data-key="licenseName" placeholder="Lizenzname">
+        <input data-key="licensePrice" placeholder="Preis Lizenz (€)" type="number" min="0" step="0.01">
       </div>
-
-      <div class="actions">
-        <button class="remove" type="button">Entfernen</button>
-      </div>
-    </div>
-  </template>
-
-  <template id="tpl-input-row">
-    <div class="input-row">
-      <input data-k="name" placeholder="Item-Name">
-      <input data-k="qty" placeholder="Menge" type="number">
-      <label style="display:flex;align-items:center;gap:6px"><input data-k="purchased" type="checkbox"> einkaufen?</label>
-      <input data-k="price" placeholder="Preis / Einheit (EUR)" type="number" title="Nur relevant, wenn 'einkaufen?' aktiv ist">
-      <button class="delInput" type="button">✕</button>
     </div>
   </template>
 
   <template id="tpl-verkauf">
     <div class="step" data-type="verkauf">
       <h3>Verkaufsort</h3>
-      <input data-key="where" placeholder="Wo wird verkauft?">
-      <div class="actions" style="margin-top:6px">
-        <button class="remove" type="button">Entfernen</button>
+      <div class="row">
+        <input data-key="where" placeholder="Wo wird verkauft?">
       </div>
     </div>
   </template>
 
-  <!-- Routen-Daten im Dokument -->
-  <!--ROUTES-START-->
-  <script id="routes-data" type="application/json">{"routes":{}}</script>
-  <!--ROUTES-END-->
-
   <script>
-  (function(){
-    // ======= Utils =======
-    function qs(sel,el){return (el||document).querySelector(sel);}
-    function qsa(sel,el){return Array.prototype.slice.call((el||document).querySelectorAll(sel));}
-    function uid(){return Math.random().toString(36).slice(2,9);}
-    var eur = new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:2});
-    var num = new Intl.NumberFormat('de-DE',{maximumFractionDigits:2});
-    function fmt(n){return num.format(n);}
-    function parseNum(v){ if(v==null) return 0; if(typeof v==='number') return v; var s=String(v).trim().replace(/\./g,'').replace(',','.'); var n=parseFloat(s); return isNaN(n)?0:n; }
-    function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
+    // ---------- Helpers ----------
+    const qs  = (sel,el=document)=>el.querySelector(sel);
+    const qsa = (sel,el=document)=>Array.from(el.querySelectorAll(sel));
 
-    // ======= Embedded Routes (in-page JSON) =======
-    function readRoutes(){ try{ var n=qs('#routes-data'); if(!n) return {routes:{}}; var j=JSON.parse(n.textContent||'{}'); return j.routes?j:{routes:{}}; }catch(e){ return {routes:{}}; } }
-    function writeRoutes(map){ var n=qs('#routes-data'); if(!n){ n=document.createElement('script'); n.id='routes-data'; n.type='application/json'; document.body.appendChild(n); } n.textContent=JSON.stringify({routes:map}); updateRouteCount(); refreshRouteSelect(null); }
-    function updateRouteCount(){ var c=Object.keys(readRoutes().routes||{}).length; var tag=qs('#routeCountTag'); if(tag) tag.textContent=c+" Routen in dieser Seite"; }
-    function downloadPage(){ var html='<!doctype html>'+document.documentElement.outerHTML; var blob=new Blob([html],{type:'text/html'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='index.html'; a.click(); URL.revokeObjectURL(a.href); }
-
-    // ======= Steps/Templates =======
-    var TPLS = {
-      abbau: function(){return qs('#tpl-abbau').content.firstElementChild.cloneNode(true);},
-      fahrzeit: function(){return qs('#tpl-fahrzeit').content.firstElementChild.cloneNode(true);},
-      verarbeitung: function(){var el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); return el;},
-      verkauf: function(){return qs('#tpl-verkauf').content.firstElementChild.cloneNode(true);}
-    };
-    function addInputRow(stepEl){
-      var row=qs('#tpl-input-row').content.firstElementChild.cloneNode(true);
-      qs('[data-key="inputs"]', stepEl).appendChild(row);
-      qs('.delInput',row).addEventListener('click', function(){ row.remove(); recalc(); });
-    }
-    function attachStepControls(stepEl){
-      var rm=qs('.remove',stepEl);
-      if(rm) rm.addEventListener('click', function(){ stepEl.remove(); recalc(); }, {once:false});
-      var addI=qs('.addInput', stepEl);
-      if(addI) addI.addEventListener('click', function(){ addInputRow(stepEl); }, {once:false});
-      stepEl.addEventListener('input', function(){ recalc(); });
-    }
     function addStep(type){
-      var el = TPLS[type](); if(!el) return null;
-      el.dataset.type=type; attachStepControls(el); qs('#steps').appendChild(el); return el;
+      const tpl = qs('#tpl-'+type);
+      if(!tpl || !tpl.content || !tpl.content.firstElementChild) return;
+      const clone = tpl.content.firstElementChild.cloneNode(true);
+      qs('#steps').appendChild(clone);
     }
 
-    // ======= Build/Load Route =======
-    var currentRouteId=null;
-    function getRoute(){
-      var steps=[];
-      qsa('#steps .step').forEach(function(step){
-        var type=step.dataset.type;
-        if(type==='abbau'){
-          steps.push({type:type,
-            what:qs('[data-key="what"]',step).value.trim(),
-            unitWeight:parseNum(qs('[data-key="unitWeight"]',step).value),
-            where:qs('[data-key="where"]',step).value.trim(),
-            time2000:parseNum(qs('[data-key="time2000"]',step).value)
-          });
-        }else if(type==='fahrzeit'){
-          steps.push({type:type,
-            start:qs('[data-key="start"]',step).value.trim(),
-            end:qs('[data-key="end"]',step).value.trim(),
-            minutes:parseNum(qs('[data-key="minutes"]',step).value)
-          });
-        }else if(type==='verarbeitung'){
-          var inputs=qsa('[data-key="inputs"] .input-row',step).map(function(row){
-            return {
-              name:qs('[data-k="name"]',row).value.trim(),
-              qty:parseNum(qs('[data-k="qty"]',row).value),
-              purchased:qs('[data-k="purchased"]',row).checked,
-              price:parseNum(qs('[data-k="price"]',row).value)
-            };
-          }).filter(function(x){return x.name && x.qty>0;});
-          steps.push({type:type,
-            where:qs('[data-key="where"]',step).value.trim(),
-            duration:parseNum(qs('[data-key="duration"]',step).value),
-            inputs:inputs,
-            outputName:qs('[data-key="outputName"]',step).value.trim(),
-            outputQty:parseNum(qs('[data-key="outputQty"]',step).value),
-            outputUnitWeight:parseNum(qs('[data-key="outputUnitWeight"]',step).value),
-            licenseName:qs('[data-key="licenseName"]',step).value.trim(),
-            licensePrice:parseNum(qs('[data-key="licensePrice"]',step).value)
-          });
-        }else if(type==='verkauf'){
-          steps.push({type:type, where:qs('[data-key="where"]',step).value.trim()});
-        }
+    function getCurrentRoute(){
+      const steps=[];
+      qsa('#steps .step').forEach(step=>{
+        const obj={type:step.dataset.type};
+        qsa('input',step).forEach(inp=>{
+          const k = (inp.dataset && inp.dataset.key) ? inp.dataset.key : null;
+          if(k) obj[k]=inp.value;
+        });
+        steps.push(obj);
       });
       return {
-        id: currentRouteId || uid(),
-        name: (function(){ var s=qs('#routeSelect'); return s && s.selectedOptions[0] ? s.selectedOptions[0].textContent : 'Unbenannt'; })(),
-        endProduct: qs('#endProduct').value.trim(),
-        baseKg: parseNum(qs('#baseKg').value),
-        backpackKg: parseNum(qs('#backpackKg').value),
-        customPrice: (function(v){var n=parseNum(v); return n>0?n:null;})(qs('#customPrice').value),
-        includeLicenses: qs('#includeLicenses').checked,
-        steps: steps
+        endProduct:qs('#endProduct').value,
+        customPrice:qs('#customPrice').value,
+        baseKg:parseFloat(qs('#baseKg').value)||2000,
+        rucksackKg:parseFloat(qs('#rucksackKg').value)||100,
+        steps
       };
     }
-    function setRoute(route){
-      currentRouteId = route.id || uid();
-      qs('#endProduct').value = route.endProduct || '';
-      qs('#baseKg').value = route.baseKg || 2000;
-      qs('#backpackKg').value = route.backpackKg || 150;
-      qs('#customPrice').value = route.customPrice!=null ? route.customPrice : '';
-      qs('#includeLicenses').checked = route.includeLicenses!==false;
-      var box=qs('#steps'); box.innerHTML='';
-      (route.steps||[]).forEach(function(s){
-        var el=addStep(s.type); if(!el) return;
-        if(s.type==='abbau'){
-          qs('[data-key="what"]',el).value=s.what||'';
-          qs('[data-key="unitWeight"]',el).value=s.unitWeight||'';
-          qs('[data-key="where"]',el).value=s.where||'';
-          qs('[data-key="time2000"]',el).value=s.time2000||'';
-        }else if(s.type==='fahrzeit'){
-          qs('[data-key="start"]',el).value=s.start||'';
-          qs('[data-key="end"]',el).value=s.end||'';
-          qs('[data-key="minutes"]',el).value=s.minutes||'';
-        }else if(s.type==='verarbeitung'){
-          qs('[data-key="where"]',el).value=s.where||'';
-          qs('[data-key="duration"]',el).value=s.duration||'';
-          var list=qs('[data-key="inputs"]',el); list.innerHTML='';
-          (s.inputs||[]).forEach(function(inp){
-            addInputRow(el);
-            var row=list.lastElementChild;
-            qs('[data-k="name"]',row).value=inp.name||'';
-            qs('[data-k="qty"]',row).value=inp.qty||'';
-            qs('[data-k="purchased"]',row).checked=!!inp.purchased;
-            qs('[data-k="price"]',row).value=inp.price||'';
-          });
-          qs('[data-key="outputName"]',el).value=s.outputName||'';
-          qs('[data-key="outputQty"]',el).value=s.outputQty||'';
-          qs('[data-key="outputUnitWeight"]',el).value=s.outputUnitWeight||'';
-          qs('[data-key="licenseName"]',el).value=s.licenseName||'';
-          qs('[data-key="licensePrice"]',el).value=s.licensePrice||'';
-        }else if(s.type==='verkauf'){
-          qs('[data-key="where"]',el).value=s.where||'';
+
+    function saveRoute(){
+      const route=getCurrentRoute();
+      const all=JSON.parse(sessionStorage.getItem('routes')||'[]');
+      all.push(route);
+      sessionStorage.setItem('routes',JSON.stringify(all));
+      refreshRouteSelect();
+    }
+
+    function refreshRouteSelect(){
+      const sel=qs('#routeSelect');
+      if(!sel) return;
+      sel.innerHTML='';
+      const all=JSON.parse(sessionStorage.getItem('routes')||'[]');
+      const opt0=document.createElement('option');
+      opt0.value=''; opt0.textContent='— Gespeicherte Routen (Sitzung) —';
+      sel.appendChild(opt0);
+      all.forEach((r,i)=>{
+        const opt=document.createElement('option');
+        opt.value=i; opt.textContent=r.endProduct||('Route '+(i+1));
+        sel.appendChild(opt);
+      });
+    }
+
+    function recalc(){
+      const route=getCurrentRoute();
+      const lkw=route.baseKg;
+      const rucksack=route.rucksackKg;
+      const ladungen=Math.ceil(lkw/rucksack);
+      let text=`LKW: ${lkw} kg, Rucksack: ${rucksack} kg → ${ladungen} Ladungen.\n`;
+
+      route.steps.forEach(s=>{
+        if(s.type==='verarbeitung'){
+          const outName=s.outputName||'Produkt';
+          const outQty=parseFloat(s.outputQty)||0;
+          const outWeight=parseFloat(s.outputUnitWeight)||0;
+          const totalUnits=outQty*ladungen;
+          const totalWeight=totalUnits*outWeight;
+          text+=`Verarbeitung: ${totalUnits}× ${outName} (${totalWeight} kg) in ${ladungen} Vorgängen.\n`;
         }
       });
+
+      qs('#summary').innerText=text;
+    }
+
+    // ---------- Init / Events ----------
+    function bindOnce(el, event, handler){
+      if(!el) return;
+      if(el.dataset && el.dataset.bound===event) return;
+      el.addEventListener(event, handler);
+      if(el.dataset) el.dataset.bound = event;
+    }
+
+    function init(){
+      // Add button (robust, nur einmal)
+      bindOnce(qs('#addBtn'),'click',()=>{
+        const type = qs('#addType')?.value || 'abbau';
+        addStep(type);
+      });
+
+      // Speichern
+      bindOnce(qs('#saveBtn'),'click',saveRoute);
+
+      // Route laden
+      bindOnce(qs('#routeSelect'),'change',e=>{
+        const all=JSON.parse(sessionStorage.getItem('routes')||'[]');
+        const r=all[e.target.value];
+        if(r){
+          qs('#endProduct').value=r.endProduct||'';
+          qs('#customPrice').value=r.customPrice||'';
+          qs('#baseKg').value=r.baseKg||2000;
+          qs('#rucksackKg').value=r.rucksackKg||100;
+          qs('#steps').innerHTML='';
+          (r.steps||[]).forEach(s=>addStep(s.type));
+          recalc();
+        }
+      });
+
+      // Recalc bei Eingaben
+      ['endProduct','customPrice','baseKg','rucksackKg'].forEach(id=>{
+        const el=qs('#'+id);
+        if(el) bindOnce(el,'input',recalc);
+      });
+
+      refreshRouteSelect();
       recalc();
     }
 
-    // ======= Calculation with Backpack & Truck =======
-    function compute(route){
-      var baseKg = route.baseKg>0 ? route.baseKg : 2000;
-      var backpackKg = route.backpackKg>0 ? route.backpackKg : 150;
-
-      var inventory = {};   // item -> units
-      var weight = {};      // item -> kg per unit
-      var miningTime=0, driveTime=0
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
