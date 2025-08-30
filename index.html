@@ -11,7 +11,8 @@
     }
     html,body{height:100%}
     body{
-      margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
+      margin:0; background:var(--bg); color:var(--text);
+      font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
       position:relative;
     }
     /* Börsen-Raster unter Inhalt */
@@ -53,11 +54,6 @@
     .sub{color:var(--soft); font-size:13px}
     .hr{height:1px; background:linear-gradient(90deg,transparent, var(--border), transparent); margin:12px 0}
     .mini{font-size:12px; color:#9bb2c9}
-
-    .kpi{display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-top:8px}
-    .kpi .box{background:#0c171f; border:1px solid var(--border); border-radius:12px; padding:10px}
-    .kpi .box .label{color:#9bb2c9; font-size:12px}
-    .kpi .box .val{font-size:18px; font-weight:700}
 
     #steps{min-height:20px}
     .step{border:1px dashed var(--border); border-radius:14px; padding:12px; margin:10px 0; position:relative; display:grid; gap:8px; background:#0f141b}
@@ -112,7 +108,7 @@
     <main class="wrap grid">
       <section class="card" id="builder">
         <h2>Route zusammenstellen</h2>
-        <div class="sub">Gib beim Verarbeitungsschritt nur das Grundrezept (Inputs je Batch) und die Dauer an. Outputmengen werden automatisch hergeleitet.</div>
+        <div class="sub">Verarbeitungszeit gilt jetzt pro <strong>Run</strong> (alle Batches, die in den Rucksack passen). Inputs haben optional einen Fundort.</div>
 
         <div class="hr"></div>
         <!-- Basisdaten -->
@@ -205,14 +201,14 @@
       </div>
       <div class="step-body two">
         <input data-key="where" placeholder="Wo wird verarbeitet?">
-        <input data-key="duration" placeholder="Dauer pro Batch (Minuten)" type="number" step="1">
+        <input data-key="duration" placeholder="Dauer pro Run (Minuten)" type="number" step="1">
       </div>
 
       <div class="mini" style="margin:4px 0">Inputs (pro Batch – Grundrezept):</div>
       <div class="input-list" data-key="inputs"></div>
       <div class="actions"><button class="addInput" type="button">+ Input</button></div>
 
-      <div class="mini" style="margin:4px 0">Outputs (Name + Gewicht/Einheit – Menge wird automatisch ermittelt, außer du trägst sie ein):</div>
+      <div class="mini" style="margin:4px 0">Outputs (Name + Gewicht/Einheit – Menge optional):</div>
       <div class="output-list" data-key="outputs"></div>
       <div class="actions"><button class="addOutput" type="button">+ Output</button></div>
 
@@ -237,9 +233,10 @@
   </template>
 
   <template id="tpl-input-row">
-    <div class="input-row" style="display:grid;grid-template-columns:2fr .8fr .8fr 1.2fr auto;gap:6px">
+    <div class="input-row" style="display:grid;grid-template-columns:1.6fr .7fr 1.2fr .8fr 1fr auto;gap:6px">
       <input data-k="name" placeholder="Item-Name">
       <input data-k="qty" placeholder="Menge / Batch" type="number" step="0.01">
+      <input data-k="source" placeholder="Fundort (optional)">
       <label style="display:flex;align-items:center;gap:6px"><input data-k="purchased" type="checkbox"> einkaufen?</label>
       <input data-k="price" placeholder="Preis / Einheit (&euro;)" type="number" step="0.01" title="Nur relevant, wenn 'einkaufen?' aktiv ist">
       <button class="delInput" type="button">✕</button>
@@ -358,6 +355,7 @@
             return {
               name: qs('[data-k="name"]',row).value.trim(),
               qty: num(qs('[data-k="qty"]',row).value),
+              source: qs('[data-k="source"]',row).value.trim(),
               purchased: qs('[data-k="purchased"]',row).checked,
               price: num(qs('[data-k="price"]',row).value)
             };
@@ -418,6 +416,7 @@
             var row=listI.lastElementChild;
             qs('[data-k="name"]',row).value=inp.name||'';
             qs('[data-k="qty"]',row).value=inp.qty||'';
+            qs('[data-k="source"]',row).value=inp.source||'';
             qs('[data-k="purchased"]',row).checked=!!inp.purchased;
             qs('[data-k="price"]',row).value=inp.price||'';
           });
@@ -466,6 +465,26 @@
       }catch(e){}
     }
 
+    // ===== Automatik-Hilfen =====
+    function deriveOutputQuantities(outputs, weights, totalInputKg){
+      // Wenn irgendeine Output-Menge explizit gesetzt ist, nimm diese und 0 für leere.
+      var anySet = outputs.some(function(o){ return num(o.qty)>0; });
+      if(anySet){
+        return outputs.map(function(o){ return Math.max(0, num(o.qty)); });
+      }
+      // Sonst automatisch: 1 Output ⇒ alles, mehrere ⇒ gleich verteilt nach Gewicht
+      var count = outputs.length;
+      if(count===1){
+        var ow = Math.max(0.0001, weights[outputs[0].name] || 1);
+        return [ Math.max(0, Math.floor(totalInputKg / ow)) ];
+      }
+      var shareKg = totalInputKg / count;
+      return outputs.map(function(o){
+        var ow = Math.max(0.0001, weights[o.name] || 1);
+        return Math.max(0, Math.floor(shareKg / ow));
+      });
+    }
+
     // ===== Berechnung =====
     function compute(route){
       var baseKg = route.lkwSize>0? route.lkwSize : 2000; // LKW-Größe
@@ -491,7 +510,7 @@
         }
       });
 
-      // Fahrten (nur bekannte Zeiten; neue werden beim Blur aufgenommen)
+      // Fahrten (nur bekannte Zeiten; neue kommen via Blur/Popup)
       var store=readStore();
       var lastPlace=null;
       route.steps.forEach(function(s){
@@ -512,12 +531,14 @@
 
         var inputs=s.inputs||[];
         var outputs=s.outputs||[];
-        if(inputs.length===0 || outputs.length===0){ log.push('Verarbeitung @'+(s.where||'?')+': Input/Output unvollständig – übersprungen.'); return; }
+        if(inputs.length===0 || outputs.length===0){
+          log.push('Verarbeitung @'+(s.where||'?')+': Input/Output unvollständig – übersprungen.'); return;
+        }
 
-        // Output-Gewichte fixieren
+        // Output-Gewichte sichern
         outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
-        var dur = Math.max(0, num(s.duration));
+        var dur = Math.max(0, num(s.duration));  // Dauer pro RUN
         var lic = Math.max(0, num(s.licensePrice)); licenseCost+=lic;
 
         var nonPurchased=inputs.filter(function(i){return !i.purchased;});
@@ -527,34 +548,14 @@
         function kgPerBatchAllInputs(){
           var sum=0;
           inputs.forEach(function(i){
-            var w = weights[i.name] || 1; // falls unbekannt, 1kg annehmen
+            var w = weights[i.name] || 1; // Default 1 kg, falls unbekannt
             sum += Math.max(0, num(i.qty)) * w;
           });
           return sum;
         }
 
-        // Hilfsfunktion: automatische Output-Mengen (falls nicht gesetzt)
-        function deriveOutputQuantities(){
-          var anySet = outputs.some(function(o){ return num(o.qty)>0; });
-          if(anySet) return outputs.map(function(o){ return Math.max(0,num(o.qty)); });
-
-          var totalInputKg = kgPerBatchAllInputs();
-          var count = outputs.length;
-          var outQ = [];
-
-          if(count===1){
-            var ow = Math.max(0.0001, weights[outputs[0].name]||1);
-            outQ[0] = Math.max(0, Math.floor(totalInputKg / ow));
-          } else {
-            // gleichmäßige Gewichtsverteilung über alle Outputs
-            var shareKg = totalInputKg / count;
-            for(var i=0;i<count;i++){
-              var ow2 = Math.max(0.0001, weights[outputs[i].name]||1);
-              outQ[i] = Math.max(0, Math.floor(shareKg / ow2));
-            }
-          }
-          return outQ;
-        }
+        // Gesamt-Input-kg (für automatische Outputmengen/Batch)
+        var totalInputKgPerBatch = kgPerBatchAllInputs();
 
         var runs=0, batchesTotal=0;
         while(true){
@@ -567,11 +568,11 @@
               var can=Math.floor(avail/need);
               return Math.min(min, can);
             }, Infinity);
-          } else { batchesByInventory=999999; }
+          } else { batchesByInventory = 999999; }
           if(batchesByInventory<=0) break;
 
           // Limit 2: Rucksackgewicht (alle Inputs)
-          var kgBatch = kgPerBatchAllInputs();
+          var kgBatch = totalInputKgPerBatch;
           var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
           if(kgBatch>0 && batchesByBackpack<=0) break;
 
@@ -588,30 +589,36 @@
             purchaseCost += need*batchesThisRun*price;
           });
 
-          // Outputs produzieren
-          var autoOut = deriveOutputQuantities(); // pro Batch
-          for(var k=0;k<outputs.length;k++){
-            var qPerBatch = autoOut[k] || 0;
-            inventory[outputs[k].name]=(inventory[outputs[k].name]||0) + qPerBatch*batchesThisRun;
-          }
+          // Outputs je Batch (automatisch, falls keine Menge angegeben)
+          var qPerBatchArr = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
+          outputs.forEach(function(o,ix){
+            var qPerBatch = Math.max(0, num(o.qty)) || qPerBatchArr[ix] || 0;
+            inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
+          });
 
-          procTime += dur*batchesThisRun;
+          // >>> Zeit pro RUN (fix) – NICHT pro Batch
+          procTime += dur;
+
           runs++; batchesTotal+=batchesThisRun;
           if(batchesThisRun<=0) break;
         }
 
         var inputsTxt = inputs.map(function(i){
           var t=fmt(num(i.qty))+'× '+i.name;
+          if(i.source) t += ' ['+i.source+']';
           if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
           return t;
         }).join(' + ');
 
-        var autoOutDbg = (function(){
-          var arr=deriveOutputQuantities();
-          return outputs.map(function(o,ix){ return fmt(arr[ix]||0)+'× '+o.name; }).join(' + ');
+        var dbgOut = (function(){
+          var auto = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
+          return outputs.map(function(o,ix){
+            var q = Math.max(0, num(o.qty)) || auto[ix] || 0;
+            return fmt(q)+'× '+o.name;
+          }).join(' + ');
         })();
 
-        log.push((runs||0)+' Runs, '+fmt(batchesTotal||0)+' Batches @'+(s.where||'?')+': '+inputsTxt+' → '+autoOutDbg+' je Batch'+(lic?(', Lizenz +'+cf.format(lic)):'')+'.');
+        log.push((runs||0)+' Runs, '+fmt(batchesTotal||0)+' Batches/Run @'+(s.where||'?')+': '+inputsTxt+' → '+dbgOut+' je Batch'+(lic?(' · Lizenz '+cf.format(lic)):'')+'. Dauer/Run: '+fmt(dur)+' min');
       });
 
       // Ergebnis
@@ -632,11 +639,11 @@
       var includeLicenses = route.includeLicenses!==false;
       var totalCost = purchaseCost + (includeLicenses? licenseCost : 0);
       var hours = totalMinutes/60;
-      var customPrice = route.customPrice;
-      var revenueAtCustom = customPrice? (customPrice*sellableUnits) : 0;
-      var hourlyProfit = customPrice? ((revenueAtCustom - totalCost)/Math.max(0.0001,hours)) : null;
-      var breakEvenPerUnit = sellableUnits>0? (totalCost/sellableUnits) : 0;
-      var suggestedPerUnit = sellableUnits>0? Math.max(breakEvenPerUnit, (500000*hours + totalCost)/sellableUnits) : 0;
+      var customPrice = num(route.customPrice);
+      var revenueAtCustom = customPrice>0 ? (customPrice*sellableUnits) : 0;
+      var hourlyProfit = customPrice>0 ? ((revenueAtCustom - totalCost)/Math.max(0.0001,hours)) : null;
+      var breakEvenPerUnit = sellableUnits>0 ? (totalCost/sellableUnits) : 0;
+      var suggestedPerUnit = sellableUnits>0 ? Math.max(breakEvenPerUnit, (500000*hours + totalCost)/sellableUnits) : 0;
 
       return {
         miningTime:miningTime, driveTime:driveTime, procTime:procTime, totalMinutes:totalMinutes,
@@ -655,8 +662,8 @@
       var box=qs('#summary'); box.innerHTML='';
       function row(label, value){
         var r=document.createElement('div'); r.className='row';
-        r.style.display='grid'; r.style.gridTemplateColumns='1fr auto';
-        r.style.gap='8px'; r.style.padding='6px 0'; r.style.borderBottom='1px solid var(--border)';
+        r.style.display='grid'; r.style.gridTemplateColumns='1fr auto'; r.style.gap='8px';
+        r.style.padding='6px 0'; r.style.borderBottom='1px solid var(--border)';
         r.innerHTML = '<span>'+label+'</span><strong>'+value+'</strong>'; box.appendChild(r);
       }
       row('Mining', minutesToH(calc.miningTime)+' ('+fmt(calc.miningTime)+' min)');
@@ -724,7 +731,7 @@
         var data=readStore(); var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='routen.json'; a.click(); URL.revokeObjectURL(a.href);
       });
-      qs('#importFile')?.addEventListener('change', function(e){
+      qs('#importFile']?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
         rd.onload=function(){
@@ -756,16 +763,16 @@
           steps: [
             {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', timeLkw: 180},
             {type:'verarbeitung', where:'Ingenieurbüro', duration: 8,
-              inputs:[{name:'Rohes Bauxit', qty:10, purchased:false}],
+              inputs:[{name:'Rohes Bauxit', qty:10, source:'Bauxitmine', purchased:false}],
               outputs:[{name:'Feingemahlenes Bauxitpulver', unitWeight:3}]},
             {type:'verarbeitung', where:'Ingenieurbüro', duration: 12,
-              inputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, purchased:false},{name:'Schwefelsäure', qty:3, purchased:true, price:85}],
+              inputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, source:'Ingenieurbüro', purchased:false},{name:'Schwefelsäure', qty:3, source:'Chemiewerk', purchased:true, price:85}],
               outputs:[{name:'Verunreinigtes Aluminiumoxid', unitWeight:2}]},
             {type:'verarbeitung', where:'Metallschmelze', duration: 15,
-              inputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, purchased:false},{name:'Schlacke', qty:1, purchased:true, price:0}],
+              inputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, source:'Ingenieurbüro', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
               outputs:[{name:'Unreiner Aluminiumschrott', unitWeight:2}]},
             {type:'verarbeitung', where:'Metallschmelze', duration: 10,
-              inputs:[{name:'Unreiner Aluminiumschrott', qty:4, purchased:false},{name:'Schlacke', qty:1, purchased:true, price:0}],
+              inputs:[{name:'Unreiner Aluminiumschrott', qty:4, source:'Metallschmelze', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
               outputs:[{name:'Aluminiumbarren', unitWeight:1}],
               licenseName:'Schmelz-Lizenz', licensePrice:10000},
             {type:'verkauf', where:'Großhändler'}
