@@ -5,238 +5,678 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Farmrouten-Preisrechner</title>
   <style>
-    body{background:#0b0f14;color:#e6f0ff;font-family:system-ui,sans-serif;margin:0;padding:0}
-    header{background:#0f141b;padding:10px;position:sticky;top:0;z-index:10}
-    h1{margin:0;font-size:18px}
-    .wrap{max-width:1100px;margin:auto;padding:10px}
-    .card{background:#161c24;border:1px solid #1f2a36;border-radius:12px;padding:16px;margin-bottom:16px}
-    input,select,button{background:#0f141b;border:1px solid #1f2a36;border-radius:8px;padding:8px;color:#e6f0ff}
-    button{cursor:pointer}
-    .step{border:1px dashed #1f2a36;border-radius:12px;padding:10px;margin:10px 0}
-    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .row label{display:flex;gap:6px;align-items:center}
+    :root{
+      --bg:#0b0f14; --panel:#0f141b; --muted:#161c24; --text:#e6f0ff; --soft:#b7c2d0;
+      --green:#00e676; --red:#ff4d4f; --accent:#1aff95; --grid:#0d2a1f; --border:#1f2a36; --yellow:#ffd666;
+    }
+    html,body{height:100%}
+    body{
+      margin:0; background:
+        radial-gradient(1200px 1200px at 100% 0%,rgba(0,230,118,.06),transparent 40%),
+        radial-gradient(1200px 1200px at 0% 100%,rgba(0,230,118,.06),transparent 40%),
+        var(--bg);
+      color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
+    }
+    body:before{content:""; position:fixed; inset:0; pointer-events:none; background:
+      linear-gradient(var(--grid) 1px,transparent 1px) 0 0/ 100% 24px,
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/ 24px 100%; opacity:.4;}
+    header{position:sticky; top:0; z-index:50; backdrop-filter: blur(8px);
+      background:linear-gradient(180deg,rgba(11,15,20,.9),rgba(11,15,20,.65));
+      border-bottom:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,.25);}
+    .wrap{max-width:1200px; margin:0 auto; padding:16px;}
+    .brand{display:flex; align-items:center; gap:12px;}
+    .logo{width:28px; height:28px; border-radius:8px; background:conic-gradient(from 180deg,var(--green),#0ff,var(--green)); box-shadow:0 0 0 3px rgba(0,230,118,.15);}
+    h1{font-size:18px; margin:0; letter-spacing:.3px}
+    .toolbar{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; margin-top:10px;}
+    .menu{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+    select, input, button, textarea{background:var(--muted); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font:inherit; outline:none}
+    input[type="number"]{width:140px}
+    input::placeholder, textarea::placeholder{color:#88a0b7}
+    button{cursor:pointer; transition:.2s transform ease, .2s background ease;}
+    button:hover{transform:translateY(-1px)}
+    .primary{background:linear-gradient(180deg,var(--green),#09c966); color:#00160a; font-weight:700; border:none}
+    .danger{background:linear-gradient(180deg,#ff7676,#ff4d4f); color:#2b0004; font-weight:700; border:none}
+    .ghost{background:transparent; border:1px dashed var(--border)}
+    .grid{display:grid; grid-template-columns: 1.2fr .8fr; gap:16px; margin-top:16px}
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
+    .card h2{margin:0 0 6px; font-size:16px}
+    .sub{color:var(--soft); font-size:13px}
+
+    .step{border:1px dashed var(--border); border-radius:14px; padding:12px; margin:10px 0; position:relative; display:grid; gap:8px}
+    .step .bar{display:flex; align-items:center; gap:8px; justify-content:space-between}
+    .handle{cursor:grab; user-select:none; padding:6px 8px; border-radius:8px; background:#0e171f; border:1px solid var(--border); font-size:12px}
+    .handle:active{cursor:grabbing}
+    .step[draggable="true"]{opacity:1}
+    .step.dragging{opacity:.6; outline:2px dashed var(--accent)}
+    .drop-indicator{height:0; border-top:2px solid var(--accent); margin:6px 0; opacity:.8}
+
+    .step-body{display:grid; gap:8px}
+    .two{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+    .three{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
+    .actions{display:flex; gap:8px; flex-wrap:wrap}
+    .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f}
+    .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
+    .tag.yellow{border-color:#5a4; background:#2b2410}
+
+    .ticker{display:block; white-space:nowrap; overflow:hidden; mask-image:linear-gradient(90deg,transparent,rgba(0,0,0,1) 8%, rgba(0,0,0,1) 92%, transparent)}
+    .ticker-inner{display:inline-block; animation:ticker 30s linear infinite}
+    @keyframes ticker{from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+    .summary{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:13px}
+    .summary .row{display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px solid var(--border)}
+    .summary .row:last-child{border-bottom:none}
+
+    details{border:1px solid var(--border); border-radius:12px; padding:10px; background:#0d141b}
+    details>summary{cursor:pointer}
+
+    .kpi{display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-top:8px}
+    .kpi .box{background:#0c171f; border:1px solid var(--border); border-radius:12px; padding:10px}
+    .kpi .box .label{color:#9bb2c9; font-size:12px}
+    .kpi .box .val{font-size:18px; font-weight:700}
+
+    .hr{height:1px; background:linear-gradient(90deg,transparent, var(--border), transparent); margin:12px 0}
+    .mini{font-size:12px; color:#9bb2c9}
+
+    .input-list .input-row{display:grid; grid-template-columns:2fr .8fr .8fr 1.2fr auto; gap:6px; margin:6px 0}
+    .input-list .input-row input[type="checkbox"]{transform:translateY(2px)}
+
+    .hidden{display:none}
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
-      <h1>Farmrouten-Preisrechner</h1>
-      <div class="row">
-        <select id="routeSelect" title="In dieser Sitzung gespeicherte Routen"></select>
-        <button id="saveBtn" type="button">Aktuelle Route speichern</button>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <h1>Farmrouten-Preisrechner</h1>
+        <span class="tag green" title="Alle Daten bleiben in dieser Datei">In-Page Speicher</span>
+      </div>
+
+      <div class="toolbar">
+        <div class="menu">
+          <select id="routeSelect" title="Gespeicherte Routen (in dieser Seite)"></select>
+          <button id="saveBtn">Route speichern</button>
+          <button id="deleteBtn" class="danger">Löschen</button>
+          <button id="downloadPageBtn" class="primary" title="Neue HTML mit eingebetteten Routen herunterladen">Seite mit Routen herunterladen</button>
+        </div>
+        <div class="menu">
+          <button id="exportBtn">Export</button>
+          <label for="importFile" class="ghost" style="padding:10px 12px; cursor:pointer">Import<input id="importFile" type="file" accept="application/json" class="hidden"></label>
+          <button id="demoBtn">Demo laden</button>
+        </div>
+      </div>
+
+      <div class="ticker" aria-hidden="true">
+        <div class="ticker-inner">
+          <span class="tag">Drag & Drop: Ziehe die Griffe ▤, um Schritte zu sortieren.</span>
+          <span class="tag">Fahrzeiten werden automatisch eingefügt, wenn Orte nicht übereinstimmen.</span>
+          <span class="tag">Vorschlagspreis begrenzt den Stundengewinn ≤ 500 000 €.</span>
+        </div>
       </div>
     </div>
   </header>
 
-  <main class="wrap">
+  <main class="wrap grid">
     <section class="card" id="builder">
       <h2>Route zusammenstellen</h2>
+      <div class="sub">Lege Basisdaten und Schritte fest. Verarbeitung nutzt LKW-/Rucksack-Limit; Fahrzeiten werden automatisch erfragt.</div>
 
-      <div class="row" style="margin-bottom:10px">
-        <label>Endprodukt:
+      <div class="hr"></div>
+      <!-- Basisdaten -->
+      <div class="two">
+        <label>Endprodukt<br/>
           <input id="endProduct" type="text" placeholder="z. B. Aluminiumbarren">
         </label>
-        <label>Eigener Preis (€ / Einheit):
-          <input id="customPrice" type="number" step="0.01" placeholder="optional">
+        <label>Eigener Preis (€/Einheit)<br/>
+          <input id="customPrice" type="text" placeholder="optional">
         </label>
-        <label>LKW-Größe (kg):
-          <input id="baseKg" type="number" value="2000" min="1" step="1">
+        <label>LKW-Größe (kg)<br/>
+          <input id="lkwSize" type="number" min="1" step="1" value="2000">
         </label>
-        <label>Rucksack-Größe (kg):
-          <input id="rucksackKg" type="number" value="100" min="1" step="1">
+        <label>Rucksack-Größe (kg)<br/>
+          <input id="backpackKg" type="number" min="1" step="1" value="150">
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; margin-top:8px">
+          <input id="includeLicenses" type="checkbox" checked> Lizenzkosten einrechnen
         </label>
       </div>
+      <div class="hr"></div>
 
       <div id="steps"></div>
 
-      <div class="row">
+      <div class="actions">
         <select id="addType">
           <option value="abbau">➕ Abbau</option>
-          <option value="fahrzeit">➕ Fahrzeit</option>
           <option value="verarbeitung">➕ Verarbeitung</option>
           <option value="verkauf">➕ Verkaufsort</option>
         </select>
         <button id="addBtn" type="button">Schritt hinzufügen</button>
       </div>
+      <div class="mini">Hinweis: Gewichte der Zwischenprodukte bitte in „Verarbeitung“ (Gewicht/Einheit) pflegen, damit die Rucksack-Logik korrekt greift.</div>
     </section>
 
-    <section class="card">
-      <h2>Ergebnis</h2>
-      <div id="summary">Noch keine Berechnung.</div>
-    </section>
+    <aside class="card">
+      <h2>Ergebnis & Struktur</h2>
+      <div class="kpi">
+        <div class="box"><div class="label">Gesamtdauer</div><div id="kpiTime" class="val">–</div></div>
+        <div class="box"><div class="label">Gesamtkosten</div><div id="kpiCost" class="val">–</div></div>
+        <div class="box"><div class="label">Ausbeute</div><div id="kpiYield" class="val">–</div></div>
+      </div>
+      <div class="hr"></div>
+
+      <div class="summary" id="summary"></div>
+
+      <div class="hr"></div>
+      <details>
+        <summary>Preis & Gewinn</summary>
+        <div style="margin-top:8px">
+          <div class="row"><span>Endprodukt</span> <strong id="sumEndProduct">–</strong></div>
+          <div class="row"><span>Einheiten (verkaufbar)</span> <strong id="sumUnits">–</strong></div>
+          <div class="row"><span>Break-even (€/Einheit)</span> <strong id="sumBreakeven">–</strong></div>
+          <div class="row"><span>Vorschlag (≤ 500 000 €/h)</span> <strong id="sumSuggested">–</strong></div>
+          <div class="row"><span>Stundengewinn (eigener Preis)</span> <strong id="sumHourly">–</strong></div>
+        </div>
+      </details>
+    </aside>
   </main>
 
   <!-- Schritt-Vorlagen -->
   <template id="tpl-abbau">
-    <div class="step" data-type="abbau">
-      <h3>Abbau</h3>
-      <div class="row">
-        <input data-key="what" placeholder="Was wird abgebaut?">
-        <input data-key="unitWeight" placeholder="Gewicht pro Einheit (kg)" type="number" min="0" step="0.01">
-        <input data-key="where" placeholder="Wo wird abgebaut?">
-        <input data-key="time2000" placeholder="Zeit für 2000kg (Minuten)" type="number" min="0" step="1">
+    <div class="step" data-type="abbau" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag green">Abbau</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
       </div>
-    </div>
-  </template>
-
-  <template id="tpl-fahrzeit">
-    <div class="step" data-type="fahrzeit">
-      <h3>Fahrzeit</h3>
-      <div class="row">
-        <input data-key="start" placeholder="Startpunkt">
-        <input data-key="end" placeholder="Endpunkt">
-        <input data-key="minutes" placeholder="Fahrzeit (Minuten)" type="number" min="0" step="1">
+      <div class="step-body three">
+        <input data-key="what" placeholder="Was wird abgebaut? (z. B. Rohes Bauxit)">
+        <input data-key="unitWeight" placeholder="Gewicht pro Einheit (kg)" type="number" step="0.01">
+        <input data-key="where" placeholder="Abbauort">
+      </div>
+      <div class="step-body">
+        <input data-key="time2000" placeholder="Zeit für 2000 kg (Minuten)" type="number" step="1">
       </div>
     </div>
   </template>
 
   <template id="tpl-verarbeitung">
-    <div class="step" data-type="verarbeitung">
-      <h3>Verarbeitung</h3>
-      <div class="row">
+    <div class="step" data-type="verarbeitung" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag yellow">Verarbeitung</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body two">
         <input data-key="where" placeholder="Wo wird verarbeitet?">
-        <input data-key="duration" placeholder="Dauer pro Batch (Minuten)" type="number" min="0" step="1">
+        <input data-key="duration" placeholder="Dauer pro Batch (Minuten)" type="number" step="1">
       </div>
-      <div class="row">
+
+      <div class="mini" style="margin:4px 0">Inputs (pro Batch):</div>
+      <div class="input-list" data-key="inputs"></div>
+      <div class="actions"><button class="addInput" type="button">+ Input</button></div>
+
+      <div class="mini" style="margin:4px 0">Ausgabe (pro Batch):</div>
+      <div class="step-body three">
         <input data-key="outputName" placeholder="Was wird hergestellt?">
-        <input data-key="outputQty" placeholder="Menge / Batch" type="number" min="0" step="1">
-        <input data-key="outputUnitWeight" placeholder="Gewicht / Einheit (kg)" type="number" min="0" step="0.01">
+        <input data-key="outputQty" placeholder="Menge / Batch" type="number" step="1">
+        <input data-key="outputUnitWeight" placeholder="Gewicht / Einheit (kg)" type="number" step="0.01">
       </div>
-      <div class="row">
-        <input data-key="licenseName" placeholder="Lizenzname">
-        <input data-key="licensePrice" placeholder="Preis Lizenz (€)" type="number" min="0" step="0.01">
+
+      <div class="mini" style="margin:4px 0">Lizenz (optional):</div>
+      <div class="step-body two">
+        <input data-key="licenseName" placeholder="Lizenzname (optional)">
+        <input data-key="licensePrice" placeholder="Preis der Lizenz (€)" type="number" step="0.01">
       </div>
     </div>
   </template>
 
   <template id="tpl-verkauf">
-    <div class="step" data-type="verkauf">
-      <h3>Verkaufsort</h3>
-      <div class="row">
+    <div class="step" data-type="verkauf" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Verkaufsort</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body">
         <input data-key="where" placeholder="Wo wird verkauft?">
       </div>
     </div>
   </template>
 
+  <template id="tpl-input-row">
+    <div class="input-row">
+      <input data-k="name" placeholder="Item-Name">
+      <input data-k="qty" placeholder="Menge" type="number" step="0.01">
+      <label style="display:flex; align-items:center; gap:6px"><input data-k="purchased" type="checkbox"> einkaufen?</label>
+      <input data-k="price" placeholder="Preis / Einheit (€)" type="number" step="0.01" title="Nur relevant, wenn 'einkaufen?' aktiv ist">
+      <button class="delInput" type="button">✕</button>
+    </div>
+  </template>
+
+  <!-- In-Page Speicher (Routen + bekannte Fahrzeiten) -->
+  <!--ROUTES-START-->
+  <script id="routes-data" type="application/json">{"routes":{},"travelTimes":{}}</script>
+  <!--ROUTES-END-->
+
   <script>
-    // ---------- Helpers ----------
-    const qs  = (sel,el=document)=>el.querySelector(sel);
-    const qsa = (sel,el=document)=>Array.from(el.querySelectorAll(sel));
+  (function(){
+    // ===== Utils =====
+    const qs=(s,e=document)=>e.querySelector(s);
+    const qsa=(s,e=document)=>Array.from(e.querySelectorAll(s));
+    const uid=()=>Math.random().toString(36).slice(2,9);
+    const € = new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:2});
+    const nf = new Intl.NumberFormat('de-DE',{maximumFractionDigits:2});
+    const fmt=(n)=>nf.format(n);
+    const num=(v)=>{ if(v==null) return 0; if(typeof v==='number') return v; const s=String(v).trim().replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:n; };
+    const minutesToH=(m)=>{const h=Math.floor(m/60),min=Math.round(m%60);return h<=0?min+" min":h+" h "+min+" min";};
 
-    function addStep(type){
-      const tpl = qs('#tpl-'+type);
-      if(!tpl || !tpl.content || !tpl.content.firstElementChild) return;
-      const clone = tpl.content.firstElementChild.cloneNode(true);
-      qs('#steps').appendChild(clone);
+    // ===== In-Page Speicher =====
+    function readStore(){ try{ const n=qs('#routes-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{}}; } catch{ return {routes:{},travelTimes:{}}; } }
+    function writeStore(store){ const n=qs('#routes-data'); n.textContent = JSON.stringify(store); refreshRouteSelect(); }
+    function downloadPage(){ const html='<!doctype html>'+document.documentElement.outerHTML; const blob=new Blob([html],{type:'text/html'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='index.html'; a.click(); URL.revokeObjectURL(a.href); }
+
+    // ===== Templates / Steps =====
+    const TPLS={
+      abbau: ()=>qs('#tpl-abbau').content.firstElementChild.cloneNode(true),
+      verarbeitung: ()=>{const el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); return el;},
+      verkauf: ()=>qs('#tpl-verkauf').content.firstElementChild.cloneNode(true)
+    };
+    function addInputRow(stepEl){
+      const row=qs('#tpl-input-row').content.firstElementChild.cloneNode(true);
+      qs('[data-key="inputs"]', stepEl).appendChild(row);
+      qs('.delInput',row).addEventListener('click',()=>{ row.remove(); recalc(); });
     }
+    function attachStepControls(stepEl){
+      // Remove
+      qs('.remove',stepEl)?.addEventListener('click',()=>{ stepEl.remove(); recalc(); });
+      // Add input
+      qs('.addInput',stepEl)?.addEventListener('click',()=> addInputRow(stepEl));
+      // Recalc on input
+      stepEl.addEventListener('input', ()=> recalc());
+      // Drag
+      const handle=qs('.handle',stepEl);
+      stepEl.addEventListener('dragstart',(e)=>{ stepEl.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','drag'); });
+      stepEl.addEventListener('dragend',()=> stepEl.classList.remove('dragging'));
+      handle?.addEventListener('mousedown',()=> stepEl.setAttribute('draggable','true'));
+      handle?.addEventListener('mouseup',()=> stepEl.setAttribute('draggable','true'));
+    }
+    function addStep(type){
+      const el=TPLS[type]?.(); if(!el) return null;
+      el.dataset.type=type; attachStepControls(el); qs('#steps').appendChild(el); return el;
+    }
+    // Container DnD (HTML5)
+    (function setupDnD(){
+      const list=()=>qs('#steps');
+      function getDragAfterElement(container, y){
+        const els=[...container.querySelectorAll('.step:not(.dragging)')];
+        return els.reduce((closest, child)=>{
+          const box=child.getBoundingClientRect();
+          const offset=y - box.top - box.height/2;
+          if(offset<0 && offset>closest.offset){ return {offset, element:child}; } else { return closest; }
+        }, {offset:Number.NEGATIVE_INFINITY}).element;
+      }
+      document.addEventListener('dragover',(e)=>{
+        if(!qs('.step.dragging')) return;
+        e.preventDefault();
+        const container=list();
+        const after=getDragAfterElement(container, e.clientY);
+        const dragging=qs('.step.dragging');
+        if(after==null){ container.appendChild(dragging); }
+        else{ container.insertBefore(dragging, after); }
+      });
+    })();
 
-    function getCurrentRoute(){
+    // ===== Route Build/Load =====
+    let currentRouteId=null;
+    function getRoute(){
       const steps=[];
       qsa('#steps .step').forEach(step=>{
-        const obj={type:step.dataset.type};
-        qsa('input',step).forEach(inp=>{
-          const k = (inp.dataset && inp.dataset.key) ? inp.dataset.key : null;
-          if(k) obj[k]=inp.value;
-        });
-        steps.push(obj);
+        const type=step.dataset.type;
+        if(type==='abbau'){
+          steps.push({type,
+            what: qs('[data-key="what"]',step).value.trim(),
+            unitWeight: num(qs('[data-key="unitWeight"]',step).value),
+            where: qs('[data-key="where"]',step).value.trim(),
+            time2000: num(qs('[data-key="time2000"]',step).value)
+          });
+        } else if(type==='verarbeitung'){
+          const inputs=qsa('[data-key="inputs"] .input-row',step).map(row=>({
+            name: qs('[data-k="name"]',row).value.trim(),
+            qty: num(qs('[data-k="qty"]',row).value),
+            purchased: qs('[data-k="purchased"]',row).checked,
+            price: num(qs('[data-k="price"]',row).value)
+          })).filter(i=>i.name && i.qty>0);
+          steps.push({type,
+            where: qs('[data-key="where"]',step).value.trim(),
+            duration: num(qs('[data-key="duration"]',step).value),
+            inputs,
+            outputName: qs('[data-key="outputName"]',step).value.trim(),
+            outputQty: num(qs('[data-key="outputQty"]',step).value),
+            outputUnitWeight: num(qs('[data-key="outputUnitWeight"]',step).value),
+            licenseName: qs('[data-key="licenseName"]',step).value.trim(),
+            licensePrice: num(qs('[data-key="licensePrice"]',step).value)
+          });
+        } else if(type==='verkauf'){
+          steps.push({type, where: qs('[data-key="where"]',step).value.trim()});
+        }
       });
+      const store=readStore();
       return {
-        endProduct:qs('#endProduct').value,
-        customPrice:qs('#customPrice').value,
-        baseKg:parseFloat(qs('#baseKg').value)||2000,
-        rucksackKg:parseFloat(qs('#rucksackKg').value)||100,
-        steps
+        id: currentRouteId || uid(),
+        name: (qs('#routeSelect')?.selectedOptions[0]?.textContent) || 'Unbenannt',
+        endProduct: qs('#endProduct').value.trim(),
+        lkwSize: Math.max(1, num(qs('#lkwSize').value)||2000),
+        backpackKg: Math.max(1, num(qs('#backpackKg').value)||150),
+        customPrice: (v=>{const n=num(v); return n>0?n:null;})(qs('#customPrice').value),
+        includeLicenses: qs('#includeLicenses').checked,
+        steps,
+        travelTimes: store.travelTimes || {} // referenzieren, damit bekannte Zeiten genutzt werden
       };
     }
-
-    function saveRoute(){
-      const route=getCurrentRoute();
-      const all=JSON.parse(sessionStorage.getItem('routes')||'[]');
-      all.push(route);
-      sessionStorage.setItem('routes',JSON.stringify(all));
-      refreshRouteSelect();
-    }
-
-    function refreshRouteSelect(){
-      const sel=qs('#routeSelect');
-      if(!sel) return;
-      sel.innerHTML='';
-      const all=JSON.parse(sessionStorage.getItem('routes')||'[]');
-      const opt0=document.createElement('option');
-      opt0.value=''; opt0.textContent='— Gespeicherte Routen (Sitzung) —';
-      sel.appendChild(opt0);
-      all.forEach((r,i)=>{
-        const opt=document.createElement('option');
-        opt.value=i; opt.textContent=r.endProduct||('Route '+(i+1));
-        sel.appendChild(opt);
-      });
-    }
-
-    function recalc(){
-      const route=getCurrentRoute();
-      const lkw=route.baseKg;
-      const rucksack=route.rucksackKg;
-      const ladungen=Math.ceil(lkw/rucksack);
-      let text=`LKW: ${lkw} kg, Rucksack: ${rucksack} kg → ${ladungen} Ladungen.\n`;
-
-      route.steps.forEach(s=>{
-        if(s.type==='verarbeitung'){
-          const outName=s.outputName||'Produkt';
-          const outQty=parseFloat(s.outputQty)||0;
-          const outWeight=parseFloat(s.outputUnitWeight)||0;
-          const totalUnits=outQty*ladungen;
-          const totalWeight=totalUnits*outWeight;
-          text+=`Verarbeitung: ${totalUnits}× ${outName} (${totalWeight} kg) in ${ladungen} Vorgängen.\n`;
+    function setRoute(route){
+      currentRouteId = route.id || uid();
+      qs('#endProduct').value = route.endProduct || '';
+      qs('#lkwSize').value = route.lkwSize || 2000;
+      qs('#backpackKg').value = route.backpackKg || 150;
+      qs('#customPrice').value = route.customPrice ?? '';
+      qs('#includeLicenses').checked = route.includeLicenses!==false;
+      const box=qs('#steps'); box.innerHTML='';
+      (route.steps||[]).forEach(s=>{
+        const el=addStep(s.type); if(!el) return;
+        if(s.type==='abbau'){
+          qs('[data-key="what"]',el).value=s.what||'';
+          qs('[data-key="unitWeight"]',el).value=s.unitWeight||'';
+          qs('[data-key="where"]',el).value=s.where||'';
+          qs('[data-key="time2000"]',el).value=s.time2000||'';
+        } else if(s.type==='verarbeitung'){
+          qs('[data-key="where"]',el).value=s.where||'';
+          qs('[data-key="duration"]',el).value=s.duration||'';
+          const list=qs('[data-key="inputs"]',el); list.innerHTML='';
+          (s.inputs||[]).forEach(inp=>{
+            addInputRow(el);
+            const row=list.lastElementChild;
+            qs('[data-k="name"]',row).value=inp.name||'';
+            qs('[data-k="qty"]',row).value=inp.qty||'';
+            qs('[data-k="purchased"]',row).checked=!!inp.purchased;
+            qs('[data-k="price"]',row).value=inp.price||'';
+          });
+          qs('[data-key="outputName"]',el).value=s.outputName||'';
+          qs('[data-key="outputQty"]',el).value=s.outputQty||'';
+          qs('[data-key="outputUnitWeight"]',el).value=s.outputUnitWeight||'';
+          qs('[data-key="licenseName"]',el).value=s.licenseName||'';
+          qs('[data-key="licensePrice"]',el).value=s.licensePrice||'';
+        } else if(s.type==='verkauf'){
+          qs('[data-key="where"]',el).value=s.where||'';
         }
       });
-
-      qs('#summary').innerText=text;
-    }
-
-    // ---------- Init / Events ----------
-    function bindOnce(el, event, handler){
-      if(!el) return;
-      if(el.dataset && el.dataset.bound===event) return;
-      el.addEventListener(event, handler);
-      if(el.dataset) el.dataset.bound = event;
-    }
-
-    function init(){
-      // Add button (robust, nur einmal)
-      bindOnce(qs('#addBtn'),'click',()=>{
-        const type = qs('#addType')?.value || 'abbau';
-        addStep(type);
-      });
-
-      // Speichern
-      bindOnce(qs('#saveBtn'),'click',saveRoute);
-
-      // Route laden
-      bindOnce(qs('#routeSelect'),'change',e=>{
-        const all=JSON.parse(sessionStorage.getItem('routes')||'[]');
-        const r=all[e.target.value];
-        if(r){
-          qs('#endProduct').value=r.endProduct||'';
-          qs('#customPrice').value=r.customPrice||'';
-          qs('#baseKg').value=r.baseKg||2000;
-          qs('#rucksackKg').value=r.rucksackKg||100;
-          qs('#steps').innerHTML='';
-          (r.steps||[]).forEach(s=>addStep(s.type));
-          recalc();
-        }
-      });
-
-      // Recalc bei Eingaben
-      ['endProduct','customPrice','baseKg','rucksackKg'].forEach(id=>{
-        const el=qs('#'+id);
-        if(el) bindOnce(el,'input',recalc);
-      });
-
-      refreshRouteSelect();
       recalc();
     }
 
-    document.addEventListener('DOMContentLoaded', init);
+    // ===== Auto-Fahrzeiten =====
+    function getTravelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
+    function ensureTravelMinutes(store, from, to){
+      if(!from || !to || from===to) return 0;
+      const key=getTravelKey(from,to);
+      if(store.travelTimes[key]==null){
+        const ans = prompt(`Fahrzeit von "${from}" nach "${to}" (Minuten)?`, "10");
+        const m = Math.max(0, num(ans));
+        store.travelTimes[key]=m;
+        writeStore(store); // persistieren
+      }
+      return Math.max(0, num(store.travelTimes[key]));
+    }
+
+    // ===== Compute =====
+    function compute(route){
+      const baseKg = route.lkwSize>0? route.lkwSize : 2000;
+      const backpackKg = route.backpackKg>0? route.backpackKg : 150;
+
+      const inventory={}; // item -> units
+      const weights={};   // item -> kg per unit
+      let miningTime=0, driveTime=0, procTime=0;
+      let purchaseCost=0, licenseCost=0;
+      const log=[];
+
+      // Abbau: Einheiten aus LKW-kg (perUnit Gewicht)
+      route.steps.forEach((s,idx)=>{
+        if(s.type==='abbau'){
+          const perUnit=Math.max(0, num(s.unitWeight));
+          const units = perUnit>0? Math.floor(baseKg / perUnit) : 0;
+          const what = s.what || `Rohstoff_${idx+1}`;
+          inventory[what]=(inventory[what]||0)+units;
+          if(perUnit>0) weights[what]=perUnit;
+          // Zeit proportional zur LKW-Menge (Feld ist „Zeit für 2000kg“)
+          const t2000=Math.max(0, num(s.time2000));
+          const t = t2000 * (baseKg/2000);
+          miningTime += t;
+          log.push(`Abbau ${what} @${s.where||'?'}: ${fmt(units)} Einheiten (à ${perUnit||1} kg). Zeit +${fmt(t)} min.`);
+        }
+      });
+
+      // Auto-Fahrten zwischen Orten
+      const store=readStore();
+      let lastPlace=null;
+      route.steps.forEach((s)=>{
+        // Ort eines Schritts
+        const place = (s.type==='abbau' || s.type==='verkauf') ? (s.where||'') :
+                      (s.type==='verarbeitung' ? (s.where||'') : '');
+        if(place){
+          if(lastPlace && lastPlace!==place){
+            const min = ensureTravelMinutes(store, lastPlace, place);
+            driveTime += min;
+            log.push(`Fahrt ${lastPlace} → ${place}: +${fmt(min)} min.`);
+          }
+          lastPlace = place;
+        }
+      });
+
+      // Verarbeitung (mit Rucksack-Runs)
+      route.steps.forEach((s,idx)=>{
+        if(s.type!=='verarbeitung') return;
+
+        const inputs=s.inputs||[];
+        const nonPurchased=inputs.filter(i=>!i.purchased);
+        const purchased=inputs.filter(i=>i.purchased);
+        if(inputs.length===0){
+          log.push(`Verarbeitung @${s.where||'?'}: Kein Input – übersprungen.`);
+          return;
+        }
+        const outName = s.outputName || `Produkt_${idx+1}`;
+        const outQty = Math.max(0, num(s.outputQty));
+        const outW = Math.max(0, num(s.outputUnitWeight)) || weights[outName] || 1;
+        weights[outName]=outW;
+
+        const dur = Math.max(0, num(s.duration));
+        const lic = Math.max(0, num(s.licensePrice)); licenseCost+=lic;
+
+        const kgPerBatch = nonPurchased.reduce((sum,i)=> sum + (Math.max(0,num(i.qty)) * (weights[i.name]||1)), 0);
+
+        let runs=0, batchesTotal=0;
+        while(true){
+          let batchesByInventory = Infinity;
+          if(nonPurchased.length>0){
+            batchesByInventory = nonPurchased.reduce((min,i)=>{
+              const avail=inventory[i.name]||0;
+              const need=Math.max(1, num(i.qty));
+              const can=Math.floor(avail/need);
+              return Math.min(min, can);
+            }, Infinity);
+          } else {
+            batchesByInventory = 999999;
+          }
+          if(batchesByInventory<=0) break;
+
+          const batchesByBackpack = kgPerBatch>0 ? Math.max(0, Math.floor(backpackKg / kgPerBatch)) : batchesByInventory;
+          if(kgPerBatch>0 && batchesByBackpack<=0) break;
+
+          const batchesThisRun = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
+          // Abziehen
+          nonPurchased.forEach(i=>{
+            const need=Math.max(0,num(i.qty));
+            inventory[i.name]=(inventory[i.name]||0)-need*batchesThisRun;
+          });
+          purchased.forEach(i=>{
+            const need=Math.max(0,num(i.qty));
+            const price=Math.max(0,num(i.price));
+            purchaseCost += need*batchesThisRun*price;
+          });
+          // Output
+          inventory[outName]=(inventory[outName]||0) + outQty*batchesThisRun;
+          procTime += dur*batchesThisRun;
+
+          runs++; batchesTotal+=batchesThisRun;
+          if(batchesThisRun<=0) break;
+        }
+
+        const inputsTxt = inputs.map(i=>{
+          let t = `${fmt(num(i.qty))}× ${i.name}`;
+          if(i.purchased) t += ` (gekauft ${€.format(num(i.price))})`;
+          return t;
+        }).join(' + ');
+        log.push(`${runs||0} Runs, ${fmt(batchesTotal||0)} Batches @${s.where||'?'}: ${inputsTxt} → ${fmt(outQty)}× ${outName} je Batch${lic?`, Lizenz +${€.format(lic)}`:''}.`);
+      });
+
+      // Ergebnis
+      const totalMinutes = miningTime + driveTime + procTime;
+      const endName = route.endProduct || (()=>{ for(let i=route.steps.length-1;i>=0;i--){ const st=route.steps[i]; if(st.type==='verarbeitung' && st.outputName) return st.outputName; } for(let i=route.steps.length-1;i>=0;i--){ const st=route.steps[i]; if(st.type==='abbau' && st.what) return st.what; } return 'Endprodukt'; })();
+      const sellableUnits = Math.max(0, Math.floor(inventory[endName]||0));
+      const includeLicenses = route.includeLicenses!==false;
+      const totalCost = purchaseCost + (includeLicenses? licenseCost : 0);
+      const hours = totalMinutes/60;
+      const customPrice = route.customPrice;
+      const revenueAtCustom = customPrice? (customPrice*sellableUnits) : 0;
+      const hourlyProfit = customPrice? ((revenueAtCustom - totalCost)/Math.max(0.0001,hours)) : null;
+      const breakEvenPerUnit = sellableUnits>0? (totalCost/sellableUnits) : 0;
+      const suggestedPerUnit = sellableUnits>0? Math.max(breakEvenPerUnit, (500000*hours + totalCost)/sellableUnits) : 0;
+
+      return {miningTime, driveTime, procTime, totalMinutes, purchaseCost, licenseCost, totalCost,
+              endName, sellableUnits, hours, breakEvenPerUnit, suggestedPerUnit, hourlyProfit, log};
+    }
+
+    function renderSummary(calc){
+      qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
+      qs('#kpiCost').textContent = €.format(calc.totalCost);
+      qs('#kpiYield').textContent = `${fmt(calc.sellableUnits)} × ${calc.endName}`;
+
+      const box=qs('#summary'); box.innerHTML='';
+      const rows=[
+        ['Mining', `${minutesToH(calc.miningTime)} (${fmt(calc.miningTime)} min)`],
+        ['Fahrten', `${minutesToH(calc.driveTime)} (${fmt(calc.driveTime)} min)`],
+        ['Verarbeitung', `${minutesToH(calc.procTime)} (${fmt(calc.procTime)} min)`],
+        ['Kosten (Einkauf)', €.format(calc.purchaseCost)],
+        ['Lizenzkosten', €.format(calc.licenseCost)],
+        ['Gesamtkosten', €.format(calc.totalCost)],
+      ];
+      rows.forEach(([k,v])=>{ const r=document.createElement('div'); r.className='row'; r.style.display='grid'; r.style.gridTemplateColumns='1fr auto'; r.style.gap='8px'; r.style.padding='6px 0'; r.style.borderBottom='1px solid var(--border)'; r.innerHTML=`<span>${k}</span><strong>${v}</strong>`; box.appendChild(r); });
+
+      const det=document.createElement('details'); det.open=true; det.innerHTML=`<summary>Routenstruktur</summary>`;
+      const ul=document.createElement('ul'); ul.style.marginTop='8px';
+      calc.log.forEach(t=>{ const li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
+      det.appendChild(ul); box.appendChild(det);
+
+      qs('#sumEndProduct').textContent = calc.endName;
+      qs('#sumUnits').textContent = fmt(calc.sellableUnits);
+      qs('#sumBreakeven').textContent = calc.sellableUnits>0? €.format(calc.breakEvenPerUnit): '–';
+      qs('#sumSuggested').textContent = calc.sellableUnits>0? €.format(calc.suggestedPerUnit): '–';
+      qs('#sumHourly').textContent = (calc.hourlyProfit==null)? '–' : €.format(calc.hourlyProfit);
+    }
+
+    function recalc(){ const route=getRoute(); const calc=compute(route); renderSummary(calc); }
+
+    // ===== Routenverwaltung (in-page) =====
+    function refreshRouteSelect(selectedId){
+      const sel=qs('#routeSelect'); if(!sel) return;
+      const store=readStore(); const map=store.routes||{};
+      sel.innerHTML='';
+      const opt0=document.createElement('option'); opt0.value=''; opt0.textContent='— Gespeicherte Routen —'; sel.appendChild(opt0);
+      Object.keys(map).forEach(id=>{ const r=map[id]; const o=document.createElement('option'); o.value=id; o.textContent=r.name||r.endProduct||id; if(id===selectedId) o.selected=true; sel.appendChild(o); });
+    }
+
+    // ===== Events =====
+    window.addEventListener('DOMContentLoaded', ()=>{
+      // Add
+      qs('#addBtn')?.addEventListener('click', ()=>{ const t=qs('#addType').value; addStep(t); });
+      // Inputs -> recalc
+      ['endProduct','customPrice','lkwSize','backpackKg','includeLicenses'].forEach(id=> qs('#'+id)?.addEventListener('input', recalc) );
+
+      // Save
+      qs('#saveBtn')?.addEventListener('click', ()=>{
+        const r=getRoute();
+        if(!r.name || r.name==='Unbenannt'){ const n=prompt('Name der Route?'); if(n) r.name=n; }
+        const store=readStore(); store.routes[r.id]=r; writeStore(store); refreshRouteSelect(r.id); alert('Route gespeichert. „Seite mit Routen herunterladen“, um Datei zu aktualisieren.');
+      });
+      // Delete
+      qs('#deleteBtn')?.addEventListener('click', ()=>{
+        const id=qs('#routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
+        if(confirm('Route wirklich löschen?')){ const store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null); }
+      });
+      // Load
+      qs('#routeSelect')?.addEventListener('change', (e)=>{
+        const id=e.target.value; if(!id) return;
+        const store=readStore(); const r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
+      });
+
+      // Export / Import
+      qs('#exportBtn')?.addEventListener('click', ()=>{
+        const data=readStore(); const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='routen.json'; a.click(); URL.revokeObjectURL(a.href);
+      });
+      qs('#importFile')?.addEventListener('change', (e)=>{
+        const f=e.target.files?.[0]; if(!f) return;
+        const rd=new FileReader();
+        rd.onload=()=>{ try{
+          const incoming=JSON.parse(rd.result||'{}');
+          const store=readStore();
+          // Merge travelTimes
+          store.travelTimes = Object.assign({}, store.travelTimes||{}, incoming.travelTimes||{});
+          // Merge routes
+          const src = incoming.routes || incoming || {};
+          Object.values(src).forEach(r=>{ if(!r.id) r.id=uid(); store.routes[r.id]=r; });
+          writeStore(store); refreshRouteSelect(null); alert('Import abgeschlossen.');
+        }catch(err){ alert('Import fehlgeschlagen: '+err.message); } };
+        rd.readAsText(f); e.target.value='';
+      });
+
+      // Download updated page
+      qs('#downloadPageBtn')?.addEventListener('click', downloadPage);
+
+      // Demo
+      qs('#demoBtn')?.addEventListener('click', ()=>{
+        const demo={
+          id: uid(),
+          name: 'Bauxit → Aluminiumbarren (Demo)',
+          endProduct: 'Aluminiumbarren',
+          lkwSize: 2000,
+          backpackKg: 150,
+          customPrice: 0,
+          includeLicenses: true,
+          steps: [
+            {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', time2000: 180},
+            {type:'verarbeitung', where:'Ingenieurbüro', duration: 8,
+              inputs:[{name:'Rohes Bauxit', qty:10, purchased:false}],
+              outputName:'Feingemahlenes Bauxitpulver', outputQty:10, outputUnitWeight:3,
+              licenseName:'', licensePrice:0},
+            {type:'verarbeitung', where:'Ingenieurbüro', duration: 12,
+              inputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, purchased:false},{name:'Schwefelsäure', qty:3, purchased:true, price:85}],
+              outputName:'Verunreinigtes Aluminiumoxid', outputQty:10, outputUnitWeight:2,
+              licenseName:'', licensePrice:0},
+            {type:'verarbeitung', where:'Metallschmelze', duration: 15,
+              inputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, purchased:false},{name:'Schlacke', qty:1, purchased:true, price:0}],
+              outputName:'Unreiner Aluminiumschrott', outputQty:8, outputUnitWeight:2,
+              licenseName:'', licensePrice:0},
+            {type:'verarbeitung', where:'Metallschmelze', duration: 10,
+              inputs:[{name:'Unreiner Aluminiumschrott', qty:4, purchased:false},{name:'Schlacke', qty:1, purchased:true, price:0}],
+              outputName:'Aluminiumbarren', outputQty:5, outputUnitWeight:1,
+              licenseName:'Schmelz-Lizenz', licensePrice:10000},
+            {type:'verkauf', where:'Großhändler'}
+          ]
+        };
+        setRoute(demo);
+      });
+
+      // Erste UI
+      refreshRouteSelect(null);
+      if(qs('#steps').children.length===0){ addStep('abbau'); }
+      recalc();
+    });
+  })();
   </script>
 </body>
 </html>
