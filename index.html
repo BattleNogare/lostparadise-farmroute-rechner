@@ -14,7 +14,7 @@
       margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
       position:relative;
     }
-    /* Grid-Hintergrund unter dem Inhalt */
+    /* Börsen-Raster klar unter dem Inhalt */
     body::before{
       content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
       background:
@@ -59,11 +59,6 @@
     .kpi .box .label{color:#9bb2c9; font-size:12px}
     .kpi .box .val{font-size:18px; font-weight:700}
 
-    .ticker{display:block; white-space:nowrap; overflow:hidden; mask-image:linear-gradient(90deg,transparent,rgba(0,0,0,1) 8%, rgba(0,0,0,1) 92%, transparent)}
-    .ticker-inner{display:inline-block; animation:ticker 30s linear infinite}
-    @keyframes ticker{from{transform:translateX(0)} to{transform:translateX(-50%)} }
-
-    /* Steps */
     #steps{min-height:20px}
     .step{border:1px dashed var(--border); border-radius:14px; padding:12px; margin:10px 0; position:relative; display:grid; gap:8px; background:#0f141b}
     .step .bar{display:flex; align-items:center; gap:8px; justify-content:space-between}
@@ -79,6 +74,13 @@
     .summary{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:13px}
     .summary .row{display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px solid var(--border)}
     .summary .row:last-child{border-bottom:none}
+
+    /* Modal */
+    .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:5}
+    .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(420px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
+    .modal h3{margin:0 0 8px 0}
+    .modal .row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
+    .modal .actions{display:flex; gap:8px; justify-content:flex-end}
   </style>
 </head>
 <body>
@@ -104,21 +106,13 @@
             <button id="demoBtn">Demo laden</button>
           </div>
         </div>
-
-        <div class="ticker" aria-hidden="true">
-          <div class="ticker-inner">
-            <span class="tag">Ziehe ▤ zum Sortieren (Drag &amp; Drop).</span>
-            <span class="tag">Fahrzeiten werden automatisch erfragt &amp; gespeichert.</span>
-            <span class="tag">Vorschlagspreis begrenzt &le; 500&nbsp;000 &euro;/h.</span>
-          </div>
-        </div>
       </div>
     </header>
 
     <main class="wrap grid">
       <section class="card" id="builder">
         <h2>Route zusammenstellen</h2>
-        <div class="sub">LKW-/Rucksack-Logik, automatische Fahrzeiten nach Ortwechsel, Drag &amp; Drop.</div>
+        <div class="sub">LKW-/Rucksack-Logik, automatische Fahrzeiten per Popup beim Verlassen der Ortsfelder, Drag &amp; Drop.</div>
 
         <div class="hr"></div>
         <!-- Basisdaten -->
@@ -151,6 +145,7 @@
           </select>
           <button id="addBtn" type="button">Schritt hinzufügen</button>
         </div>
+        <div class="mini">Hinweis: Gewichte der Zwischenprodukte in „Verarbeitung“ pflegen. Fahrzeit wird erfragt, sobald du das Ortsfeld verlässt und der vorherige Ort abweicht.</div>
       </section>
 
       <aside class="card">
@@ -197,7 +192,7 @@
         <input data-key="where" placeholder="Abbauort">
       </div>
       <div class="step-body">
-        <input data-key="time2000" placeholder="Zeit für 2000 kg (Minuten)" type="number" step="1">
+        <input data-key="timeLkw" placeholder="Zeit für LKW-Größe (Minuten)" type="number" step="1">
       </div>
     </div>
   </template>
@@ -217,12 +212,9 @@
       <div class="input-list" data-key="inputs"></div>
       <div class="actions"><button class="addInput" type="button">+ Input</button></div>
 
-      <div class="mini" style="margin:4px 0">Ausgabe (pro Batch):</div>
-      <div class="step-body three">
-        <input data-key="outputName" placeholder="Was wird hergestellt?">
-        <input data-key="outputQty" placeholder="Menge / Batch" type="number" step="1">
-        <input data-key="outputUnitWeight" placeholder="Gewicht / Einheit (kg)" type="number" step="0.01">
-      </div>
+      <div class="mini" style="margin:4px 0">Outputs (pro Batch):</div>
+      <div class="output-list" data-key="outputs"></div>
+      <div class="actions"><button class="addOutput" type="button">+ Output</button></div>
 
       <div class="mini" style="margin:4px 0">Lizenz (optional):</div>
       <div class="step-body two">
@@ -254,27 +246,52 @@
     </div>
   </template>
 
+  <template id="tpl-output-row">
+    <div class="output-row" style="display:grid;grid-template-columns:2fr .8fr .8fr auto;gap:6px">
+      <input data-k="name" placeholder="Output-Name">
+      <input data-k="qty" placeholder="Menge / Batch" type="number" step="0.01">
+      <input data-k="unitWeight" placeholder="Gewicht / Einheit (kg)" type="number" step="0.01">
+      <button class="delOutput" type="button">✕</button>
+    </div>
+  </template>
+
+  <!-- Fahrzeit-Modal -->
+  <div id="travelModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <h3>Fahrzeit eintragen</h3>
+      <div class="row">
+        <label>Von<br><input id="travelFrom" readonly></label>
+        <label>Nach<br><input id="travelTo" readonly></label>
+      </div>
+      <label>Fahrzeit (Minuten)<br><input id="travelMinutes" type="number" min="0" step="1"></label>
+      <div class="actions" style="margin-top:10px">
+        <button id="travelCancel" type="button">Abbrechen</button>
+        <button id="travelSave" class="primary" type="button">Speichern</button>
+      </div>
+    </div>
+  </div>
+
   <script>
   (function(){
-    // ===== Utils (keine Backticks, keine Sondervariablennamen) =====
+    // ===== Utils =====
     function qs(s, e){return (e||document).querySelector(s);}
     function qsa(s, e){return Array.prototype.slice.call((e||document).querySelectorAll(s));}
     function uid(){return Math.random().toString(36).slice(2,9);}
-    var nf = new Intl.NumberFormat('de-DE',{maximumFractionDigits:2});
-    var cf = new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:2});
+    var nf=new Intl.NumberFormat('de-DE',{maximumFractionDigits:2});
+    var cf=new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:2});
     function fmt(n){return nf.format(n);}
-    function num(v){ if(v==null) return 0; if(typeof v==='number') return v; var s=String(v).trim().replace(/\./g,'').replace(',','.'); var n=parseFloat(s); return isNaN(n)?0:n; }
+    function num(v){ if(v==null) return 0; if(typeof v==='number') return v; var s=String(v).trim().replace(/\./g,'').replace(',', '.'); var n=parseFloat(s); return isNaN(n)?0:n; }
     function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
 
     // ===== In-Page Speicher =====
-    function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {"routes":{},"travelTimes":{}}; }catch(e){ return {"routes":{},"travelTimes":{}}; } }
-    function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent = JSON.stringify(store); refreshRouteSelect(null); }
+    function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{}}; }catch(e){ return {routes:{},travelTimes:{}}; } }
+    function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); refreshRouteSelect(null); }
     function downloadPage(){ var html='<!doctype html>'+document.documentElement.outerHTML; var blob=new Blob([html],{type:'text/html'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='index.html'; a.click(); URL.revokeObjectURL(a.href); }
 
     // ===== Templates / Steps =====
     var TPLS={
       abbau: function(){return qs('#tpl-abbau').content.firstElementChild.cloneNode(true);},
-      verarbeitung: function(){var el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); return el;},
+      verarbeitung: function(){ var el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); addOutputRow(el); return el; },
       verkauf: function(){return qs('#tpl-verkauf').content.firstElementChild.cloneNode(true);}
     };
     function addInputRow(stepEl){
@@ -282,25 +299,31 @@
       qs('[data-key="inputs"]', stepEl).appendChild(row);
       qs('.delInput',row).addEventListener('click', function(){ row.remove(); recalc(); });
     }
+    function addOutputRow(stepEl){
+      var row=qs('#tpl-output-row').content.firstElementChild.cloneNode(true);
+      qs('[data-key="outputs"]', stepEl).appendChild(row);
+      qs('.delOutput',row).addEventListener('click', function(){ row.remove(); recalc(); });
+    }
     function attachStepControls(stepEl){
-      // remove
-      var rm=qs('.remove',stepEl); if(rm) rm.addEventListener('click', function(){ stepEl.remove(); recalc(); });
-      // add input
-      var addI=qs('.addInput', stepEl); if(addI) addI.addEventListener('click', function(){ addInputRow(stepEl); });
-      // recalc on input
+      qs('.remove',stepEl)?.addEventListener('click', function(){ stepEl.remove(); recalc(); });
+      qs('.addInput',stepEl)?.addEventListener('click', function(){ addInputRow(stepEl); });
+      qs('.addOutput',stepEl)?.addEventListener('click', function(){ addOutputRow(stepEl); });
       stepEl.addEventListener('input', function(){ recalc(); });
-      // drag
+      // Drag
       stepEl.addEventListener('dragstart', function(e){ stepEl.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','drag'); });
       stepEl.addEventListener('dragend', function(){ stepEl.classList.remove('dragging'); recalc(); });
+      // Fahrzeit-Abfrage beim Verlassen des Ortsfeldes
+      var where=qs('[data-key="where"]', stepEl);
+      if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
     }
     function addStep(type){
-      var el = TPLS[type]? TPLS[type](): null; if(!el) return null;
+      var el=TPLS[type]?TPLS[type]():null; if(!el) return null;
       el.dataset.type=type; attachStepControls(el); qs('#steps').appendChild(el); return el;
     }
-    // DnD-Container
+    // DnD Container
     (function(){
       var container=qs('#steps');
-      function getDragAfterElement(container,y){
+      function afterEl(container,y){
         var els=[].slice.call(container.querySelectorAll('.step:not(.dragging)'));
         return els.reduce(function(closest,child){
           var box=child.getBoundingClientRect();
@@ -312,9 +335,8 @@
       document.addEventListener('dragover', function(e){
         var dragging=qs('.step.dragging'); if(!dragging) return;
         e.preventDefault();
-        var after=getDragAfterElement(container, e.clientY);
-        if(after==null){ container.appendChild(dragging); }
-        else{ container.insertBefore(dragging, after); }
+        var a=afterEl(container, e.clientY);
+        if(a==null){ container.appendChild(dragging); } else { container.insertBefore(dragging, a); }
       });
     })();
 
@@ -329,7 +351,7 @@
             what: qs('[data-key="what"]',step).value.trim(),
             unitWeight: num(qs('[data-key="unitWeight"]',step).value),
             where: qs('[data-key="where"]',step).value.trim(),
-            time2000: num(qs('[data-key="time2000"]',step).value)
+            timeLkw: num(qs('[data-key="timeLkw"]',step).value)
           });
         } else if(type==='verarbeitung'){
           var inputs=qsa('[data-key="inputs"] .input-row',step).map(function(row){
@@ -340,13 +362,18 @@
               price: num(qs('[data-k="price"]',row).value)
             };
           }).filter(function(i){return i.name && i.qty>0;});
+          var outputs=qsa('[data-key="outputs"] .output-row',step).map(function(row){
+            return {
+              name: qs('[data-k="name"]',row).value.trim(),
+              qty: num(qs('[data-k="qty"]',row).value),
+              unitWeight: num(qs('[data-k="unitWeight"]',row).value)
+            };
+          }).filter(function(o){return o.name && o.qty>0;});
           steps.push({type:type,
             where: qs('[data-key="where"]',step).value.trim(),
             duration: num(qs('[data-key="duration"]',step).value),
             inputs: inputs,
-            outputName: qs('[data-key="outputName"]',step).value.trim(),
-            outputQty: num(qs('[data-key="outputQty"]',step).value),
-            outputUnitWeight: num(qs('[data-key="outputUnitWeight"]',step).value),
+            outputs: outputs,
             licenseName: qs('[data-key="licenseName"]',step).value.trim(),
             licensePrice: num(qs('[data-key="licensePrice"]',step).value)
           });
@@ -381,22 +408,27 @@
           qs('[data-key="what"]',el).value=s.what||'';
           qs('[data-key="unitWeight"]',el).value=s.unitWeight||'';
           qs('[data-key="where"]',el).value=s.where||'';
-          qs('[data-key="time2000"]',el).value=s.time2000||'';
+          qs('[data-key="timeLkw"]',el).value=s.timeLkw||'';
         } else if(s.type==='verarbeitung'){
           qs('[data-key="where"]',el).value=s.where||'';
           qs('[data-key="duration"]',el).value=s.duration||'';
-          var list=qs('[data-key="inputs"]',el); list.innerHTML='';
+          var listI=qs('[data-key="inputs"]',el); listI.innerHTML='';
           (s.inputs||[]).forEach(function(inp){
             addInputRow(el);
-            var row=list.lastElementChild;
+            var row=listI.lastElementChild;
             qs('[data-k="name"]',row).value=inp.name||'';
             qs('[data-k="qty"]',row).value=inp.qty||'';
             qs('[data-k="purchased"]',row).checked=!!inp.purchased;
             qs('[data-k="price"]',row).value=inp.price||'';
           });
-          qs('[data-key="outputName"]',el).value=s.outputName||'';
-          qs('[data-key="outputQty"]',el).value=s.outputQty||'';
-          qs('[data-key="outputUnitWeight"]',el).value=s.outputUnitWeight||'';
+          var listO=qs('[data-key="outputs"]',el); listO.innerHTML='';
+          (s.outputs||[]).forEach(function(out){
+            addOutputRow(el);
+            var row=listO.lastElementChild;
+            qs('[data-k="name"]',row).value=out.name||'';
+            qs('[data-k="qty"]',row).value=out.qty||'';
+            qs('[data-k="unitWeight"]',row).value=out.unitWeight||'';
+          });
           qs('[data-key="licenseName"]',el).value=s.licenseName||'';
           qs('[data-key="licensePrice"]',el).value=s.licensePrice||'';
         } else if(s.type==='verkauf'){
@@ -406,23 +438,38 @@
       recalc();
     }
 
-    // ===== Auto-Fahrzeiten =====
+    // ===== Fahrzeit per Popup beim Verlassen der Ortsfelder =====
     function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
-    function ensureTravelMinutes(store, from, to){
-      if(!from || !to || from===to) return 0;
-      var key=travelKey(from,to);
-      if(store.travelTimes[key]==null){
-        var ans = prompt('Fahrzeit von "'+from+'" nach "'+to+'" (Minuten)?','10');
-        var m = Math.max(0, num(ans));
-        store.travelTimes[key]=m;
-        writeStore(store);
-      }
-      return Math.max(0, num(store.travelTimes[key]));
+    function openTravelModal(from,to, cb){
+      var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
+      m.style.display='flex'; m.setAttribute('aria-hidden','false');
+      function close(){ m.style.display='none'; m.setAttribute('aria-hidden','true'); }
+      qs('#travelSave').onclick=function(){ var mins=Math.max(0, num(qs('#travelMinutes').value)); close(); cb(mins); };
+      qs('#travelCancel').onclick=function(){ close(); cb(null); };
+    }
+    function handlePlaceBlur(stepEl){
+      try{
+        var route=getRoute();
+        var stepsNodes=qsa('#steps .step');
+        var idx=stepsNodes.findIndex(function(n){return n===stepEl;});
+        if(idx<=0) return;
+        var currPlace=qs('[data-key="where"]', stepEl)?.value.trim(); if(!currPlace) return;
+        var prevPlace=null;
+        for(var i=idx-1;i>=0;i--){
+          var node=stepsNodes[i];
+          var w=qs('[data-key="where"]', node);
+          if(w && w.value.trim()){ prevPlace=w.value.trim(); break; }
+        }
+        if(!prevPlace || prevPlace===currPlace) return;
+        var store=readStore(); var key=travelKey(prevPlace, currPlace);
+        if(store.travelTimes[key]!=null) return;
+        openTravelModal(prevPlace, currPlace, function(mins){ if(mins==null) return; store.travelTimes[key]=mins; writeStore(store); recalc(); });
+      }catch(e){}
     }
 
-    // ===== Berechnung =====
+    // ===== Compute (inkl. mehrere Outputs & gekaufte Input-Gewichte im Rucksack) =====
     function compute(route){
-      var baseKg = route.lkwSize>0? route.lkwSize : 2000;
+      var baseKg = route.lkwSize>0? route.lkwSize : 2000; // LKW-Größe
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
 
       var inventory = {};   // item -> units
@@ -431,7 +478,7 @@
       var purchaseCost=0, licenseCost=0;
       var log=[];
 
-      // Abbau: Einheiten aus LKW-kg
+      // Abbau: Einheiten aus LKW-kg, Zeit direkt für LKW-Größe
       route.steps.forEach(function(s,idx){
         if(s.type==='abbau'){
           var perUnit=Math.max(0, num(s.unitWeight));
@@ -439,51 +486,55 @@
           var what = s.what || ('Rohstoff_'+(idx+1));
           inventory[what]=(inventory[what]||0)+units;
           if(perUnit>0) weights[what]=perUnit;
-          var t2000=Math.max(0,num(s.time2000));
-          var t=t2000*(baseKg/2000);
+          var t = Math.max(0, num(s.timeLkw));
           miningTime += t;
           log.push('Abbau '+what+' @'+(s.where||'?')+': '+fmt(units)+' Einheiten (à '+(perUnit||1)+' kg). Zeit +'+fmt(t)+' min.');
         }
       });
 
-      // Auto-Fahrten anhand Ortswechsel
+      // Fahrten (bekannte Zeiten aus Store; neue werden beim Blur gesammelt)
       var store=readStore();
       var lastPlace=null;
       route.steps.forEach(function(s){
-        var place = (s.type==='abbau'||s.type==='verkauf') ? (s.where||'') : (s.type==='verarbeitung' ? (s.where||'') : '');
+        var place = (s.type==='abbau'||s.type==='verkauf'||s.type==='verarbeitung') ? (s.where||'') : '';
         if(place){
           if(lastPlace && lastPlace!==place){
-            var min = ensureTravelMinutes(store, lastPlace, place);
-            driveTime += min;
-            log.push('Fahrt '+lastPlace+' → '+place+': +'+fmt(min)+' min.');
+            var key=travelKey(lastPlace, place);
+            var m=store.travelTimes[key];
+            if(m!=null){ driveTime += Math.max(0,num(m)); log.push('Fahrt '+lastPlace+' → '+place+': +'+fmt(m)+' min.'); }
           }
           lastPlace=place;
         }
       });
 
-      // Verarbeitung mit Rucksack-Runs
+      // Verarbeitung: mehrere Outputs; Batchgröße je Run durch Rucksack; GEKAUFTE Inputs zählen beim Gewicht mit
       route.steps.forEach(function(s,idx){
         if(s.type!=='verarbeitung') return;
+        var inputs=s.inputs||[]; var outputs=s.outputs||[];
+        if(inputs.length===0 || outputs.length===0){ log.push('Verarbeitung @'+(s.where||'?')+': Input/Output unvollständig – übersprungen.'); return; }
 
-        var inputs=s.inputs||[];
-        var nonPurchased=inputs.filter(function(i){return !i.purchased;});
-        var purchased=inputs.filter(function(i){return i.purchased;});
-        if(inputs.length===0){ log.push('Verarbeitung @'+(s.where||'?')+': Kein Input – übersprungen.'); return; }
-
-        var outName = s.outputName || ('Produkt_'+(idx+1));
-        var outQty = Math.max(0, num(s.outputQty));
-        var outW = Math.max(0, num(s.outputUnitWeight)) || weights[outName] || 1;
-        weights[outName]=outW;
+        // Gewichte für Outputs sichern
+        outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
         var dur = Math.max(0, num(s.duration));
         var lic = Math.max(0, num(s.licensePrice)); licenseCost+=lic;
 
-        var kgPerBatch = nonPurchased.reduce(function(sum,i){
-          var w=weights[i.name]||1; return sum + (Math.max(0, num(i.qty))*w);
-        },0);
+        var nonPurchased=inputs.filter(function(i){return !i.purchased;});
+        var purchased=inputs.filter(function(i){return i.purchased;});
+
+        // kg/Batch: ALLE Inputs (gekauft + nicht gekauft) zählen fürs Rucksack-Gewicht
+        function kgPerBatchAllInputs(){
+          var sum=0;
+          inputs.forEach(function(i){
+            var w = weights[i.name] || 1;
+            sum += Math.max(0, num(i.qty)) * w;
+          });
+          return sum;
+        }
 
         var runs=0, batchesTotal=0;
         while(true){
+          // Limit 1: Inventar nur für NICHT gekaufte
           var batchesByInventory = Infinity;
           if(nonPurchased.length>0){
             batchesByInventory = nonPurchased.reduce(function(min,i){
@@ -492,17 +543,20 @@
               var can=Math.floor(avail/need);
               return Math.min(min, can);
             }, Infinity);
-          } else { batchesByInventory=999999; }
+          } else { batchesByInventory = 999999; }
           if(batchesByInventory<=0) break;
 
-          var batchesByBackpack = kgPerBatch>0 ? Math.floor(backpackKg / kgPerBatch) : batchesByInventory;
-          if(kgPerBatch>0 && batchesByBackpack<=0) break;
+          // Limit 2: Rucksackgewicht (alle Inputs)
+          var kgBatch = kgPerBatchAllInputs();
+          var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
+          if(kgBatch>0 && batchesByBackpack<=0) break;
 
           var batchesThisRun = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
 
+          // Inputs verbrauchen / Kosten
           nonPurchased.forEach(function(i){
             var need=Math.max(0, num(i.qty));
-            inventory[i.name]=(inventory[i.name]||0)-need*batchesThisRun;
+            inventory[i.name]=(inventory[i.name]||0) - need*batchesThisRun;
           });
           purchased.forEach(function(i){
             var need=Math.max(0, num(i.qty));
@@ -510,26 +564,37 @@
             purchaseCost += need*batchesThisRun*price;
           });
 
-          inventory[outName]=(inventory[outName]||0) + outQty*batchesThisRun;
-          procTime += dur*batchesThisRun;
+          // Outputs produzieren (alle Outputs)
+          outputs.forEach(function(o){
+            var q=Math.max(0, num(o.qty));
+            inventory[o.name]=(inventory[o.name]||0) + q*batchesThisRun;
+          });
 
+          procTime += dur*batchesThisRun;
           runs++; batchesTotal+=batchesThisRun;
           if(batchesThisRun<=0) break;
         }
 
         var inputsTxt = inputs.map(function(i){
-          var t = fmt(num(i.qty))+'× '+i.name;
-          if(i.purchased) t += ' (gekauft '+cf.format(num(i.price))+')';
+          var t=fmt(num(i.qty))+'× '+i.name;
+          if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
           return t;
         }).join(' + ');
-        log.push((runs||0)+' Runs, '+fmt(batchesTotal||0)+' Batches @'+(s.where||'?')+': '+inputsTxt+' → '+fmt(outQty)+'× '+outName+' je Batch'+(lic?(', Lizenz +'+cf.format(lic)):'')+'.');
+        var outputsTxt = outputs.map(function(o){ return fmt(num(o.qty))+'× '+o.name; }).join(' + ');
+        log.push((runs||0)+' Runs, '+fmt(batchesTotal||0)+' Batches @'+(s.where||'?')+': '+inputsTxt+' → '+outputsTxt+' je Batch'+(lic?(', Lizenz +'+cf.format(lic)):'')+'.');
       });
 
+      // Ergebnis
       var totalMinutes = miningTime + driveTime + procTime;
       function inferEnd(route){
-        var i;
-        for(i=route.steps.length-1;i>=0;i--){ var st=route.steps[i]; if(st.type==='verarbeitung' && st.outputName){ return st.outputName; } }
-        for(i=route.steps.length-1;i>=0;i--){ var st2=route.steps[i]; if(st2.type==='abbau' && st2.what){ return st2.what; } }
+        for(var i=route.steps.length-1;i>=0;i--){
+          var st=route.steps[i];
+          if(st.type==='verarbeitung' && st.outputs && st.outputs.length>0){ return st.outputs[st.outputs.length-1].name; }
+        }
+        for(var j=route.steps.length-1;j>=0;j--){
+          var st2=route.steps[j];
+          if(st2.type==='abbau' && st2.what){ return st2.what; }
+        }
         return route.endProduct || 'Endprodukt';
       }
       var endName = route.endProduct || inferEnd(route);
@@ -543,11 +608,13 @@
       var breakEvenPerUnit = sellableUnits>0? (totalCost/sellableUnits) : 0;
       var suggestedPerUnit = sellableUnits>0? Math.max(breakEvenPerUnit, (500000*hours + totalCost)/sellableUnits) : 0;
 
-      return {miningTime:miningTime, driveTime:driveTime, procTime:procTime, totalMinutes:totalMinutes,
-              purchaseCost:purchaseCost, licenseCost:licenseCost, totalCost:totalCost,
-              endName:endName, sellableUnits:sellableUnits, hours:hours,
-              breakEvenPerUnit:breakEvenPerUnit, suggestedPerUnit:suggestedPerUnit, hourlyProfit:hourlyProfit,
-              log:log};
+      return {
+        miningTime:miningTime, driveTime:driveTime, procTime:procTime, totalMinutes:totalMinutes,
+        purchaseCost:purchaseCost, licenseCost:licenseCost, totalCost:totalCost,
+        endName:endName, sellableUnits:sellableUnits, hours:hours,
+        breakEvenPerUnit:breakEvenPerUnit, suggestedPerUnit:suggestedPerUnit, hourlyProfit:hourlyProfit,
+        log:log
+      };
     }
 
     function renderSummary(calc){
@@ -558,10 +625,9 @@
       var box=qs('#summary'); box.innerHTML='';
       function row(label, value){
         var r=document.createElement('div'); r.className='row';
-        r.style.display='grid'; r.style.gridTemplateColumns='1fr auto'; r.style.gap='8px';
-        r.style.padding='6px 0'; r.style.borderBottom='1px solid var(--border)';
-        r.innerHTML = '<span>'+label+'</span><strong>'+value+'</strong>';
-        box.appendChild(r);
+        r.style.display='grid'; r.style.gridTemplateColumns='1fr auto';
+        r.style.gap='8px'; r.style.padding='6px 0'; r.style.borderBottom='1px solid var(--border)';
+        r.innerHTML = '<span>'+label+'</span><strong>'+value+'</strong>'; box.appendChild(r);
       }
       row('Mining', minutesToH(calc.miningTime)+' ('+fmt(calc.miningTime)+' min)');
       row('Fahrten', minutesToH(calc.driveTime)+' ('+fmt(calc.driveTime)+' min)');
@@ -595,31 +661,32 @@
       });
     }
 
-    // ===== Events (einmalig) =====
+    // ===== Events =====
     window.addEventListener('DOMContentLoaded', function(){
       // Add
-      var addBtn=qs('#addBtn');
-      if(addBtn && !addBtn.dataset.bound){ addBtn.dataset.bound='1'; addBtn.addEventListener('click', function(){ var t=qs('#addType').value; addStep(t); }); }
+      var addBtn=qs('#addBtn'); if(addBtn) addBtn.addEventListener('click', function(){ var t=qs('#addType').value; addStep(t); });
 
       // Basisdaten -> Recalc
       ['endProduct','customPrice','lkwSize','backpackKg','includeLicenses'].forEach(function(id){
-        var el=qs('#'+id); if(el && !el.dataset.bound){ el.dataset.bound='1'; el.addEventListener('input', function(){ recalc(); }); }
+        var el=qs('#'+id); if(el) el.addEventListener('input', recalc);
       });
 
       // Save
-      var saveBtn=qs('#saveBtn'); if(saveBtn) saveBtn.addEventListener('click', function(){
-        var r=getRoute(); if(!r.name || r.name==='Unbenannt'){ var n=prompt('Name der Route?'); if(n) r.name=n; }
-        var store=readStore(); store.routes[r.id]=r; writeStore(store); refreshRouteSelect(r.id); alert('Route gespeichert. „Seite mit Routen herunterladen“, um Datei zu aktualisieren.');
+      qs('#saveBtn')?.addEventListener('click', function(){
+        var r=getRoute();
+        if(!r.name || r.name==='Unbenannt'){ var n=prompt('Name der Route?'); if(n) r.name=n; }
+        var store=readStore(); store.routes[r.id]=r; writeStore(store); refreshRouteSelect(r.id);
+        alert('Route gespeichert. „Seite mit Routen herunterladen“, um Datei zu aktualisieren.');
       });
       // Delete
-      var delBtn=qs('#deleteBtn'); if(delBtn) delBtn.addEventListener('click', function(){
+      qs('#deleteBtn')?.addEventListener('click', function(){
         var id=qs('#routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
         if(confirm('Route wirklich löschen?')){ var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null); }
       });
       // Load
-      var sel=qs('#routeSelect'); if(sel) sel.addEventListener('change', function(e){
+      qs('#routeSelect')?.addEventListener('change', function(e){
         var id=e.target.value; if(!id) return;
-        var store=readStore(); if(store.routes[id]){ setRoute(store.routes[id]); currentRouteId=id; }
+        var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
       });
 
       // Export / Import
@@ -657,22 +724,22 @@
           customPrice: 0,
           includeLicenses: true,
           steps: [
-            {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', time2000: 180},
+            {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', timeLkw: 180},
             {type:'verarbeitung', where:'Ingenieurbüro', duration: 8,
               inputs:[{name:'Rohes Bauxit', qty:10, purchased:false}],
-              outputName:'Feingemahlenes Bauxitpulver', outputQty:10, outputUnitWeight:3,
+              outputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, unitWeight:3}],
               licenseName:'', licensePrice:0},
             {type:'verarbeitung', where:'Ingenieurbüro', duration: 12,
               inputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, purchased:false},{name:'Schwefelsäure', qty:3, purchased:true, price:85}],
-              outputName:'Verunreinigtes Aluminiumoxid', outputQty:10, outputUnitWeight:2,
+              outputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, unitWeight:2}],
               licenseName:'', licensePrice:0},
             {type:'verarbeitung', where:'Metallschmelze', duration: 15,
               inputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, purchased:false},{name:'Schlacke', qty:1, purchased:true, price:0}],
-              outputName:'Unreiner Aluminiumschrott', outputQty:8, outputUnitWeight:2,
+              outputs:[{name:'Unreiner Aluminiumschrott', qty:8, unitWeight:2}],
               licenseName:'', licensePrice:0},
             {type:'verarbeitung', where:'Metallschmelze', duration: 10,
-              inputs:[{name:'Unreiner Aluminiumschrott', qty:4, purchased:false},{name:'Schlacke', qty:1, purchased:true, price:0}],
-              outputName:'Aluminiumbarren', outputQty:5, outputUnitWeight:1,
+              inputs:[{name:'Unreiner Aluminiumschrott', qty:4, purchased:true, price:0},{name:'Schlacke', qty:1, purchased:true, price:0}],
+              outputs:[{name:'Aluminiumbarren', qty:5, unitWeight:1}],
               licenseName:'Schmelz-Lizenz', licensePrice:10000},
             {type:'verkauf', where:'Großhändler'}
           ]
