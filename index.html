@@ -7,7 +7,7 @@
   <style>
     :root{
       --bg:#0b0f14; --panel:#0f141b; --muted:#161c24; --text:#e6f0ff; --soft:#9bb2c9;
-      --green:#00e676; --red:#ff4d4f; --accent:#1aff95; --grid:#0d2a1f; --border:#1f2a36; --yellow:#ffd666;
+      --green:#00e676; --red:#ff4d4f; --accent:#1aff95; --grid:#0d2a1f; --border:#1f2a36;
     }
     html,body{height:100%}
     body{
@@ -15,7 +15,7 @@
       font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
       position:relative;
     }
-    /* Börsen-Raster hinter Inhalt */
+    /* Börsen-Raster hinter dem Inhalt */
     body::before{
       content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
       background:
@@ -32,7 +32,7 @@
       border-bottom:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,.25);}
     .wrap{max-width:1200px; margin:0 auto; padding:16px;}
     .brand{display:flex; align-items:center; gap:12px;}
-    .logo{width:28px; height:28px; border-radius:8px; background:conic-gradient(from 180deg,var(--green),#0ff,var(--green)); box-shadow:0 0 0 3px rgba(0,230,118,.15);}
+    .logo{width:28px; height:28px; border-radius:8px; background:conic-gradient(from 180deg,var(--green),#0ff,var(--green));}
     h1{font-size:18px; margin:0; letter-spacing:.3px}
     .toolbar{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; margin-top:10px;}
     .menu{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
@@ -48,8 +48,8 @@
     .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f}
     .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
 
-    /* Layout: Ergebnis & Struktur breiter (rechts) */
-    .grid{display:grid; grid-template-columns: 0.9fr 1.1fr; gap:16px; margin-top:16px}
+    /* Layout: Builder breiter, Ergebnis etwas schmaler */
+    .grid{display:grid; grid-template-columns:1.2fr .8fr; gap:16px; margin-top:16px}
     .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
     .card h2{margin:0 0 6px; font-size:16px}
     .sub{color:var(--soft); font-size:13px}
@@ -109,7 +109,7 @@
     <main class="wrap grid">
       <section class="card" id="builder">
         <h2>Route zusammenstellen</h2>
-        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> und wird in <strong>Sekunden</strong> angegeben. Outputs können ohne Mengenangabe eingetragen werden – Mengen/Batch werden bei Bedarf automatisch berechnet.</div>
+        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> und wird in <strong>Sekunden</strong> angegeben. Outputs können ohne Mengenangabe eingetragen werden – Mengen/Batch werden bei Bedarf automatisch ermittelt.</div>
 
         <div class="hr"></div>
         <!-- Basisdaten -->
@@ -144,10 +144,10 @@
 
       <aside class="card">
         <h2>Ergebnis &amp; Struktur</h2>
-        <div class="kpi">
-          <div class="box"><div class="label">Gesamtdauer</div><div id="kpiTime" class="val">–</div></div>
-          <div class="box"><div class="label">Gesamtkosten</div><div id="kpiCost" class="val">–</div></div>
-          <div class="box"><div class="label">Ausbeute</div><div id="kpiYield" class="val">–</div></div>
+        <div class="kpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
+          <div class="box" style="background:#0c171f;border:1px solid var(--border);border-radius:12px;padding:10px"><div class="label" style="color:#9bb2c9;font-size:12px">Gesamtdauer</div><div id="kpiTime" class="val" style="font-size:18px;font-weight:700">–</div></div>
+          <div class="box" style="background:#0c171f;border:1px solid var(--border);border-radius:12px;padding:10px"><div class="label" style="color:#9bb2c9;font-size:12px">Gesamtkosten</div><div id="kpiCost" class="val" style="font-size:18px;font-weight:700">–</div></div>
+          <div class="box" style="background:#0c171f;border:1px solid var(--border);border-radius:12px;padding:10px"><div class="label" style="color:#9bb2c9;font-size:12px">Ausbeute</div><div id="kpiYield" class="val" style="font-size:18px;font-weight:700">–</div></div>
         </div>
         <div class="hr"></div>
 
@@ -538,12 +538,12 @@
         var nonPurchased=inputs.filter(function(i){return !i.purchased;});
         var purchased=inputs.filter(function(i){return i.purchased;});
 
-        // kg/Batch: ALLE Inputs zählen fürs Rucksack-Gewicht
+        // kg/Batch: ALLE Inputs (gekauft + nicht gekauft) zählen fürs Rucksack-Gewicht
         var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
 
         var runs=0, batchesTotal=0;
         while(true){
-          // Inventarlimit (nur nicht gekaufte Inputs)
+          // Inventar-Limit (nur nicht gekaufte Inputs)
           var batchesByInventory = Infinity;
           if(nonPurchased.length>0){
             batchesByInventory = nonPurchased.reduce(function(min,i){
@@ -555,7 +555,7 @@
           } else { batchesByInventory = 999999; }
           if(batchesByInventory<=0) break;
 
-          // Rucksacklimit
+          // Rucksack-Limit (alle Inputs)
           var kgBatch = totalInputKgPerBatch;
           var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
           if(kgBatch>0 && batchesByBackpack<=0) break;
@@ -573,7 +573,7 @@
             purchaseCost += need*batchesThisRun*price;
           });
 
-          // Outputs je Batch (auto falls Menge leer)
+          // Outputs je Batch (auto, falls Output-Menge nicht gesetzt)
           var qPerBatchArr = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
           outputs.forEach(function(o,ix){
             var qPerBatch = Math.max(0, num(o.qty)) || qPerBatchArr[ix] || 0;
@@ -668,4 +668,118 @@
       qs('#sumHourly').textContent = (calc.hourlyProfit==null) ? '–' : cf.format(calc.hourlyProfit);
     }
 
-    function recalc(){ var route=getRoute();
+    function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
+
+    // ===== Routenverwaltung =====
+    function refreshRouteSelect(selectedId){
+      var sel=qs('#routeSelect'); if(!sel) return;
+      var store=readStore(); var map=store.routes||{};
+      sel.innerHTML='';
+      var opt0=document.createElement('option'); opt0.value=''; opt0.textContent='— Gespeicherte Routen —'; sel.appendChild(opt0);
+      Object.keys(map).forEach(function(id){
+        var r=map[id]; var o=document.createElement('option'); o.value=id; o.textContent=r.name||r.endProduct||id; if(id===selectedId) o.selected=true; sel.appendChild(o);
+      });
+    }
+
+    // ===== Events =====
+    window.addEventListener('DOMContentLoaded', function(){
+      // Add
+      var addBtn=qs('#addBtn'); if(addBtn) addBtn.addEventListener('click', function(){ var t=qs('#addType').value; addStep(t); });
+
+      // Basisdaten -> Recalc
+      ['endProduct','customPrice','lkwSize','backpackKg'].forEach(function(id){
+        var el=qs('#'+id); if(el) el.addEventListener('input', recalc);
+      });
+
+      // Save – speichert & fügt SOFORT einen neuen Auswahlpunkt hinzu und wählt ihn aus
+      qs('#saveBtn')?.addEventListener('click', function(){
+        var r=getRoute();
+        if(!r.name || r.name==='Unbenannt'){
+          var suggested = r.endProduct || 'Unbenannt';
+          var n=prompt('Name der Route?', suggested);
+          if(n) r.name=n;
+        }
+        if(!r.id) r.id = uid();
+        var store=readStore(); store.routes[r.id]=r; writeStore(store);
+
+        // Dropdown aktualisieren und neu gespeicherte Route auswählen
+        refreshRouteSelect(r.id);
+        var sel=qs('#routeSelect'); if(sel){ sel.value=r.id; }
+
+        alert('Route gespeichert. „Seite mit Routen herunterladen“, um Datei zu aktualisieren.');
+      });
+
+      // Delete
+      qs('#deleteBtn')?.addEventListener('click', function(){
+        var id=qs('#routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
+        if(confirm('Route wirklich löschen?')){ var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null); }
+      });
+
+      // Load
+      qs('#routeSelect')?.addEventListener('change', function(e){
+        var id=e.target.value; if(!id) return;
+        var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
+      });
+
+      // Export / Import
+      qs('#exportBtn')?.addEventListener('click', function(){
+        var data=readStore(); var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='routen.json'; a.click(); URL.revokeObjectURL(a.href);
+      });
+      qs('#importFile')?.addEventListener('change', function(e){
+        var f=e.target.files && e.target.files[0]; if(!f) return;
+        var rd=new FileReader();
+        rd.onload=function(){
+          try{
+            var incoming=JSON.parse(rd.result||'{}');
+            var store=readStore();
+            store.travelTimes = Object.assign({}, store.travelTimes||{}, incoming.travelTimes||{});
+            var src=incoming.routes || incoming || {};
+            Object.keys(src).forEach(function(id){ var r=src[id]; if(!r.id) r.id=uid(); store.routes[r.id]=r; });
+            writeStore(store); refreshRouteSelect(null); alert('Import abgeschlossen.');
+          }catch(err){ alert('Import fehlgeschlagen: '+err.message); }
+        };
+        rd.readAsText(f); e.target.value='';
+      });
+
+      // Download page
+      qs('#downloadPageBtn')?.addEventListener('click', downloadPage);
+
+      // Demo
+      qs('#demoBtn')?.addEventListener('click', function(){
+        var demo={
+          id: uid(),
+          name: 'Bauxit → Aluminiumbarren (Demo)',
+          endProduct: 'Aluminiumbarren',
+          lkwSize: 2000,
+          backpackKg: 150,
+          customPrice: 0,
+          steps: [
+            {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', timeLkw: 180},
+            {type:'verarbeitung', where:'Ingenieurbüro', duration: 480, /* 480s = 8min */
+              inputs:[{name:'Rohes Bauxit', qty:10, source:'Bauxitmine', purchased:false}],
+              outputs:[{name:'Feingemahlenes Bauxitpulver', unitWeight:3}]},
+            {type:'verarbeitung', where:'Ingenieurbüro', duration: 720,
+              inputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, source:'Ingenieurbüro', purchased:false},{name:'Schwefelsäure', qty:3, source:'Chemiewerk', purchased:true, price:85}],
+              outputs:[{name:'Verunreinigtes Aluminiumoxid', unitWeight:2}]},
+            {type:'verarbeitung', where:'Metallschmelze', duration: 900,
+              inputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, source:'Ingenieurbüro', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
+              outputs:[{name:'Unreiner Aluminiumschrott', unitWeight:2}]},
+            {type:'verarbeitung', where:'Metallschmelze', duration: 600,
+              inputs:[{name:'Unreiner Aluminiumschrott', qty:4, source:'Metallschmelze', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
+              outputs:[{name:'Aluminiumbarren', unitWeight:1}]},
+            {type:'verkauf', where:'Großhändler'}
+          ]
+        };
+        setRoute(demo);
+      });
+
+      // Initial
+      refreshRouteSelect(null);
+      if(qs('#steps').children.length===0){ addStep('abbau'); }
+      recalc();
+    });
+  })();
+  </script>
+</body>
+</html>
