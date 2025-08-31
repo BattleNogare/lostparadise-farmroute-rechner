@@ -15,7 +15,7 @@
       font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
       position:relative;
     }
-    /* Börsen-Raster eindeutig hinter dem Inhalt */
+    /* Börsen-Raster hinter Inhalt */
     body::before{
       content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
       background:
@@ -48,7 +48,8 @@
     .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f}
     .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
 
-    .grid{display:grid; grid-template-columns: 1.2fr .8fr; gap:16px; margin-top:16px}
+    /* Layout: Ergebnis & Struktur breiter (rechts) */
+    .grid{display:grid; grid-template-columns: 0.9fr 1.1fr; gap:16px; margin-top:16px}
     .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
     .card h2{margin:0 0 6px; font-size:16px}
     .sub{color:var(--soft); font-size:13px}
@@ -108,7 +109,7 @@
     <main class="wrap grid">
       <section class="card" id="builder">
         <h2>Route zusammenstellen</h2>
-        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> (alle Batches, die in den Rucksack passen). Outputs können ohne Mengenangabe eingetragen werden – die Mengen/Batch werden bei Bedarf automatisch berechnet.</div>
+        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> und wird in <strong>Sekunden</strong> angegeben. Outputs können ohne Mengenangabe eingetragen werden – Mengen/Batch werden bei Bedarf automatisch berechnet.</div>
 
         <div class="hr"></div>
         <!-- Basisdaten -->
@@ -124,9 +125,6 @@
           </label>
           <label>Rucksack-Größe (kg)<br/>
             <input id="backpackKg" type="number" min="1" step="1" value="150">
-          </label>
-          <label style="display:flex; align-items:center; gap:8px; margin-top:8px">
-            <input id="includeLicenses" type="checkbox" checked> Lizenzkosten einrechnen
           </label>
         </div>
         <div class="hr"></div>
@@ -183,7 +181,7 @@
         <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
       </div>
       <div class="step-body three">
-        <input data-key="what" placeholder="Was wird abgebaut? (z. B. Rohes Bauxit)">
+        <input data-key="what" placeholder="Was wird abgebaut? (z. B. Kupfererz)">
         <input data-key="unitWeight" placeholder="Gewicht pro Einheit (kg)" type="number" step="0.01">
         <input data-key="where" placeholder="Abbauort">
       </div>
@@ -201,7 +199,7 @@
       </div>
       <div class="step-body two">
         <input data-key="where" placeholder="Wo wird verarbeitet?">
-        <input data-key="duration" placeholder="Dauer pro Run (Minuten)" type="number" step="1">
+        <input data-key="duration" placeholder="Dauer pro Run (Sekunden)" type="number" step="1">
       </div>
 
       <div class="mini" style="margin:4px 0">Inputs (pro Batch – Grundrezept):</div>
@@ -211,12 +209,6 @@
       <div class="mini" style="margin:4px 0">Outputs (Name + Gewicht/Einheit – Menge optional):</div>
       <div class="output-list" data-key="outputs"></div>
       <div class="actions"><button class="addOutput" type="button">+ Output</button></div>
-
-      <div class="mini" style="margin:4px 0">Lizenz (optional):</div>
-      <div class="step-body two">
-        <input data-key="licenseName" placeholder="Lizenzname (optional)">
-        <input data-key="licensePrice" placeholder="Preis der Lizenz (&euro;)" type="number" step="0.01">
-      </div>
     </div>
   </template>
 
@@ -282,7 +274,7 @@
 
     // ===== In-Page Speicher =====
     function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{}}; }catch(e){ return {routes:{},travelTimes:{}}; } }
-    function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); refreshRouteSelect(null); }
+    function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
     function downloadPage(){ var html='<!doctype html>'+document.documentElement.outerHTML; var blob=new Blob([html],{type:'text/html'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='index.html'; a.click(); URL.revokeObjectURL(a.href); }
 
     // ===== Templates / Steps =====
@@ -369,11 +361,9 @@
           }).filter(function(o){return o.name;});
           steps.push({type:type,
             where: qs('[data-key="where"]',step).value.trim(),
-            duration: num(qs('[data-key="duration"]',step).value),
+            duration: num(qs('[data-key="duration"]',step).value), // Sekunden pro Run
             inputs: inputs,
-            outputs: outputs,
-            licenseName: qs('[data-key="licenseName"]',step).value.trim(),
-            licensePrice: num(qs('[data-key="licensePrice"]',step).value)
+            outputs: outputs
           });
         } else if(type==='verkauf'){
           steps.push({type:type, where: qs('[data-key="where"]',step).value.trim()});
@@ -387,7 +377,6 @@
         lkwSize: Math.max(1, num(qs('#lkwSize').value)||2000),
         backpackKg: Math.max(1, num(qs('#backpackKg').value)||150),
         customPrice: (function(v){ var n=num(v); return n>0?n:null; })(qs('#customPrice').value),
-        includeLicenses: qs('#includeLicenses').checked,
         steps: steps,
         travelTimes: store.travelTimes || {}
       };
@@ -398,7 +387,6 @@
       qs('#lkwSize').value = route.lkwSize || 2000;
       qs('#backpackKg').value = route.backpackKg || 150;
       qs('#customPrice').value = route.customPrice!=null ? route.customPrice : '';
-      qs('#includeLicenses').checked = route.includeLicenses!==false;
       var box=qs('#steps'); box.innerHTML='';
       (route.steps||[]).forEach(function(s){
         var el=addStep(s.type); if(!el) return;
@@ -428,8 +416,6 @@
             qs('[data-k="qty"]',row).value=out.qty||''; // optional
             qs('[data-k="unitWeight"]',row).value=out.unitWeight||'';
           });
-          qs('[data-key="licenseName"]',el).value=s.licenseName||'';
-          qs('[data-key="licensePrice"]',el).value=s.licensePrice||'';
         } else if(s.type==='verkauf'){
           qs('[data-key="where"]',el).value=s.where||'';
         }
@@ -500,8 +486,8 @@
 
       var inventory = {};   // item -> units
       var weights = {};     // item -> kg per unit
-      var miningTime=0, driveTime=0, procTime=0;
-      var purchaseCost=0, licenseCost=0;
+      var miningTime=0, driveTime=0, procTime=0; // Minuten
+      var purchaseCost=0;
       var log=[];
 
       // Abbau
@@ -518,7 +504,7 @@
         }
       });
 
-      // Fahrten (nur bekannte Zeiten; neue kommen via Blur/Popup)
+      // Fahrten
       var store=readStore();
       var lastPlace=null;
       route.steps.forEach(function(s){
@@ -546,18 +532,18 @@
         // Output-Gewichte sichern
         outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
-        var dur = Math.max(0, num(s.duration));  // Dauer pro RUN
-        var lic = Math.max(0, num(s.licensePrice)); licenseCost+=lic;
+        var durSec = Math.max(0, num(s.duration));  // Sekunden pro RUN
+        var durMin = durSec/60;
 
         var nonPurchased=inputs.filter(function(i){return !i.purchased;});
         var purchased=inputs.filter(function(i){return i.purchased;});
 
-        // kg/Batch: ALLE Inputs (gekauft + nicht gekauft) zählen fürs Rucksack-Gewicht
+        // kg/Batch: ALLE Inputs zählen fürs Rucksack-Gewicht
         var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
 
         var runs=0, batchesTotal=0;
         while(true){
-          // Limit 1: Inventar für NICHT gekaufte Inputs
+          // Inventarlimit (nur nicht gekaufte Inputs)
           var batchesByInventory = Infinity;
           if(nonPurchased.length>0){
             batchesByInventory = nonPurchased.reduce(function(min,i){
@@ -569,7 +555,7 @@
           } else { batchesByInventory = 999999; }
           if(batchesByInventory<=0) break;
 
-          // Limit 2: Rucksackgewicht (alle Inputs)
+          // Rucksacklimit
           var kgBatch = totalInputKgPerBatch;
           var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
           if(kgBatch>0 && batchesByBackpack<=0) break;
@@ -587,15 +573,15 @@
             purchaseCost += need*batchesThisRun*price;
           });
 
-          // Outputs je Batch (automatisch, falls keine Menge angegeben)
+          // Outputs je Batch (auto falls Menge leer)
           var qPerBatchArr = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
           outputs.forEach(function(o,ix){
             var qPerBatch = Math.max(0, num(o.qty)) || qPerBatchArr[ix] || 0;
             inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
           });
 
-          // Zeit pro RUN (einmal je Run, nicht pro Batch)
-          procTime += dur;
+          // Zeit pro RUN (einmal je Run, nicht pro Batch) – in Minuten addieren
+          procTime += durMin;
 
           runs++; batchesTotal+=batchesThisRun;
           if(batchesThisRun<=0) break;
@@ -616,7 +602,7 @@
           }).join(' + ');
         })();
 
-        log.push(runs+' Runs, '+fmt(batchesTotal)+' Batches/Run @'+(s.where||'?')+': '+inputsTxt+' → '+dbgOut+' je Batch'+(lic?(' · Lizenz '+cf.format(lic)):'')+'. Dauer/Run: '+fmt(dur)+' min');
+        log.push(runs+' Runs, '+fmt(batchesTotal)+' Batches/Run @'+(s.where||'?')+': '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Run: '+fmt(durSec)+' s');
       });
 
       // Ergebnis
@@ -634,19 +620,18 @@
       }
       var endName = route.endProduct || inferEnd(route);
       var sellableUnits = Math.max(0, Math.floor(inventory[endName]||0));
-      var includeLicenses = route.includeLicenses!==false;
-      var totalCost = purchaseCost + (includeLicenses? licenseCost : 0);
+      var totalCost = purchaseCost;
       var hours = totalMinutes/60;
       var customPrice = num(route.customPrice);
       var revenueAtCustom = customPrice>0 ? (customPrice*sellableUnits) : 0;
       var hourlyProfit = customPrice>0 ? ((revenueAtCustom - totalCost)/Math.max(0.0001,hours)) : null;
       var breakEvenPerUnit = sellableUnits>0 ? (totalCost/sellableUnits) : 0;
-      // Vorschlag: Preis so, dass max. 500k €/h erzielt würden, aber nie unter Break-even
+      // Vorschlagspreis: nicht unter Break-even und so, dass Gewinn/h <= 500k bleibt
       var suggestedPerUnit = sellableUnits>0 ? Math.max(breakEvenPerUnit, (500000*hours + totalCost)/sellableUnits) : 0;
 
       return {
         miningTime:miningTime, driveTime:driveTime, procTime:procTime, totalMinutes:totalMinutes,
-        purchaseCost:purchaseCost, licenseCost:licenseCost, totalCost:totalCost,
+        purchaseCost:purchaseCost, totalCost:totalCost,
         endName:endName, sellableUnits:sellableUnits, hours:hours,
         breakEvenPerUnit:breakEvenPerUnit, suggestedPerUnit:suggestedPerUnit, hourlyProfit:hourlyProfit,
         log:log
@@ -669,7 +654,6 @@
       row('Fahrten', minutesToH(calc.driveTime)+' ('+fmt(calc.driveTime)+' min)');
       row('Verarbeitung', minutesToH(calc.procTime)+' ('+fmt(calc.procTime)+' min)');
       row('Kosten (Einkauf)', cf.format(calc.purchaseCost));
-      row('Lizenzkosten', cf.format(calc.licenseCost));
       row('Gesamtkosten', cf.format(calc.totalCost));
 
       var det=document.createElement('details'); det.open=true; det.innerHTML='<summary>Routenstruktur</summary>';
@@ -684,108 +668,4 @@
       qs('#sumHourly').textContent = (calc.hourlyProfit==null) ? '–' : cf.format(calc.hourlyProfit);
     }
 
-    function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
-
-    // ===== Routenverwaltung =====
-    function refreshRouteSelect(selectedId){
-      var sel=qs('#routeSelect'); if(!sel) return;
-      var store=readStore(); var map=store.routes||{};
-      sel.innerHTML='';
-      var opt0=document.createElement('option'); opt0.value=''; opt0.textContent='— Gespeicherte Routen —'; sel.appendChild(opt0);
-      Object.keys(map).forEach(function(id){
-        var r=map[id]; var o=document.createElement('option'); o.value=id; o.textContent=r.name||r.endProduct||id; if(id===selectedId) o.selected=true; sel.appendChild(o);
-      });
-    }
-
-    // ===== Events =====
-    window.addEventListener('DOMContentLoaded', function(){
-      // Add
-      var addBtn=qs('#addBtn'); if(addBtn) addBtn.addEventListener('click', function(){ var t=qs('#addType').value; addStep(t); });
-
-      // Basisdaten -> Recalc
-      ['endProduct','customPrice','lkwSize','backpackKg','includeLicenses'].forEach(function(id){
-        var el=qs('#'+id); if(el) el.addEventListener('input', recalc);
-      });
-
-      // Save
-      qs('#saveBtn')?.addEventListener('click', function(){
-        var r=getRoute();
-        if(!r.name || r.name==='Unbenannt'){ var n=prompt('Name der Route?'); if(n) r.name=n; }
-        var store=readStore(); store.routes[r.id]=r; writeStore(store); refreshRouteSelect(r.id);
-        alert('Route gespeichert. „Seite mit Routen herunterladen“, um Datei zu aktualisieren.');
-      });
-      // Delete
-      qs('#deleteBtn')?.addEventListener('click', function(){
-        var id=qs('#routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
-        if(confirm('Route wirklich löschen?')){ var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null); }
-      });
-      // Load
-      qs('#routeSelect')?.addEventListener('change', function(e){
-        var id=e.target.value; if(!id) return;
-        var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
-      });
-
-      // Export / Import
-      qs('#exportBtn')?.addEventListener('click', function(){
-        var data=readStore(); var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-        var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='routen.json'; a.click(); URL.revokeObjectURL(a.href);
-      });
-      qs('#importFile')?.addEventListener('change', function(e){
-        var f=e.target.files && e.target.files[0]; if(!f) return;
-        var rd=new FileReader();
-        rd.onload=function(){
-          try{
-            var incoming=JSON.parse(rd.result||'{}');
-            var store=readStore();
-            store.travelTimes = Object.assign({}, store.travelTimes||{}, incoming.travelTimes||{});
-            var src=incoming.routes || incoming || {};
-            Object.keys(src).forEach(function(id){ var r=src[id]; if(!r.id) r.id=uid(); store.routes[r.id]=r; });
-            writeStore(store); refreshRouteSelect(null); alert('Import abgeschlossen.');
-          }catch(err){ alert('Import fehlgeschlagen: '+err.message); }
-        };
-        rd.readAsText(f); e.target.value='';
-      });
-
-      // Download page
-      qs('#downloadPageBtn')?.addEventListener('click', downloadPage);
-
-      // Demo
-      qs('#demoBtn')?.addEventListener('click', function(){
-        var demo={
-          id: uid(),
-          name: 'Bauxit → Aluminiumbarren (Demo)',
-          endProduct: 'Aluminiumbarren',
-          lkwSize: 2000,
-          backpackKg: 150,
-          customPrice: 0,
-          includeLicenses: true,
-          steps: [
-            {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', timeLkw: 180},
-            {type:'verarbeitung', where:'Ingenieurbüro', duration: 8,
-              inputs:[{name:'Rohes Bauxit', qty:10, source:'Bauxitmine', purchased:false}],
-              outputs:[{name:'Feingemahlenes Bauxitpulver', unitWeight:3}]},
-            {type:'verarbeitung', where:'Ingenieurbüro', duration: 12,
-              inputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, source:'Ingenieurbüro', purchased:false},{name:'Schwefelsäure', qty:3, source:'Chemiewerk', purchased:true, price:85}],
-              outputs:[{name:'Verunreinigtes Aluminiumoxid', unitWeight:2}]},
-            {type:'verarbeitung', where:'Metallschmelze', duration: 15,
-              inputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, source:'Ingenieurbüro', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
-              outputs:[{name:'Unreiner Aluminiumschrott', unitWeight:2}]},
-            {type:'verarbeitung', where:'Metallschmelze', duration: 10,
-              inputs:[{name:'Unreiner Aluminiumschrott', qty:4, source:'Metallschmelze', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
-              outputs:[{name:'Aluminiumbarren', unitWeight:1}],
-              licenseName:'Schmelz-Lizenz', licensePrice:10000},
-            {type:'verkauf', where:'Großhändler'}
-          ]
-        };
-        setRoute(demo);
-      });
-
-      // Initial
-      refreshRouteSelect(null);
-      if(qs('#steps').children.length===0){ addStep('abbau'); }
-      recalc();
-    });
-  })();
-  </script>
-</body>
-</html>
+    function recalc(){ var route=getRoute();
