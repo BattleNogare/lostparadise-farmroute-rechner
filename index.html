@@ -15,7 +15,7 @@
       font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
       position:relative;
     }
-    /* Börsen-Raster unter Inhalt */
+    /* Börsen-Raster eindeutig hinter dem Inhalt */
     body::before{
       content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
       background:
@@ -108,7 +108,7 @@
     <main class="wrap grid">
       <section class="card" id="builder">
         <h2>Route zusammenstellen</h2>
-        <div class="sub">Verarbeitungszeit gilt jetzt pro <strong>Run</strong> (alle Batches, die in den Rucksack passen). Inputs haben optional einen Fundort.</div>
+        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> (alle Batches, die in den Rucksack passen). Outputs können ohne Mengenangabe eingetragen werden – die Mengen/Batch werden bei Bedarf automatisch berechnet.</div>
 
         <div class="hr"></div>
         <!-- Basisdaten -->
@@ -466,13 +466,21 @@
     }
 
     // ===== Automatik-Hilfen =====
+    function kgPerBatchAllInputs(inputs, weights){
+      var sum=0;
+      inputs.forEach(function(i){
+        var w = weights[i.name] || 1; // Default 1 kg, falls unbekannt
+        sum += Math.max(0, num(i.qty)) * w;
+      });
+      return sum;
+    }
     function deriveOutputQuantities(outputs, weights, totalInputKg){
-      // Wenn irgendeine Output-Menge explizit gesetzt ist, nimm diese und 0 für leere.
+      // Wenn irgendeine Output-Menge explizit gesetzt ist, verwende diese (leere = 0)
       var anySet = outputs.some(function(o){ return num(o.qty)>0; });
       if(anySet){
         return outputs.map(function(o){ return Math.max(0, num(o.qty)); });
       }
-      // Sonst automatisch: 1 Output ⇒ alles, mehrere ⇒ gleich verteilt nach Gewicht
+      // Sonst automatisch: 1 Output ⇒ alles; mehrere ⇒ gleichmäßige Gewichtsverteilung
       var count = outputs.length;
       if(count===1){
         var ow = Math.max(0.0001, weights[outputs[0].name] || 1);
@@ -526,7 +534,7 @@
       });
 
       // Verarbeitung
-      route.steps.forEach(function(s,idx){
+      route.steps.forEach(function(s){
         if(s.type!=='verarbeitung') return;
 
         var inputs=s.inputs||[];
@@ -545,17 +553,7 @@
         var purchased=inputs.filter(function(i){return i.purchased;});
 
         // kg/Batch: ALLE Inputs (gekauft + nicht gekauft) zählen fürs Rucksack-Gewicht
-        function kgPerBatchAllInputs(){
-          var sum=0;
-          inputs.forEach(function(i){
-            var w = weights[i.name] || 1; // Default 1 kg, falls unbekannt
-            sum += Math.max(0, num(i.qty)) * w;
-          });
-          return sum;
-        }
-
-        // Gesamt-Input-kg (für automatische Outputmengen/Batch)
-        var totalInputKgPerBatch = kgPerBatchAllInputs();
+        var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
 
         var runs=0, batchesTotal=0;
         while(true){
@@ -596,7 +594,7 @@
             inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
           });
 
-          // >>> Zeit pro RUN (fix) – NICHT pro Batch
+          // Zeit pro RUN (einmal je Run, nicht pro Batch)
           procTime += dur;
 
           runs++; batchesTotal+=batchesThisRun;
@@ -605,7 +603,7 @@
 
         var inputsTxt = inputs.map(function(i){
           var t=fmt(num(i.qty))+'× '+i.name;
-          if(i.source) t += ' ['+i.source+']';
+          if(i.source) t+=' ['+i.source+']';
           if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
           return t;
         }).join(' + ');
@@ -618,7 +616,7 @@
           }).join(' + ');
         })();
 
-        log.push((runs||0)+' Runs, '+fmt(batchesTotal||0)+' Batches/Run @'+(s.where||'?')+': '+inputsTxt+' → '+dbgOut+' je Batch'+(lic?(' · Lizenz '+cf.format(lic)):'')+'. Dauer/Run: '+fmt(dur)+' min');
+        log.push(runs+' Runs, '+fmt(batchesTotal)+' Batches/Run @'+(s.where||'?')+': '+inputsTxt+' → '+dbgOut+' je Batch'+(lic?(' · Lizenz '+cf.format(lic)):'')+'. Dauer/Run: '+fmt(dur)+' min');
       });
 
       // Ergebnis
@@ -643,6 +641,7 @@
       var revenueAtCustom = customPrice>0 ? (customPrice*sellableUnits) : 0;
       var hourlyProfit = customPrice>0 ? ((revenueAtCustom - totalCost)/Math.max(0.0001,hours)) : null;
       var breakEvenPerUnit = sellableUnits>0 ? (totalCost/sellableUnits) : 0;
+      // Vorschlag: Preis so, dass max. 500k €/h erzielt würden, aber nie unter Break-even
       var suggestedPerUnit = sellableUnits>0 ? Math.max(breakEvenPerUnit, (500000*hours + totalCost)/sellableUnits) : 0;
 
       return {
@@ -731,7 +730,7 @@
         var data=readStore(); var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='routen.json'; a.click(); URL.revokeObjectURL(a.href);
       });
-      qs('#importFile']?.addEventListener('change', function(e){
+      qs('#importFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
         rd.onload=function(){
