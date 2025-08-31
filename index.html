@@ -7,7 +7,7 @@
   <style>
     :root{
       --bg:#0b0f14; --panel:#0f141b; --muted:#161c24; --text:#e6f0ff; --soft:#9bb2c9;
-      --green:#00e676; --red:#ff4d4f; --accent:#1aff95; --grid:#0d2a1f; --border:#1f2a36;
+      --green:#00e676; --red:#ff4d4f; --accent:#1aff95; --grid:#0d2a1f; --border:#1f2a36; --warn:#ffd666;
     }
     html,body{height:100%}
     body{
@@ -15,7 +15,7 @@
       font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
       position:relative;
     }
-    /* Börsen-Raster hinter dem Inhalt */
+    /* Börsen-Raster */
     body::before{
       content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
       background:
@@ -34,8 +34,12 @@
     .brand{display:flex; align-items:center; gap:12px;}
     .logo{width:28px; height:28px; border-radius:8px; background:conic-gradient(from 180deg,var(--green),#0ff,var(--green));}
     h1{font-size:18px; margin:0; letter-spacing:.3px}
+
     .toolbar{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; margin-top:10px;}
     .menu{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+    .tabs{display:flex; gap:6px}
+    .tab{background:transparent; border:1px solid var(--border); color:var(--text); padding:8px 10px; border-radius:10px; cursor:pointer}
+    .tab.active{background:#0e171f}
 
     select, input, button, textarea{background:var(--muted); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font:inherit; outline:none}
     input[type="number"]{width:140px}
@@ -48,7 +52,7 @@
     .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f}
     .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
 
-    /* Layout: Builder breiter, Ergebnis etwas schmaler */
+    /* Layout: Builder breiter, Ergebnis schmaler */
     .grid{display:grid; grid-template-columns:1.2fr .8fr; gap:16px; margin-top:16px}
     .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
     .card h2{margin:0 0 6px; font-size:16px}
@@ -56,28 +60,44 @@
     .hr{height:1px; background:linear-gradient(90deg,transparent, var(--border), transparent); margin:12px 0}
     .mini{font-size:12px; color:#9bb2c9}
 
+    /* Builder Steps */
     #steps{min-height:20px}
     .step{border:1px dashed var(--border); border-radius:14px; padding:12px; margin:10px 0; position:relative; display:grid; gap:8px; background:#0f141b}
     .step .bar{display:flex; align-items:center; gap:8px; justify-content:space-between}
     .handle{cursor:grab; user-select:none; padding:6px 8px; border-radius:8px; background:#0e171f; border:1px solid var(--border); font-size:12px}
     .handle:active{cursor:grabbing}
     .step.dragging{opacity:.6; outline:2px dashed var(--accent)}
-
     .step-body{display:grid; gap:8px}
     .two{display:grid; grid-template-columns:1fr 1fr; gap:8px}
     .three{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
     .actions{display:flex; gap:8px; flex-wrap:wrap}
-
     .summary{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:13px}
     .summary .row{display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px solid var(--border)}
     .summary .row:last-child{border-bottom:none}
 
+    /* KPI */
+    .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+    .kpi .box{background:#0c171f;border:1px solid var(--border);border-radius:12px;padding:10px}
+    .kpi .label{color:#9bb2c9;font-size:12px}
+    .kpi .val{font-size:18px;font-weight:700}
+
     /* Modal */
     .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:5}
-    .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(420px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
+    .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(480px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
     .modal h3{margin:0 0 8px 0}
     .modal .row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
     .modal .actions{display:flex; gap:8px; justify-content:flex-end}
+
+    /* Routenliste */
+    #listView{grid-column:1/-1}
+    .route-row{display:grid; grid-template-columns: 32px 1.2fr .8fr .8fr auto; gap:10px; align-items:center; padding:10px; border:1px dashed var(--border); border-radius:12px; background:#0f141b; margin:8px 0}
+    .route-row .drag{cursor:grab; user-select:none; text-align:center; border:1px solid var(--border); border-radius:8px; padding:6px}
+    .route-row.dragging{opacity:.6; outline:2px dashed var(--accent)}
+    .pill{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f; font-size:12px}
+    .muted{color:#9bb2c9}
+    .warn{color:#2b2300; background:linear-gradient(180deg,#ffe58f,#ffd666); border-color:#e8c14c}
+    .adjustments{margin-top:12px; border:1px solid var(--border); border-radius:12px; padding:10px; background:#0e171f}
+    .adjustments ul{margin:8px 0 0 18px}
   </style>
 </head>
 <body>
@@ -91,13 +111,15 @@
         </div>
 
         <div class="toolbar">
+          <div class="tabs">
+            <button class="tab active" id="tabBuilder">Builder</button>
+            <button class="tab" id="tabList">Routenliste</button>
+          </div>
           <div class="menu">
             <select id="routeSelect" title="Gespeicherte Routen (in dieser Seite)"></select>
             <button id="saveBtn">Route speichern</button>
             <button id="deleteBtn" class="danger">Löschen</button>
             <button id="downloadPageBtn" class="primary" title="Neue HTML mit eingebetteten Routen herunterladen">Seite mit Routen herunterladen</button>
-          </div>
-          <div class="menu">
             <button id="exportBtn">Export</button>
             <label for="importFile" class="ghost" style="padding:10px 12px; cursor:pointer">Import<input id="importFile" type="file" accept="application/json" style="display:none"></label>
             <button id="demoBtn">Demo laden</button>
@@ -107,9 +129,10 @@
     </header>
 
     <main class="wrap grid">
-      <section class="card" id="builder">
+      <!-- Builder Ansicht -->
+      <section class="card" id="builderView">
         <h2>Route zusammenstellen</h2>
-        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> und wird in <strong>Sekunden</strong> angegeben. Outputs können ohne Mengenangabe eingetragen werden – Mengen/Batch werden bei Bedarf automatisch ermittelt.</div>
+        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet.</div>
 
         <div class="hr"></div>
         <!-- Basisdaten -->
@@ -142,12 +165,12 @@
         <div class="mini">Fahrzeiten werden beim Verlassen eines Ortsfelds per Popup abgefragt (wenn sich der Ort ändert).</div>
       </section>
 
-      <aside class="card">
+      <aside class="card" id="resultView">
         <h2>Ergebnis &amp; Struktur</h2>
-        <div class="kpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
-          <div class="box" style="background:#0c171f;border:1px solid var(--border);border-radius:12px;padding:10px"><div class="label" style="color:#9bb2c9;font-size:12px">Gesamtdauer</div><div id="kpiTime" class="val" style="font-size:18px;font-weight:700">–</div></div>
-          <div class="box" style="background:#0c171f;border:1px solid var(--border);border-radius:12px;padding:10px"><div class="label" style="color:#9bb2c9;font-size:12px">Gesamtkosten</div><div id="kpiCost" class="val" style="font-size:18px;font-weight:700">–</div></div>
-          <div class="box" style="background:#0c171f;border:1px solid var(--border);border-radius:12px;padding:10px"><div class="label" style="color:#9bb2c9;font-size:12px">Ausbeute</div><div id="kpiYield" class="val" style="font-size:18px;font-weight:700">–</div></div>
+        <div class="kpi">
+          <div class="box"><div class="label">Gesamtdauer</div><div id="kpiTime" class="val">–</div></div>
+          <div class="box"><div class="label">Gesamtkosten</div><div id="kpiCost" class="val">–</div></div>
+          <div class="box"><div class="label">Ausbeute</div><div id="kpiYield" class="val">–</div></div>
         </div>
         <div class="hr"></div>
 
@@ -165,6 +188,21 @@
           </div>
         </details>
       </aside>
+
+      <!-- Routenliste Ansicht -->
+      <section class="card" id="listView" hidden>
+        <h2>Routenliste</h2>
+        <div class="sub">Alle gespeicherten Routen. Standardmäßig nach <strong>Gewinn/Stunde</strong> sortiert. Ziehe an der Griffspalte, um die Reihenfolge zu ändern.</div>
+        <div class="hr"></div>
+
+        <div id="routesList"></div>
+
+        <div id="adjustmentsPanel" class="adjustments" style="display:none">
+          <strong>Anpassungen nötig, um diese Reihenfolge zu erreichen:</strong>
+          <ul id="adjustmentsList"></ul>
+          <div class="mini muted" id="adjustmentsNote" style="margin-top:6px"></div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -301,7 +339,7 @@
       // Drag
       stepEl.addEventListener('dragstart', function(e){ stepEl.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','drag'); });
       stepEl.addEventListener('dragend', function(){ stepEl.classList.remove('dragging'); recalc(); });
-      // Fahrzeit-Abfrage bei Ortswechsel (beim Verlassen des Feldes)
+      // Fahrzeit-Abfrage bei Ortswechsel (on blur)
       var where=qs('[data-key="where"]', stepEl);
       if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
     }
@@ -309,7 +347,7 @@
       var el=TPLS[type]?TPLS[type]():null; if(!el) return null;
       el.dataset.type=type; attachStepControls(el); qs('#steps').appendChild(el); return el;
     }
-    // DnD Container
+    // DnD Container für Steps
     (function(){
       var container=qs('#steps');
       function afterEl(container,y){
@@ -423,7 +461,7 @@
       recalc();
     }
 
-    // ===== Fahrzeit-Popup beim Verlassen der Ortsfelder =====
+    // ===== Fahrzeit-Popup (on blur) =====
     function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
     function openTravelModal(from,to, cb){
       var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
@@ -455,18 +493,14 @@
     function kgPerBatchAllInputs(inputs, weights){
       var sum=0;
       inputs.forEach(function(i){
-        var w = weights[i.name] || 1; // Default 1 kg, falls unbekannt
+        var w = weights[i.name] || 1; // Default 1 kg
         sum += Math.max(0, num(i.qty)) * w;
       });
       return sum;
     }
     function deriveOutputQuantities(outputs, weights, totalInputKg){
-      // Wenn irgendeine Output-Menge explizit gesetzt ist, verwende diese (leere = 0)
       var anySet = outputs.some(function(o){ return num(o.qty)>0; });
-      if(anySet){
-        return outputs.map(function(o){ return Math.max(0, num(o.qty)); });
-      }
-      // Sonst automatisch: 1 Output ⇒ alles; mehrere ⇒ gleichmäßige Gewichtsverteilung
+      if(anySet){ return outputs.map(function(o){ return Math.max(0, num(o.qty)); }); }
       var count = outputs.length;
       if(count===1){
         var ow = Math.max(0.0001, weights[outputs[0].name] || 1);
@@ -479,7 +513,7 @@
       });
     }
 
-    // ===== Berechnung =====
+    // ===== Berechnung einer Route =====
     function compute(route){
       var baseKg = route.lkwSize>0? route.lkwSize : 2000; // LKW-Größe
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
@@ -538,12 +572,10 @@
         var nonPurchased=inputs.filter(function(i){return !i.purchased;});
         var purchased=inputs.filter(function(i){return i.purchased;});
 
-        // kg/Batch: ALLE Inputs (gekauft + nicht gekauft) zählen fürs Rucksack-Gewicht
         var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
 
         var runs=0, batchesTotal=0;
         while(true){
-          // Inventar-Limit (nur nicht gekaufte Inputs)
           var batchesByInventory = Infinity;
           if(nonPurchased.length>0){
             batchesByInventory = nonPurchased.reduce(function(min,i){
@@ -555,14 +587,12 @@
           } else { batchesByInventory = 999999; }
           if(batchesByInventory<=0) break;
 
-          // Rucksack-Limit (alle Inputs)
           var kgBatch = totalInputKgPerBatch;
           var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
           if(kgBatch>0 && batchesByBackpack<=0) break;
 
           var batchesThisRun = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
 
-          // Inputs verbrauchen / Kosten
           nonPurchased.forEach(function(i){
             var need=Math.max(0, num(i.qty));
             inventory[i.name]=(inventory[i.name]||0) - need*batchesThisRun;
@@ -573,16 +603,13 @@
             purchaseCost += need*batchesThisRun*price;
           });
 
-          // Outputs je Batch (auto, falls Output-Menge nicht gesetzt)
           var qPerBatchArr = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
           outputs.forEach(function(o,ix){
             var qPerBatch = Math.max(0, num(o.qty)) || qPerBatchArr[ix] || 0;
             inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
           });
 
-          // Zeit pro RUN (einmal je Run, nicht pro Batch) – in Minuten addieren
-          procTime += durMin;
-
+          procTime += durMin; // Zeit/Run
           runs++; batchesTotal+=batchesThisRun;
           if(batchesThisRun<=0) break;
         }
@@ -593,19 +620,15 @@
           if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
           return t;
         }).join(' + ');
-
-        var dbgOut = (function(){
-          var auto = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
-          return outputs.map(function(o,ix){
-            var q = Math.max(0, num(o.qty)) || auto[ix] || 0;
-            return fmt(q)+'× '+o.name;
-          }).join(' + ');
-        })();
-
-        log.push(runs+' Runs, '+fmt(batchesTotal)+' Batches/Run @'+(s.where||'?')+': '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Run: '+fmt(durSec)+' s');
+        var auto = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
+        var dbgOut = outputs.map(function(o,ix){
+          var q = Math.max(0, num(o.qty)) || auto[ix] || 0;
+          return fmt(q)+'× '+o.name;
+        }).join(' + ');
+        var durSecTxt = Math.round(durMin*60);
+        log.push(runs+' Runs, '+fmt(batchesTotal)+' Batches/Run @'+(s.where||'?')+': '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Run: '+fmt(durSecTxt)+' s');
       });
 
-      // Ergebnis
       var totalMinutes = miningTime + driveTime + procTime;
       function inferEnd(route){
         for(var i=route.steps.length-1;i>=0;i--){
@@ -622,19 +645,24 @@
       var sellableUnits = Math.max(0, Math.floor(inventory[endName]||0));
       var totalCost = purchaseCost;
       var hours = totalMinutes/60;
-      var customPrice = num(route.customPrice);
-      var revenueAtCustom = customPrice>0 ? (customPrice*sellableUnits) : 0;
-      var hourlyProfit = customPrice>0 ? ((revenueAtCustom - totalCost)/Math.max(0.0001,hours)) : null;
       var breakEvenPerUnit = sellableUnits>0 ? (totalCost/sellableUnits) : 0;
-      // Vorschlagspreis: nicht unter Break-even und so, dass Gewinn/h <= 500k bleibt
+      var a_unitsPerHour = hours>0 ? (sellableUnits/hours) : 0; // Steigung: Gewinn/h pro €/Einheit
+      var b_costPerHour = hours>0 ? (-totalCost/hours) : 0;     // Achsenabschnitt
+
+      // Vorschlagpreis (<= 500k €/h) mind. Break-even
       var suggestedPerUnit = sellableUnits>0 ? Math.max(breakEvenPerUnit, (500000*hours + totalCost)/sellableUnits) : 0;
 
+      // Aktueller Preis/Profit (nutzt customPrice; wenn leer, verwenden wir Vorschlag)
+      var chosenPrice = (route.customPrice && route.customPrice>0) ? route.customPrice : suggestedPerUnit;
+      var profitPerHour = a_unitsPerHour*chosenPrice + b_costPerHour;
+
       return {
-        miningTime:miningTime, driveTime:driveTime, procTime:procTime, totalMinutes:totalMinutes,
-        purchaseCost:purchaseCost, totalCost:totalCost,
-        endName:endName, sellableUnits:sellableUnits, hours:hours,
-        breakEvenPerUnit:breakEvenPerUnit, suggestedPerUnit:suggestedPerUnit, hourlyProfit:hourlyProfit,
-        log:log
+        miningTime, driveTime, procTime, totalMinutes,
+        purchaseCost, totalCost,
+        endName, sellableUnits, hours,
+        breakEvenPerUnit, suggestedPerUnit, chosenPrice,
+        profitPerHour, a_unitsPerHour, b_costPerHour,
+        log
       };
     }
 
@@ -665,12 +693,16 @@
       qs('#sumUnits').textContent = fmt(calc.sellableUnits);
       qs('#sumBreakeven').textContent = calc.sellableUnits>0 ? cf.format(calc.breakEvenPerUnit) : '–';
       qs('#sumSuggested').textContent = calc.sellableUnits>0 ? cf.format(calc.suggestedPerUnit) : '–';
-      qs('#sumHourly').textContent = (calc.hourlyProfit==null) ? '–' : cf.format(calc.hourlyProfit);
+      var customPrice = num(qs('#customPrice').value);
+      var hourlyProfit = (customPrice>0)
+        ? (calc.a_unitsPerHour*customPrice + calc.b_costPerHour)
+        : (calc.a_unitsPerHour*calc.suggestedPerUnit + calc.b_costPerHour);
+      qs('#sumHourly').textContent = isFinite(hourlyProfit) ? cf.format(hourlyProfit) : '–';
     }
 
     function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
 
-    // ===== Routenverwaltung =====
+    // ===== Routenverwaltung (Speichern/Laden) =====
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
@@ -681,17 +713,155 @@
       });
     }
 
+    // ===== Routenliste (neuer Menüpunkt) =====
+    function buildListData(){
+      var store=readStore(); var list=[];
+      Object.keys(store.routes||{}).forEach(function(id){
+        var r=store.routes[id];
+        var calc=compute(r);
+        list.push({
+          id:id, name:r.name||r.endProduct||id, endProduct: calc.endName,
+          price: (r.customPrice && r.customPrice>0) ? r.customPrice : calc.suggestedPerUnit,
+          priceIsSuggested: !(r.customPrice && r.customPrice>0),
+          profitPerHour: calc.profitPerHour,
+          a: calc.a_unitsPerHour, b: calc.b_costPerHour, // Profit/h = a*price + b
+          breakEven: calc.breakEvenPerUnit
+        });
+      });
+      // Standard: nach Gewinn/h absteigend
+      list.sort(function(a,b){ return (b.profitPerHour||0) - (a.profitPerHour||0); });
+      return list;
+    }
+
+    function renderListView(){
+      var list = buildListData();
+      var container = qs('#routesList'); container.innerHTML='';
+
+      list.forEach(function(item){
+        var row=document.createElement('div');
+        row.className='route-row';
+        row.draggable=true;
+        row.dataset.id=item.id;
+        row.innerHTML = `
+          <div class="drag">▤</div>
+          <div><div><strong>${item.name}</strong></div><div class="muted">${item.endProduct}</div></div>
+          <div><span class="pill">${cf.format(item.price)}${item.priceIsSuggested?' <span class="muted">(Vorschlag)</span>':''}</span></div>
+          <div><strong>${cf.format(item.profitPerHour)}</strong><div class="mini muted">Gewinn/h</div></div>
+          <div class="mini muted">a=${fmt(item.a)} u/h</div>
+        `;
+        container.appendChild(row);
+      });
+
+      // Drag & Drop für Reihenfolge
+      enableListDnD(container, function(newOrderIds){
+        // Rechne Anpassungen aus
+        var store=readStore();
+        var dataById={};
+        (buildListData()).forEach(function(x){ dataById[x.id]=x; });
+
+        // Ziel: Reihenfolge newOrderIds (oben = höchster Gewinn/h)
+        // Für minimale Änderungen setzen wir für jedes Element von oben nach unten:
+        // Profit_i >= Profit_{i+1} + margin
+        var margin = 1; // € pro Stunde
+        var targets = {}; // id -> {targetProfit, requiredPrice or null if ok}
+        for(var i=0;i<newOrderIds.length;i++){
+          var id=newOrderIds[i];
+          var d=dataById[id]; if(!d){ continue; }
+          var currentProfit = d.profitPerHour;
+          var neededProfit = -Infinity;
+          if(i<newOrderIds.length-1){
+            var nextId=newOrderIds[i+1];
+            var next=dataById[nextId];
+            if(next){ neededProfit = (targets[nextId]?.targetProfit) ?? next.profitPerHour; neededProfit += margin; }
+          }
+          var targetProfit = Math.max(currentProfit, neededProfit);
+          // erforderlicher Preis: p = (targetProfit - b)/a, aber mind. Break-even
+          var reqPrice = d.a>0 ? (targetProfit - d.b)/d.a : Infinity;
+          var minPrice = d.breakEven;
+          if(!isFinite(reqPrice) || reqPrice<minPrice) reqPrice=minPrice;
+
+          // 500k €/h Warnung
+          var overCap = targetProfit>500000;
+
+          // Wenn currentProfit bereits >= neededProfit, keine Änderung nötig
+          var changeNeeded = currentProfit < (neededProfit||-Infinity) - 1e-9;
+          targets[id]={ targetProfit: targetProfit, requiredPrice: changeNeeded? reqPrice : null, overCap: overCap, currentPrice: d.price };
+        }
+
+        // Render Hinweise
+        var panel=qs('#adjustmentsPanel');
+        var ul=qs('#adjustmentsList');
+        ul.innerHTML='';
+        var any=false, capWarn=false;
+        newOrderIds.forEach(function(id){
+          var t=targets[id]; var d=dataById[id];
+          if(!t || t.requiredPrice==null) return;
+          any=true;
+          var li=document.createElement('li');
+          var warnSpan = t.overCap ? ' <span class="pill warn">Achtung: > 500 000 €/h</span>' : '';
+          if(t.overCap) capWarn=true;
+          li.innerHTML = `<strong>${d.name}</strong>: Preis anpassen ${d.priceIsSuggested?'(von Vorschlag':'(von'} ${cf.format(d.price)}) → <strong>${cf.format(t.requiredPrice)}</strong>${warnSpan}`;
+          ul.appendChild(li);
+        });
+        qs('#adjustmentsNote').innerHTML = capWarn
+          ? 'Mindestens eine Zielreihenfolge würde > 500 000 € Gewinn/Stunde erfordern (gelb markiert).'
+          : 'Berechnet mit Mindestabständen von 1 €/h zwischen benachbarten Einträgen.';
+        panel.style.display = any ? 'block' : 'none';
+      });
+    }
+
+    function enableListDnD(container, onOrderChanged){
+      var dragEl=null;
+      container.addEventListener('dragstart', function(e){
+        var row=e.target.closest('.route-row'); if(!row) return;
+        dragEl=row; row.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','drag');
+      });
+      container.addEventListener('dragend', function(e){
+        if(dragEl){ dragEl.classList.remove('dragging'); dragEl=null; }
+        var ids=[].map.call(container.querySelectorAll('.route-row'), function(r){return r.dataset.id;});
+        if(typeof onOrderChanged==='function'){ onOrderChanged(ids); }
+      });
+      container.addEventListener('dragover', function(e){
+        e.preventDefault();
+        var dragging=container.querySelector('.route-row.dragging'); if(!dragging) return;
+        var after = (function(){
+          var els=[].slice.call(container.querySelectorAll('.route-row:not(.dragging)'));
+          return els.reduce(function(closest,child){
+            var box=child.getBoundingClientRect();
+            var offset=e.clientY - box.top - box.height/2;
+            if(offset<0 && offset>closest.offset){ return {offset:offset, element:child}; }
+            else { return closest; }
+          }, {offset:Number.NEGATIVE_INFINITY}).element;
+        })();
+        if(after==null){ container.appendChild(dragging); } else { container.insertBefore(dragging, after); }
+      });
+    }
+
+    // ===== UI: Tabs =====
+    function switchTab(name){
+      var isList = (name==='list');
+      qs('#tabBuilder').classList.toggle('active', !isList);
+      qs('#tabList').classList.toggle('active', isList);
+      qs('#builderView').hidden = isList;
+      qs('#resultView').hidden  = isList;
+      qs('#listView').hidden    = !isList;
+      if(isList){ renderListView(); }
+    }
+
+    // ===== Zusammenfassung live =====
+    function renderSummaryAndMaybeList(){ recalc(); if(!qs('#listView').hidden){ renderListView(); } }
+
     // ===== Events =====
     window.addEventListener('DOMContentLoaded', function(){
       // Add
-      var addBtn=qs('#addBtn'); if(addBtn) addBtn.addEventListener('click', function(){ var t=qs('#addType').value; addStep(t); });
+      qs('#addBtn')?.addEventListener('click', function(){ var t=qs('#addType').value; addStep(t); });
 
       // Basisdaten -> Recalc
       ['endProduct','customPrice','lkwSize','backpackKg'].forEach(function(id){
-        var el=qs('#'+id); if(el) el.addEventListener('input', recalc);
+        var el=qs('#'+id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
-      // Save – speichert & fügt SOFORT einen neuen Auswahlpunkt hinzu und wählt ihn aus
+      // Save – sofort ins Dropdown, auswählen
       qs('#saveBtn')?.addEventListener('click', function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){
@@ -701,18 +871,16 @@
         }
         if(!r.id) r.id = uid();
         var store=readStore(); store.routes[r.id]=r; writeStore(store);
-
-        // Dropdown aktualisieren und neu gespeicherte Route auswählen
         refreshRouteSelect(r.id);
         var sel=qs('#routeSelect'); if(sel){ sel.value=r.id; }
-
         alert('Route gespeichert. „Seite mit Routen herunterladen“, um Datei zu aktualisieren.');
+        if(!qs('#listView').hidden){ renderListView(); }
       });
 
       // Delete
       qs('#deleteBtn')?.addEventListener('click', function(){
         var id=qs('#routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
-        if(confirm('Route wirklich löschen?')){ var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null); }
+        if(confirm('Route wirklich löschen?')){ var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null); if(!qs('#listView').hidden){ renderListView(); } }
       });
 
       // Load
@@ -737,6 +905,7 @@
             var src=incoming.routes || incoming || {};
             Object.keys(src).forEach(function(id){ var r=src[id]; if(!r.id) r.id=uid(); store.routes[r.id]=r; });
             writeStore(store); refreshRouteSelect(null); alert('Import abgeschlossen.');
+            if(!qs('#listView').hidden){ renderListView(); }
           }catch(err){ alert('Import fehlgeschlagen: '+err.message); }
         };
         rd.readAsText(f); e.target.value='';
@@ -756,7 +925,7 @@
           customPrice: 0,
           steps: [
             {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', timeLkw: 180},
-            {type:'verarbeitung', where:'Ingenieurbüro', duration: 480, /* 480s = 8min */
+            {type:'verarbeitung', where:'Ingenieurbüro', duration: 480,
               inputs:[{name:'Rohes Bauxit', qty:10, source:'Bauxitmine', purchased:false}],
               outputs:[{name:'Feingemahlenes Bauxitpulver', unitWeight:3}]},
             {type:'verarbeitung', where:'Ingenieurbüro', duration: 720,
@@ -771,8 +940,14 @@
             {type:'verkauf', where:'Großhändler'}
           ]
         };
+        var store=readStore(); store.routes[demo.id]=demo; writeStore(store); refreshRouteSelect(demo.id);
+        if(!qs('#listView').hidden){ renderListView(); }
         setRoute(demo);
       });
+
+      // Tabs
+      qs('#tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
+      qs('#tabList').addEventListener('click', function(){ switchTab('list'); });
 
       // Initial
       refreshRouteSelect(null);
