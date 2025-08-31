@@ -71,6 +71,7 @@
     .two{display:grid; grid-template-columns:1fr 1fr; gap:8px}
     .three{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
     .actions{display:flex; gap:8px; flex-wrap:wrap}
+
     .summary{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:13px}
     .summary .row{display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px solid var(--border)}
     .summary .row:last-child{border-bottom:none}
@@ -132,7 +133,7 @@
       <!-- Builder Ansicht -->
       <section class="card" id="builderView">
         <h2>Route zusammenstellen</h2>
-        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet.</div>
+        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet. Verarbeitungskosten gelten <strong>einmalig pro Verarbeitungsschritt</strong>.</div>
 
         <div class="hr"></div>
         <!-- Basisdaten -->
@@ -156,8 +157,10 @@
 
         <div class="actions">
           <select id="addType">
+            <option value="start">➕ Startpunkt</option>
             <option value="abbau">➕ Abbau</option>
             <option value="verarbeitung">➕ Verarbeitung</option>
+            <option value="transportkosten">➕ Transportkosten</option>
             <option value="verkauf">➕ Verkaufsort</option>
           </select>
           <button id="addBtn" type="button">Schritt hinzufügen</button>
@@ -212,6 +215,18 @@
   <!--DATA-END-->
 
   <!-- Schritt-Vorlagen -->
+  <template id="tpl-start">
+    <div class="step" data-type="start" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Startpunkt</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body">
+        <input data-key="where" placeholder="Start-Ort">
+      </div>
+    </div>
+  </template>
+
   <template id="tpl-abbau">
     <div class="step" data-type="abbau" draggable="true">
       <div class="bar">
@@ -240,6 +255,11 @@
         <input data-key="duration" placeholder="Dauer pro Run (Sekunden)" type="number" step="1">
       </div>
 
+      <div class="mini" style="margin:4px 0">Verarbeitungskosten (einmalig für diesen Schritt, &euro;):</div>
+      <div class="step-body">
+        <input data-key="processCost" placeholder="z. B. 500" type="number" step="0.01">
+      </div>
+
       <div class="mini" style="margin:4px 0">Inputs (pro Batch – Grundrezept):</div>
       <div class="input-list" data-key="inputs"></div>
       <div class="actions"><button class="addInput" type="button">+ Input</button></div>
@@ -247,6 +267,19 @@
       <div class="mini" style="margin:4px 0">Outputs (Name + Gewicht/Einheit – Menge optional):</div>
       <div class="output-list" data-key="outputs"></div>
       <div class="actions"><button class="addOutput" type="button">+ Output</button></div>
+    </div>
+  </template>
+
+  <template id="tpl-transportkosten">
+    <div class="step" data-type="transportkosten" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Transportkosten</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body">
+        <input data-key="transportCost" placeholder="Transportkosten (&euro;), z. B. 1200" type="number" step="0.01">
+      </div>
+      <div class="mini">Dieser Betrag wird zu den Gesamtkosten addiert.</div>
     </div>
   </template>
 
@@ -317,8 +350,10 @@
 
     // ===== Templates / Steps =====
     var TPLS={
+      start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
       abbau: function(){return qs('#tpl-abbau').content.firstElementChild.cloneNode(true);},
       verarbeitung: function(){ var el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); addOutputRow(el); return el; },
+      transportkosten: function(){return qs('#tpl-transportkosten').content.firstElementChild.cloneNode(true);},
       verkauf: function(){return qs('#tpl-verkauf').content.firstElementChild.cloneNode(true);}
     };
     function addInputRow(stepEl){
@@ -373,7 +408,9 @@
       var steps=[];
       qsa('#steps .step').forEach(function(step){
         var type=step.dataset.type;
-        if(type==='abbau'){
+        if(type==='start'){
+          steps.push({type:type, where: qs('[data-key="where"]',step).value.trim()});
+        } else if(type==='abbau'){
           steps.push({type:type,
             what: qs('[data-key="what"]',step).value.trim(),
             unitWeight: num(qs('[data-key="unitWeight"]',step).value),
@@ -400,9 +437,12 @@
           steps.push({type:type,
             where: qs('[data-key="where"]',step).value.trim(),
             duration: num(qs('[data-key="duration"]',step).value), // Sekunden pro Run
+            processCost: num(qs('[data-key="processCost"]',step).value), // NEU: einmalig
             inputs: inputs,
             outputs: outputs
           });
+        } else if(type==='transportkosten'){
+          steps.push({type:type, transportCost: num(qs('[data-key="transportCost"]',step).value)});
         } else if(type==='verkauf'){
           steps.push({type:type, where: qs('[data-key="where"]',step).value.trim()});
         }
@@ -428,7 +468,9 @@
       var box=qs('#steps'); box.innerHTML='';
       (route.steps||[]).forEach(function(s){
         var el=addStep(s.type); if(!el) return;
-        if(s.type==='abbau'){
+        if(s.type==='start'){
+          qs('[data-key="where"]',el).value=s.where||'';
+        } else if(s.type==='abbau'){
           qs('[data-key="what"]',el).value=s.what||'';
           qs('[data-key="unitWeight"]',el).value=s.unitWeight||'';
           qs('[data-key="where"]',el).value=s.where||'';
@@ -436,6 +478,7 @@
         } else if(s.type==='verarbeitung'){
           qs('[data-key="where"]',el).value=s.where||'';
           qs('[data-key="duration"]',el).value=s.duration||'';
+          qs('[data-key="processCost"]',el).value=s.processCost||'';
           var listI=qs('[data-key="inputs"]',el); listI.innerHTML='';
           (s.inputs||[]).forEach(function(inp){
             addInputRow(el);
@@ -454,6 +497,8 @@
             qs('[data-k="qty"]',row).value=out.qty||''; // optional
             qs('[data-k="unitWeight"]',row).value=out.unitWeight||'';
           });
+        } else if(s.type==='transportkosten'){
+          qs('[data-key="transportCost"]',el).value=s.transportCost||'';
         } else if(s.type==='verkauf'){
           qs('[data-key="where"]',el).value=s.where||'';
         }
@@ -474,8 +519,10 @@
       try{
         var stepsNodes=qsa('#steps .step');
         var idx=stepsNodes.findIndex(function(n){return n===stepEl;});
-        if(idx<=0) return;
+        if(idx<0) return;
         var currPlace=qs('[data-key="where"]', stepEl)?.value.trim(); if(!currPlace) return;
+
+        // Finde letzten Ort davor
         var prevPlace=null;
         for(var i=idx-1;i>=0;i--){
           var node=stepsNodes[i];
@@ -483,6 +530,7 @@
           if(w && w.value.trim()){ prevPlace=w.value.trim(); break; }
         }
         if(!prevPlace || prevPlace===currPlace) return;
+
         var store=readStore(); var key=travelKey(prevPlace, currPlace);
         if(store.travelTimes[key]!=null) return;
         openTravelModal(prevPlace, currPlace, function(mins){ if(mins==null) return; store.travelTimes[key]=mins; writeStore(store); recalc(); });
@@ -521,7 +569,7 @@
       var inventory = {};   // item -> units
       var weights = {};     // item -> kg per unit
       var miningTime=0, driveTime=0, procTime=0; // Minuten
-      var purchaseCost=0;
+      var purchaseCost=0, transportCostTotal=0, processingCostTotal=0;
       var log=[];
 
       // Abbau
@@ -538,18 +586,27 @@
         }
       });
 
-      // Fahrten
+      // Fahrten (inkl. Startpunkt)
       var store=readStore();
       var lastPlace=null;
       route.steps.forEach(function(s){
-        var place = (s.type==='abbau'||s.type==='verkauf'||s.type==='verarbeitung') ? (s.where||'') : '';
+        var place = (s.type==='start'||s.type==='abbau'||s.type==='verkauf'||s.type==='verarbeitung') ? (s.where||'') : '';
         if(place){
           if(lastPlace && lastPlace!==place){
             var key=travelKey(lastPlace, place);
             var m=store.travelTimes[key];
             if(m!=null){ driveTime += Math.max(0,num(m)); log.push('Fahrt '+lastPlace+' → '+place+': +'+fmt(m)+' min.'); }
           }
-          lastPlace=place;
+          if(!lastPlace){ lastPlace=place; } else if(lastPlace!==place){ lastPlace=place; }
+        }
+      });
+
+      // Transportkosten (fixe Beträge)
+      route.steps.forEach(function(s){
+        if(s.type==='transportkosten'){
+          var c=Math.max(0,num(s.transportCost));
+          transportCostTotal+=c;
+          log.push('Transportkosten: +'+cf.format(c));
         }
       });
 
@@ -614,6 +671,13 @@
           if(batchesThisRun<=0) break;
         }
 
+        // Einmalige Verarbeitungskosten dieses Schritts
+        var stepCost = Math.max(0, num(s.processCost));
+        if(stepCost>0){
+          processingCostTotal += stepCost;
+          log.push('Verarbeitungskosten @'+(s.where||'?')+': +'+cf.format(stepCost)+' (einmalig für diesen Schritt)');
+        }
+
         var inputsTxt = inputs.map(function(i){
           var t=fmt(num(i.qty))+'× '+i.name;
           if(i.source) t+=' ['+i.source+']';
@@ -626,7 +690,7 @@
           return fmt(q)+'× '+o.name;
         }).join(' + ');
         var durSecTxt = Math.round(durMin*60);
-        log.push(runs+' Runs, '+fmt(batchesTotal)+' Batches/Run @'+(s.where||'?')+': '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Run: '+fmt(durSecTxt)+' s');
+        log.push('Verarbeitung @'+(s.where||'?')+': '+runs+' Runs, '+fmt(batchesTotal)+' Batches/Run: '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Run: '+fmt(durSecTxt)+' s');
       });
 
       var totalMinutes = miningTime + driveTime + procTime;
@@ -643,11 +707,14 @@
       }
       var endName = route.endProduct || inferEnd(route);
       var sellableUnits = Math.max(0, Math.floor(inventory[endName]||0));
-      var totalCost = purchaseCost;
+
+      // Kosten
+      var totalCost = purchaseCost + transportCostTotal + processingCostTotal;
+
       var hours = totalMinutes/60;
       var breakEvenPerUnit = sellableUnits>0 ? (totalCost/sellableUnits) : 0;
-      var a_unitsPerHour = hours>0 ? (sellableUnits/hours) : 0; // Steigung: Gewinn/h pro €/Einheit
-      var b_costPerHour = hours>0 ? (-totalCost/hours) : 0;     // Achsenabschnitt
+      var a_unitsPerHour = hours>0 ? (sellableUnits/hours) : 0; // Gewinn/h = a*Preis + b
+      var b_costPerHour = hours>0 ? (-totalCost/hours) : 0;
 
       // Vorschlagpreis (<= 500k €/h) mind. Break-even
       var suggestedPerUnit = sellableUnits>0 ? Math.max(breakEvenPerUnit, (500000*hours + totalCost)/sellableUnits) : 0;
@@ -658,7 +725,7 @@
 
       return {
         miningTime, driveTime, procTime, totalMinutes,
-        purchaseCost, totalCost,
+        purchaseCost, transportCostTotal, processingCostTotal, totalCost,
         endName, sellableUnits, hours,
         breakEvenPerUnit, suggestedPerUnit, chosenPrice,
         profitPerHour, a_unitsPerHour, b_costPerHour,
@@ -682,6 +749,8 @@
       row('Fahrten', minutesToH(calc.driveTime)+' ('+fmt(calc.driveTime)+' min)');
       row('Verarbeitung', minutesToH(calc.procTime)+' ('+fmt(calc.procTime)+' min)');
       row('Kosten (Einkauf)', cf.format(calc.purchaseCost));
+      row('Transportkosten', cf.format(calc.transportCostTotal));
+      row('Verarbeitungskosten (fix)', cf.format(calc.processingCostTotal));
       row('Gesamtkosten', cf.format(calc.totalCost));
 
       var det=document.createElement('details'); det.open=true; det.innerHTML='<summary>Routenstruktur</summary>';
@@ -728,7 +797,6 @@
           breakEven: calc.breakEvenPerUnit
         });
       });
-      // Standard: nach Gewinn/h absteigend
       list.sort(function(a,b){ return (b.profitPerHour||0) - (a.profitPerHour||0); });
       return list;
     }
@@ -754,16 +822,11 @@
 
       // Drag & Drop für Reihenfolge
       enableListDnD(container, function(newOrderIds){
-        // Rechne Anpassungen aus
-        var store=readStore();
         var dataById={};
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
 
-        // Ziel: Reihenfolge newOrderIds (oben = höchster Gewinn/h)
-        // Für minimale Änderungen setzen wir für jedes Element von oben nach unten:
-        // Profit_i >= Profit_{i+1} + margin
-        var margin = 1; // € pro Stunde
-        var targets = {}; // id -> {targetProfit, requiredPrice or null if ok}
+        var margin = 1; // € pro Stunde Abstand
+        var targets = {};
         for(var i=0;i<newOrderIds.length;i++){
           var id=newOrderIds[i];
           var d=dataById[id]; if(!d){ continue; }
@@ -775,20 +838,15 @@
             if(next){ neededProfit = (targets[nextId]?.targetProfit) ?? next.profitPerHour; neededProfit += margin; }
           }
           var targetProfit = Math.max(currentProfit, neededProfit);
-          // erforderlicher Preis: p = (targetProfit - b)/a, aber mind. Break-even
           var reqPrice = d.a>0 ? (targetProfit - d.b)/d.a : Infinity;
           var minPrice = d.breakEven;
           if(!isFinite(reqPrice) || reqPrice<minPrice) reqPrice=minPrice;
 
-          // 500k €/h Warnung
           var overCap = targetProfit>500000;
-
-          // Wenn currentProfit bereits >= neededProfit, keine Änderung nötig
           var changeNeeded = currentProfit < (neededProfit||-Infinity) - 1e-9;
           targets[id]={ targetProfit: targetProfit, requiredPrice: changeNeeded? reqPrice : null, overCap: overCap, currentPrice: d.price };
         }
 
-        // Render Hinweise
         var panel=qs('#adjustmentsPanel');
         var ul=qs('#adjustmentsList');
         ul.innerHTML='';
@@ -848,7 +906,6 @@
       if(isList){ renderListView(); }
     }
 
-    // ===== Zusammenfassung live =====
     function renderSummaryAndMaybeList(){ recalc(); if(!qs('#listView').hidden){ renderListView(); } }
 
     // ===== Events =====
@@ -924,17 +981,19 @@
           backpackKg: 150,
           customPrice: 0,
           steps: [
+            {type:'start', where:'HQ'},
             {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', timeLkw: 180},
-            {type:'verarbeitung', where:'Ingenieurbüro', duration: 480,
+            {type:'verarbeitung', where:'Ingenieurbüro', duration: 480, processCost: 200,
               inputs:[{name:'Rohes Bauxit', qty:10, source:'Bauxitmine', purchased:false}],
               outputs:[{name:'Feingemahlenes Bauxitpulver', unitWeight:3}]},
-            {type:'verarbeitung', where:'Ingenieurbüro', duration: 720,
+            {type:'verarbeitung', where:'Ingenieurbüro', duration: 720, processCost: 0,
               inputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, source:'Ingenieurbüro', purchased:false},{name:'Schwefelsäure', qty:3, source:'Chemiewerk', purchased:true, price:85}],
               outputs:[{name:'Verunreinigtes Aluminiumoxid', unitWeight:2}]},
-            {type:'verarbeitung', where:'Metallschmelze', duration: 900,
+            {type:'transportkosten', transportCost: 500},
+            {type:'verarbeitung', where:'Metallschmelze', duration: 900, processCost: 150,
               inputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, source:'Ingenieurbüro', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
               outputs:[{name:'Unreiner Aluminiumschrott', unitWeight:2}]},
-            {type:'verarbeitung', where:'Metallschmelze', duration: 600,
+            {type:'verarbeitung', where:'Metallschmelze', duration: 600, processCost: 0,
               inputs:[{name:'Unreiner Aluminiumschrott', qty:4, source:'Metallschmelze', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
               outputs:[{name:'Aluminiumbarren', unitWeight:1}]},
             {type:'verkauf', where:'Großhändler'}
@@ -951,7 +1010,7 @@
 
       // Initial
       refreshRouteSelect(null);
-      if(qs('#steps').children.length===0){ addStep('abbau'); }
+      if(qs('#steps').children.length===0){ addStep('start'); }
       recalc();
     });
   })();
