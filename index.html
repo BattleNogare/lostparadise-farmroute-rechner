@@ -91,7 +91,7 @@
 
     /* Routenliste */
     #listView{grid-column:1/-1}
-    .route-row{display:grid; grid-template-columns: 32px 1.2fr .8fr .8fr auto; gap:10px; align-items:center; padding:10px; border:1px dashed var(--border); border-radius:12px; background:#0f141b; margin:8px 0}
+    .route-row{display:grid; grid-template-columns: 32px 1.2fr 1fr .8fr auto; gap:10px; align-items:center; padding:10px; border:1px dashed var(--border); border-radius:12px; background:#0f141b; margin:8px 0}
     .route-row .drag{cursor:grab; user-select:none; text-align:center; border:1px solid var(--border); border-radius:8px; padding:6px}
     .route-row.dragging{opacity:.6; outline:2px dashed var(--accent)}
     .pill{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f; font-size:12px}
@@ -99,6 +99,11 @@
     .warn{color:#2b2300; background:linear-gradient(180deg,#ffe58f,#ffd666); border-color:#e8c14c}
     .adjustments{margin-top:12px; border:1px solid var(--border); border-radius:12px; padding:10px; background:#0e171f}
     .adjustments ul{margin:8px 0 0 18px}
+
+    /* Verkaufsliste (Endprodukte) */
+    .sell-list .row{display:grid; grid-template-columns:1.4fr .8fr auto; gap:8px; margin:6px 0}
+    .sell-list .row input[type="text"]{width:100%}
+    .sell-list .row input[type="number"]{width:100%}
   </style>
 </head>
 <body>
@@ -133,17 +138,12 @@
       <!-- Builder Ansicht -->
       <section class="card" id="builderView">
         <h2>Route zusammenstellen</h2>
-        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet. Verarbeitungskosten gelten <strong>einmalig pro Verarbeitungsschritt</strong>.</div>
+        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet. Verarbeitungskosten gelten <strong>einmalig pro Verarbeitungsschritt</strong>.  
+        Endprodukte & Preise kannst du unten als <strong>Verkaufsliste</strong> pflegen (mehrere möglich).</div>
 
         <div class="hr"></div>
         <!-- Basisdaten -->
         <div class="two">
-          <label>Endprodukt<br/>
-            <input id="endProduct" type="text" placeholder="z. B. Aluminiumbarren">
-          </label>
-          <label>Eigener Preis (&euro;/Einheit)<br/>
-            <input id="customPrice" type="text" placeholder="optional">
-          </label>
           <label>LKW-Größe (kg)<br/>
             <input id="lkwSize" type="number" min="1" step="1" value="2000">
           </label>
@@ -151,8 +151,13 @@
             <input id="backpackKg" type="number" min="1" step="1" value="150">
           </label>
         </div>
-        <div class="hr"></div>
 
+        <div class="hr"></div>
+        <h3 style="margin:0 0 6px 0;font-size:15px">Verkaufsliste (Endprodukte & Preise)</h3>
+        <div id="sellList" class="sell-list"></div>
+        <div class="actions"><button id="addSell" type="button">+ Produkt hinzufügen</button></div>
+
+        <div class="hr"></div>
         <div id="steps"></div>
 
         <div class="actions">
@@ -180,14 +185,11 @@
         <div class="summary" id="summary"></div>
 
         <div class="hr"></div>
-        <details>
+        <details open>
           <summary>Preis &amp; Gewinn</summary>
-          <div style="margin-top:8px">
-            <div class="row" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span>Endprodukt</span> <strong id="sumEndProduct">–</strong></div>
-            <div class="row" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span>Einheiten (verkaufbar)</span> <strong id="sumUnits">–</strong></div>
-            <div class="row" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span>Break-even (&euro;/Einheit)</span> <strong id="sumBreakeven">–</strong></div>
-            <div class="row" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span>Vorschlag (&le; 500&nbsp;000 &euro;/h)</span> <strong id="sumSuggested">–</strong></div>
-            <div class="row" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span>Stundengewinn (eigener Preis)</span> <strong id="sumHourly">–</strong></div>
+          <div id="priceTable" style="margin-top:8px"></div>
+          <div class="row" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-top:1px solid var(--border);margin-top:8px">
+            <span><strong>Gesamt: Gewinn/Stunde</strong></span> <strong id="sumHourly">–</strong>
           </div>
         </details>
       </aside>
@@ -315,6 +317,15 @@
     </div>
   </template>
 
+  <!-- Verkaufsliste-Row -->
+  <template id="tpl-sell-row">
+    <div class="row">
+      <input data-k="pname" type="text" placeholder="Endprodukt-Name (z. B. Aluminiumbarren)">
+      <input data-k="pprice" type="number" step="0.01" placeholder="Preis &euro;/Einheit">
+      <button class="delSell" type="button">✕</button>
+    </div>
+  </template>
+
   <!-- Fahrzeit-Modal -->
   <div id="travelModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal">
@@ -348,6 +359,29 @@
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
     function downloadPage(){ var html='<!doctype html>'+document.documentElement.outerHTML; var blob=new Blob([html],{type:'text/html'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='index.html'; a.click(); URL.revokeObjectURL(a.href); }
 
+    // ===== Verkaufsliste =====
+    function addSellRow(pname, price){
+      var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
+      var list=qs('#sellList'); list.appendChild(row);
+      if(pname) qs('[data-k="pname"]',row).value=pname;
+      if(price!=null) qs('[data-k="pprice"]',row).value=price;
+      row.addEventListener('input', recalc);
+      qs('.delSell',row).addEventListener('click', function(){ row.remove(); recalc(); });
+    }
+    function getSellList(){
+      return qsa('#sellList .row').map(function(r){
+        var n=qs('[data-k="pname"]',r).value.trim();
+        var p=num(qs('[data-k="pprice"]',r).value);
+        if(!n) return null;
+        return {name:n, price:(p>0?p:null)};
+      }).filter(Boolean);
+    }
+    function setSellList(arr){
+      var list=qs('#sellList'); list.innerHTML='';
+      (arr||[]).forEach(function(x){ addSellRow(x.name, x.price); });
+      if((arr||[]).length===0){ addSellRow('', null); }
+    }
+
     // ===== Templates / Steps =====
     var TPLS={
       start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
@@ -360,11 +394,13 @@
       var row=qs('#tpl-input-row').content.firstElementChild.cloneNode(true);
       qs('[data-key="inputs"]', stepEl).appendChild(row);
       qs('.delInput',row).addEventListener('click', function(){ row.remove(); recalc(); });
+      row.addEventListener('input', recalc);
     }
     function addOutputRow(stepEl){
       var row=qs('#tpl-output-row').content.firstElementChild.cloneNode(true);
       qs('[data-key="outputs"]', stepEl).appendChild(row);
       qs('.delOutput',row).addEventListener('click', function(){ row.remove(); recalc(); });
+      row.addEventListener('input', recalc);
     }
     function attachStepControls(stepEl){
       qs('.remove',stepEl)?.addEventListener('click', function(){ stepEl.remove(); recalc(); });
@@ -437,7 +473,7 @@
           steps.push({type:type,
             where: qs('[data-key="where"]',step).value.trim(),
             duration: num(qs('[data-key="duration"]',step).value), // Sekunden pro Run
-            processCost: num(qs('[data-key="processCost"]',step).value), // NEU: einmalig
+            processCost: num(qs('[data-key="processCost"]',step).value), // einmalig
             inputs: inputs,
             outputs: outputs
           });
@@ -451,20 +487,18 @@
       return {
         id: currentRouteId || uid(),
         name: (qs('#routeSelect') && qs('#routeSelect').selectedOptions[0]) ? qs('#routeSelect').selectedOptions[0].textContent : 'Unbenannt',
-        endProduct: qs('#endProduct').value.trim(),
         lkwSize: Math.max(1, num(qs('#lkwSize').value)||2000),
         backpackKg: Math.max(1, num(qs('#backpackKg').value)||150),
-        customPrice: (function(v){ var n=num(v); return n>0?n:null; })(qs('#customPrice').value),
+        sellList: getSellList(), // [{name, price}]
         steps: steps,
         travelTimes: store.travelTimes || {}
       };
     }
     function setRoute(route){
       currentRouteId = route.id || uid();
-      qs('#endProduct').value = route.endProduct || '';
       qs('#lkwSize').value = route.lkwSize || 2000;
       qs('#backpackKg').value = route.backpackKg || 150;
-      qs('#customPrice').value = route.customPrice!=null ? route.customPrice : '';
+      setSellList(route.sellList||[]);
       var box=qs('#steps'); box.innerHTML='';
       (route.steps||[]).forEach(function(s){
         var el=addStep(s.type); if(!el) return;
@@ -694,41 +728,36 @@
       });
 
       var totalMinutes = miningTime + driveTime + procTime;
-      function inferEnd(route){
-        for(var i=route.steps.length-1;i>=0;i--){
-          var st=route.steps[i];
-          if(st.type==='verarbeitung' && st.outputs && st.outputs.length>0){ return st.outputs[st.outputs.length-1].name; }
-        }
-        for(var j=route.steps.length-1;j>=0;j--){
-          var st2=route.steps[j];
-          if(st2.type==='abbau' && st2.what){ return st2.what; }
-        }
-        return route.endProduct || 'Endprodukt';
-      }
-      var endName = route.endProduct || inferEnd(route);
-      var sellableUnits = Math.max(0, Math.floor(inventory[endName]||0));
+
+      // === Endprodukte laut Verkaufsliste ===
+      var sellList = (route.sellList||[]).filter(function(x){return x && x.name;});
+      // Erzeuge Map für schnelle Abfrage
+      var priceMap = {};
+      sellList.forEach(function(x){ priceMap[x.name]= (x.price>0? x.price : null); });
+
+      // Stückzahlen je Endprodukt
+      var endProducts = sellList.map(function(x){
+        var units = Math.max(0, Math.floor(inventory[x.name]||0));
+        return {name:x.name, units:units, price: x.price>0? x.price : null};
+      });
 
       // Kosten
       var totalCost = purchaseCost + transportCostTotal + processingCostTotal;
-
       var hours = totalMinutes/60;
-      var breakEvenPerUnit = sellableUnits>0 ? (totalCost/sellableUnits) : 0;
-      var a_unitsPerHour = hours>0 ? (sellableUnits/hours) : 0; // Gewinn/h = a*Preis + b
-      var b_costPerHour = hours>0 ? (-totalCost/hours) : 0;
 
-      // Vorschlagpreis (<= 500k €/h) mind. Break-even
-      var suggestedPerUnit = sellableUnits>0 ? Math.max(breakEvenPerUnit, (500000*hours + totalCost)/sellableUnits) : 0;
+      // Umsatz/Gewinn
+      var revenue = endProducts.reduce(function(sum, ep){
+        var p = ep.price>0 ? ep.price : 0; // Falls kein Preis angegeben → 0 Umsatz
+        return sum + p * ep.units;
+      }, 0);
+      var profit = revenue - totalCost;
+      var hourlyProfit = hours>0 ? (profit / hours) : 0;
 
-      // Aktueller Preis/Profit (nutzt customPrice; wenn leer, verwenden wir Vorschlag)
-      var chosenPrice = (route.customPrice && route.customPrice>0) ? route.customPrice : suggestedPerUnit;
-      var profitPerHour = a_unitsPerHour*chosenPrice + b_costPerHour;
-
+      // Zusatzkennzahlen für Routenliste (lineares Modell entfällt bei Multi-Produkten; wir speichern nur Totale)
       return {
         miningTime, driveTime, procTime, totalMinutes,
         purchaseCost, transportCostTotal, processingCostTotal, totalCost,
-        endName, sellableUnits, hours,
-        breakEvenPerUnit, suggestedPerUnit, chosenPrice,
-        profitPerHour, a_unitsPerHour, b_costPerHour,
+        endProducts, revenue, profit, hourlyProfit,
         log
       };
     }
@@ -736,7 +765,12 @@
     function renderSummary(calc){
       qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
       qs('#kpiCost').textContent = cf.format(calc.totalCost);
-      qs('#kpiYield').textContent = fmt(calc.sellableUnits)+' × '+calc.endName;
+
+      // Ausbeute: Liste der Endprodukte + Stückzahlen
+      var yieldTxt = calc.endProducts.length
+        ? calc.endProducts.map(function(ep){ return fmt(ep.units)+' × '+ep.name; }).join(', ')
+        : '–';
+      qs('#kpiYield').textContent = yieldTxt;
 
       var box=qs('#summary'); box.innerHTML='';
       function row(label, value){
@@ -758,15 +792,34 @@
       calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
       det.appendChild(ul); box.appendChild(det);
 
-      qs('#sumEndProduct').textContent = calc.endName;
-      qs('#sumUnits').textContent = fmt(calc.sellableUnits);
-      qs('#sumBreakeven').textContent = calc.sellableUnits>0 ? cf.format(calc.breakEvenPerUnit) : '–';
-      qs('#sumSuggested').textContent = calc.sellableUnits>0 ? cf.format(calc.suggestedPerUnit) : '–';
-      var customPrice = num(qs('#customPrice').value);
-      var hourlyProfit = (customPrice>0)
-        ? (calc.a_unitsPerHour*customPrice + calc.b_costPerHour)
-        : (calc.a_unitsPerHour*calc.suggestedPerUnit + calc.b_costPerHour);
-      qs('#sumHourly').textContent = isFinite(hourlyProfit) ? cf.format(hourlyProfit) : '–';
+      // Preis & Gewinn Tabelle
+      var pBox=qs('#priceTable'); pBox.innerHTML='';
+      if(calc.endProducts.length===0){
+        pBox.innerHTML='<div class="mini muted">Keine Endprodukte in der Verkaufsliste.</div>';
+      }else{
+        var tbl=document.createElement('div');
+        tbl.style.display='grid'; tbl.style.gridTemplateColumns='1.2fr .6fr .6fr .6fr'; tbl.style.gap='8px';
+        tbl.innerHTML='<div><strong>Endprodukt</strong></div><div><strong>Menge</strong></div><div><strong>Preis</strong></div><div><strong>Umsatz</strong></div>';
+        calc.endProducts.forEach(function(ep){
+          var priceDisp = (ep.price>0)? cf.format(ep.price) : '<span class="muted">–</span>';
+          var revenue = (ep.price>0)? (ep.price*ep.units) : 0;
+          var row=document.createElement('div'); row.textContent=ep.name; tbl.appendChild(row);
+          var r2=document.createElement('div'); r2.textContent=fmt(ep.units); tbl.appendChild(r2);
+          var r3=document.createElement('div'); r3.innerHTML=priceDisp; tbl.appendChild(r3);
+          var r4=document.createElement('div'); r4.textContent=cf.format(revenue); tbl.appendChild(r4);
+        });
+        var tot1=document.createElement('div'); tot1.innerHTML='<strong>Gesamtumsatz</strong>'; tbl.appendChild(tot1);
+        var tot2=document.createElement('div'); tot2.textContent=''; tbl.appendChild(tot2);
+        var tot3=document.createElement('div'); tot3.textContent=''; tbl.appendChild(tot3);
+        var tot4=document.createElement('div'); tot4.innerHTML='<strong>'+cf.format(calc.revenue)+'</strong>'; tbl.appendChild(tot4);
+        var tot5=document.createElement('div'); tot5.innerHTML='<strong>Gesamtgewinn</strong>'; tbl.appendChild(tot5);
+        var tot6=document.createElement('div'); tot6.textContent=''; tbl.appendChild(tot6);
+        var tot7=document.createElement('div'); tot7.textContent=''; tbl.appendChild(tot7);
+        var tot8=document.createElement('div'); tot8.innerHTML='<strong>'+cf.format(calc.profit)+'</strong>'; tbl.appendChild(tot8);
+        pBox.appendChild(tbl);
+      }
+
+      qs('#sumHourly').textContent = cf.format(calc.hourlyProfit);
     }
 
     function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
@@ -778,7 +831,7 @@
       sel.innerHTML='';
       var opt0=document.createElement('option'); opt0.value=''; opt0.textContent='— Gespeicherte Routen —'; sel.appendChild(opt0);
       Object.keys(map).forEach(function(id){
-        var r=map[id]; var o=document.createElement('option'); o.value=id; o.textContent=r.name||r.endProduct||id; if(id===selectedId) o.selected=true; sel.appendChild(o);
+        var r=map[id]; var o=document.createElement('option'); o.value=id; o.textContent=r.name||id; if(id===selectedId) o.selected=true; sel.appendChild(o);
       });
     }
 
@@ -789,15 +842,13 @@
         var r=store.routes[id];
         var calc=compute(r);
         list.push({
-          id:id, name:r.name||r.endProduct||id, endProduct: calc.endName,
-          price: (r.customPrice && r.customPrice>0) ? r.customPrice : calc.suggestedPerUnit,
-          priceIsSuggested: !(r.customPrice && r.customPrice>0),
-          profitPerHour: calc.profitPerHour,
-          a: calc.a_unitsPerHour, b: calc.b_costPerHour, // Profit/h = a*price + b
-          breakEven: calc.breakEvenPerUnit
+          id:id,
+          name:r.name||id,
+          endProducts: (r.sellList||[]).map(function(x){ return {name:x.name, price:x.price||null}; }),
+          hourlyProfit: calc.hourlyProfit
         });
       });
-      list.sort(function(a,b){ return (b.profitPerHour||0) - (a.profitPerHour||0); });
+      list.sort(function(a,b){ return (b.hourlyProfit||0) - (a.hourlyProfit||0); });
       return list;
     }
 
@@ -806,64 +857,80 @@
       var container = qs('#routesList'); container.innerHTML='';
 
       list.forEach(function(item){
+        var labelEP = item.endProducts.length
+          ? item.endProducts.map(function(ep){ return ep.name + (ep.price? ' ('+cf.format(ep.price)+')' : ' (–)'); }).join(', ')
+          : '–';
         var row=document.createElement('div');
         row.className='route-row';
         row.draggable=true;
         row.dataset.id=item.id;
         row.innerHTML = `
           <div class="drag">▤</div>
-          <div><div><strong>${item.name}</strong></div><div class="muted">${item.endProduct}</div></div>
-          <div><span class="pill">${cf.format(item.price)}${item.priceIsSuggested?' <span class="muted">(Vorschlag)</span>':''}</span></div>
-          <div><strong>${cf.format(item.profitPerHour)}</strong><div class="mini muted">Gewinn/h</div></div>
-          <div class="mini muted">a=${fmt(item.a)} u/h</div>
+          <div><div><strong>${item.name}</strong></div><div class="muted">${labelEP}</div></div>
+          <div><span class="pill">${item.endProducts.length? item.endProducts.length+' Produkte' : '—'}</span></div>
+          <div><strong>${cf.format(item.hourlyProfit)}</strong><div class="mini muted">Gewinn/h</div></div>
+          <div class="mini muted"></div>
         `;
         container.appendChild(row);
       });
 
       // Drag & Drop für Reihenfolge
       enableListDnD(container, function(newOrderIds){
+        // Für Multi-Endprodukte gibt es kein einfaches lineares p->profit Modell.
+        // Wir schlagen minimale Anpassungen vor, indem wir den Gewinn/h der Routen angleichen:
+        // Für Routen ohne Preise (alle 0) können wir keinen Vorschlag machen -> Hinweis.
+        var store=readStore();
         var dataById={};
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
 
         var margin = 1; // € pro Stunde Abstand
         var targets = {};
-        for(var i=0;i<newOrderIds.length;i++){
-          var id=newOrderIds[i];
-          var d=dataById[id]; if(!d){ continue; }
-          var currentProfit = d.profitPerHour;
-          var neededProfit = -Infinity;
-          if(i<newOrderIds.length-1){
-            var nextId=newOrderIds[i+1];
-            var next=dataById[nextId];
-            if(next){ neededProfit = (targets[nextId]?.targetProfit) ?? next.profitPerHour; neededProfit += margin; }
-          }
-          var targetProfit = Math.max(currentProfit, neededProfit);
-          var reqPrice = d.a>0 ? (targetProfit - d.b)/d.a : Infinity;
-          var minPrice = d.breakEven;
-          if(!isFinite(reqPrice) || reqPrice<minPrice) reqPrice=minPrice;
+        var any=false;
 
-          var overCap = targetProfit>500000;
-          var changeNeeded = currentProfit < (neededProfit||-Infinity) - 1e-9;
-          targets[id]={ targetProfit: targetProfit, requiredPrice: changeNeeded? reqPrice : null, overCap: overCap, currentPrice: d.price };
+        // Wir empfehlen pro Route einen proportionalen Aufschlag auf alle gesetzten Preise,
+        // um die Zielreihenfolge zu erreichen (Heuristik).
+        function totalPrice(r){
+          return (r.endProducts||[]).reduce(function(s,ep){ return s + (ep.price||0); },0);
         }
 
+        var ul=qs('#adjustmentsList'); ul.innerHTML='';
+        var note=qs('#adjustmentsNote'); note.textContent='';
         var panel=qs('#adjustmentsPanel');
-        var ul=qs('#adjustmentsList');
-        ul.innerHTML='';
-        var any=false, capWarn=false;
-        newOrderIds.forEach(function(id){
-          var t=targets[id]; var d=dataById[id];
-          if(!t || t.requiredPrice==null) return;
-          any=true;
-          var li=document.createElement('li');
-          var warnSpan = t.overCap ? ' <span class="pill warn">Achtung: > 500 000 €/h</span>' : '';
-          if(t.overCap) capWarn=true;
-          li.innerHTML = `<strong>${d.name}</strong>: Preis anpassen ${d.priceIsSuggested?'(von Vorschlag':'(von'} ${cf.format(d.price)}) → <strong>${cf.format(t.requiredPrice)}</strong>${warnSpan}`;
-          ul.appendChild(li);
+
+        // Wenn irgendeine Route gar keine Preise hat, Hinweis ausgeben:
+        var priceMissing = newOrderIds.some(function(id){
+          var d=dataById[id]; return !d || !(d.endProducts||[]).some(function(ep){return ep.price>0;});
         });
-        qs('#adjustmentsNote').innerHTML = capWarn
-          ? 'Mindestens eine Zielreihenfolge würde > 500 000 € Gewinn/Stunde erfordern (gelb markiert).'
-          : 'Berechnet mit Mindestabständen von 1 €/h zwischen benachbarten Einträgen.';
+
+        // Heuristik: Von oben nach unten – wenn Gewinn/h zu klein für Reihenfolge,
+        // skaliere alle vorhandenen Preise dieser Route um Faktor f >=1.
+        var lastTarget = Infinity;
+        for(var i=0;i<newOrderIds.length;i++){
+          var id=newOrderIds[i];
+          var d=dataById[id]; if(!d) continue;
+          var desiredBelow = (i<newOrderIds.length-1) ? (dataById[newOrderIds[i+1]]?.hourlyProfit || 0) + margin : -Infinity;
+          var current = d.hourlyProfit||0;
+          var need = Math.max(current, desiredBelow);
+          if(current < need - 1e-9){
+            any=true;
+            // Faktor: wir schätzen linearen Zusammenhang Umsatz ~ Sum(preise)*Menge
+            var baseSum = totalPrice(d);
+            var f = baseSum>0 ? (need/current) : null; // crude: proportional
+            var li=document.createElement('li');
+            if(f && isFinite(f) && f>1){
+              li.innerHTML = `<strong>${d.name}</strong>: Preise ca. ×${fmt(f)} erhöhen (alle gesetzten Preise proportional), um ~ ${cf.format(need)} Gewinn/h zu erreichen.`;
+            }else{
+              li.innerHTML = `<strong>${d.name}</strong>: Keine klare Preisempfehlung möglich (fehlende oder 0-Preise).`;
+            }
+            ul.appendChild(li);
+          }
+        }
+
+        if(priceMissing){
+          note.textContent = 'Für einige Routen fehlen Preise. Ohne Preise sind genaue Anpassungsvorschläge nicht möglich.';
+        }else{
+          note.textContent = 'Heuristische Vorschläge: proportionale Erhöhung gesetzter Preise, Abstand 1 €/h zwischen benachbarten Einträgen.';
+        }
         panel.style.display = any ? 'block' : 'none';
       });
     }
@@ -910,11 +977,14 @@
 
     // ===== Events =====
     window.addEventListener('DOMContentLoaded', function(){
-      // Add
+      // Verkaufsliste
+      qs('#addSell').addEventListener('click', function(){ addSellRow('', null); });
+
+      // Add step
       qs('#addBtn')?.addEventListener('click', function(){ var t=qs('#addType').value; addStep(t); });
 
       // Basisdaten -> Recalc
-      ['endProduct','customPrice','lkwSize','backpackKg'].forEach(function(id){
+      ['lkwSize','backpackKg'].forEach(function(id){
         var el=qs('#'+id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
@@ -922,8 +992,7 @@
       qs('#saveBtn')?.addEventListener('click', function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){
-          var suggested = r.endProduct || 'Unbenannt';
-          var n=prompt('Name der Route?', suggested);
+          var n=prompt('Name der Route?', r.sellList?.map(x=>x.name).filter(Boolean).join(', ') || 'Unbenannt');
           if(n) r.name=n;
         }
         if(!r.id) r.id = uid();
@@ -975,11 +1044,13 @@
       qs('#demoBtn')?.addEventListener('click', function(){
         var demo={
           id: uid(),
-          name: 'Bauxit → Aluminiumbarren (Demo)',
-          endProduct: 'Aluminiumbarren',
+          name: 'Metallschmelze Demo (Multi-Output)',
           lkwSize: 2000,
           backpackKg: 150,
-          customPrice: 0,
+          sellList: [
+            {name:'Aluminiumbarren', price: 120},
+            {name:'Schlacke', price: 10}
+          ],
           steps: [
             {type:'start', where:'HQ'},
             {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', timeLkw: 180},
@@ -995,7 +1066,7 @@
               outputs:[{name:'Unreiner Aluminiumschrott', unitWeight:2}]},
             {type:'verarbeitung', where:'Metallschmelze', duration: 600, processCost: 0,
               inputs:[{name:'Unreiner Aluminiumschrott', qty:4, source:'Metallschmelze', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
-              outputs:[{name:'Aluminiumbarren', unitWeight:1}]},
+              outputs:[{name:'Aluminiumbarren', unitWeight:1},{name:'Schlacke', unitWeight:1}]},
             {type:'verkauf', where:'Großhändler'}
           ]
         };
@@ -1010,6 +1081,7 @@
 
       // Initial
       refreshRouteSelect(null);
+      setSellList([]); // initiale leere Verkaufsliste (mit einer Zeile)
       if(qs('#steps').children.length===0){ addStep('start'); }
       recalc();
     });
