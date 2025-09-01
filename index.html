@@ -21,8 +21,8 @@
       background:
         radial-gradient(1200px 1200px at 100% 0%,rgba(0,230,118,.06),transparent 40%),
         radial-gradient(1200px 1200px at 0% 100%,rgba(0,230,118,.06),transparent 40%),
-        linear-gradient(var(--grid) 1px,transparent 1px) 0 0/ 100% 24px,
-        linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/ 24px 100%;
+        linear-gradient( var(--grid) 1px, transparent 1px) 0 0/ 100% 24px,
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/ 24px 100%;
       opacity:.45;
     }
     .content{position:relative; z-index:1;}
@@ -84,7 +84,7 @@
 
     /* Modal */
     .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:5}
-    .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(480px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
+    .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(520px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
     .modal h3{margin:0 0 8px 0}
     .modal .row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
     .modal .actions{display:flex; gap:8px; justify-content:flex-end}
@@ -138,8 +138,11 @@
       <!-- Builder Ansicht -->
       <section class="card" id="builderView">
         <h2>Route zusammenstellen</h2>
-        <div class="sub">Verarbeitungszeit gilt pro <strong>Run</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet. Verarbeitungskosten gelten <strong>einmalig pro Verarbeitungsschritt</strong>.  
-        Endprodukte & Preise kannst du unten als <strong>Verkaufsliste</strong> pflegen (mehrere möglich).</div>
+        <div class="sub">
+          Verarbeitungszeit gilt pro <strong>Run</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet.
+          Verarbeitungskosten gelten <strong>einmalig pro Verarbeitungsschritt</strong>.  
+          Endprodukte & Preise pflegst du unten in der <strong>Verkaufsliste</strong> (mehrere möglich).
+        </div>
 
         <div class="hr"></div>
         <!-- Basisdaten -->
@@ -555,8 +558,6 @@
         var idx=stepsNodes.findIndex(function(n){return n===stepEl;});
         if(idx<0) return;
         var currPlace=qs('[data-key="where"]', stepEl)?.value.trim(); if(!currPlace) return;
-
-        // Finde letzten Ort davor
         var prevPlace=null;
         for(var i=idx-1;i>=0;i--){
           var node=stepsNodes[i];
@@ -564,7 +565,6 @@
           if(w && w.value.trim()){ prevPlace=w.value.trim(); break; }
         }
         if(!prevPlace || prevPlace===currPlace) return;
-
         var store=readStore(); var key=travelKey(prevPlace, currPlace);
         if(store.travelTimes[key]!=null) return;
         openTravelModal(prevPlace, currPlace, function(mins){ if(mins==null) return; store.travelTimes[key]=mins; writeStore(store); recalc(); });
@@ -595,7 +595,7 @@
       });
     }
 
-    // ===== Berechnung einer Route =====
+    // ===== Berechnung einer Route (Schritt-Reihenfolge + Preisvorschläge) =====
     function compute(route){
       var baseKg = route.lkwSize>0? route.lkwSize : 2000; // LKW-Größe
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
@@ -606,9 +606,30 @@
       var purchaseCost=0, transportCostTotal=0, processingCostTotal=0;
       var log=[];
 
-      // Abbau
-      route.steps.forEach(function(s,idx){
-        if(s.type==='abbau'){
+      var store=readStore();
+      var lastPlace=null;
+
+      // --- Schrittweise durchgehen, Fahrten genau dazwischen einfügen ---
+      (route.steps||[]).forEach(function(s, idx){
+        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verkauf'||s.type==='verarbeitung') ? (s.where||'') : '';
+
+        // Fahrzeit falls Ortswechsel zwischen vorherigem Ort und diesem Schritt
+        if(thisPlace && lastPlace && lastPlace!==thisPlace){
+          var key= (lastPlace||'?')+'|'+(thisPlace||'?');
+          var m=store.travelTimes[key];
+          if(m!=null){
+            driveTime += Math.max(0,num(m));
+            log.push('Fahrt '+lastPlace+' → '+thisPlace+': +'+fmt(m)+' min.');
+          } else {
+            log.push('Fahrt '+lastPlace+' → '+thisPlace+': (keine Zeit hinterlegt)');
+          }
+        }
+
+        // Schritt ausführen
+        if(s.type==='start'){
+          log.push('Start @ '+(s.where||'?'));
+        }
+        else if(s.type==='abbau'){
           var perUnit=Math.max(0, num(s.unitWeight));
           var units = perUnit>0 ? Math.floor(baseKg / perUnit) : 0;
           var what = s.what || ('Rohstoff_'+(idx+1));
@@ -616,149 +637,165 @@
           if(perUnit>0) weights[what]=perUnit;
           var t = Math.max(0, num(s.timeLkw));
           miningTime += t;
-          log.push('Abbau '+what+' @'+(s.where||'?')+': '+fmt(units)+' Einheiten (à '+(perUnit||1)+' kg). Zeit +'+fmt(t)+' min.');
+          log.push('Abbau '+what+' @ '+(s.where||'?')+': '+fmt(units)+' Einheiten (à '+(perUnit||1)+' kg). Zeit +'+fmt(t)+' min.');
         }
-      });
-
-      // Fahrten (inkl. Startpunkt)
-      var store=readStore();
-      var lastPlace=null;
-      route.steps.forEach(function(s){
-        var place = (s.type==='start'||s.type==='abbau'||s.type==='verkauf'||s.type==='verarbeitung') ? (s.where||'') : '';
-        if(place){
-          if(lastPlace && lastPlace!==place){
-            var key=travelKey(lastPlace, place);
-            var m=store.travelTimes[key];
-            if(m!=null){ driveTime += Math.max(0,num(m)); log.push('Fahrt '+lastPlace+' → '+place+': +'+fmt(m)+' min.'); }
-          }
-          if(!lastPlace){ lastPlace=place; } else if(lastPlace!==place){ lastPlace=place; }
-        }
-      });
-
-      // Transportkosten (fixe Beträge)
-      route.steps.forEach(function(s){
-        if(s.type==='transportkosten'){
+        else if(s.type==='transportkosten'){
           var c=Math.max(0,num(s.transportCost));
           transportCostTotal+=c;
           log.push('Transportkosten: +'+cf.format(c));
         }
-      });
+        else if(s.type==='verarbeitung'){
+          var inputs=s.inputs||[];
+          var outputs=s.outputs||[];
+          if(inputs.length===0 || outputs.length===0){
+            log.push('Verarbeitung @ '+(s.where||'?')+': Input/Output unvollständig – übersprungen.');
+          }else{
+            // Gewichte der Outputs sichern
+            outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
-      // Verarbeitung
-      route.steps.forEach(function(s){
-        if(s.type!=='verarbeitung') return;
+            var durSec = Math.max(0, num(s.duration));  // Sekunden pro RUN
+            var durMin = durSec/60;
 
-        var inputs=s.inputs||[];
-        var outputs=s.outputs||[];
-        if(inputs.length===0 || outputs.length===0){
-          log.push('Verarbeitung @'+(s.where||'?')+': Input/Output unvollständig – übersprungen.'); return;
+            var nonPurchased=inputs.filter(function(i){return !i.purchased;});
+            var purchased=inputs.filter(function(i){return i.purchased;});
+
+            var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
+
+            var runs=0, batchesTotal=0;
+            while(true){
+              var batchesByInventory = Infinity;
+              if(nonPurchased.length>0){
+                batchesByInventory = nonPurchased.reduce(function(min,i){
+                  var avail=inventory[i.name]||0;
+                  var need=Math.max(1, num(i.qty));
+                  var can=Math.floor(avail/need);
+                  return Math.min(min, can);
+                }, Infinity);
+              } else { batchesByInventory = 999999; }
+              if(batchesByInventory<=0) break;
+
+              var kgBatch = totalInputKgPerBatch;
+              var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
+              if(kgBatch>0 && batchesByBackpack<=0) break;
+
+              var batchesThisRun = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
+
+              nonPurchased.forEach(function(i){
+                var need=Math.max(0, num(i.qty));
+                inventory[i.name]=(inventory[i.name]||0) - need*batchesThisRun;
+              });
+              purchased.forEach(function(i){
+                var need=Math.max(0, num(i.qty));
+                var price=Math.max(0, num(i.price));
+                purchaseCost += need*batchesThisRun*price;
+              });
+
+              var qPerBatchArr = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
+              outputs.forEach(function(o,ix){
+                var qPerBatch = Math.max(0, num(o.qty)) || qPerBatchArr[ix] || 0;
+                inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
+              });
+
+              procTime += durMin; // Zeit/Run
+              runs++; batchesTotal+=batchesThisRun;
+              if(batchesThisRun<=0) break;
+            }
+
+            // Einmalige Verarbeitungskosten
+            var stepCost = Math.max(0, num(s.processCost));
+            if(stepCost>0){
+              processingCostTotal += stepCost;
+              log.push('Verarbeitungskosten @ '+(s.where||'?')+': +'+cf.format(stepCost)+' (einmalig)');
+            }
+
+            var inputsTxt = inputs.map(function(i){
+              var t=fmt(num(i.qty))+'× '+i.name;
+              if(i.source) t+=' ['+i.source+']';
+              if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
+              return t;
+            }).join(' + ');
+            var auto = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
+            var dbgOut = outputs.map(function(o,ix){
+              var q = Math.max(0, num(o.qty)) || auto[ix] || 0;
+              return fmt(q)+'× '+o.name;
+            }).join(' + ');
+            var durSecTxt = Math.round(durMin*60);
+            log.push('Verarbeitung @ '+(s.where||'?')+': '+runs+' Runs, '+fmt(batchesTotal)+' Batches/Run: '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Run: '+fmt(durSecTxt)+' s');
+          }
+        }
+        else if(s.type==='verkauf'){
+          log.push('Verkaufsort: '+(s.where||'?'));
         }
 
-        // Output-Gewichte sichern
-        outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
-
-        var durSec = Math.max(0, num(s.duration));  // Sekunden pro RUN
-        var durMin = durSec/60;
-
-        var nonPurchased=inputs.filter(function(i){return !i.purchased;});
-        var purchased=inputs.filter(function(i){return i.purchased;});
-
-        var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
-
-        var runs=0, batchesTotal=0;
-        while(true){
-          var batchesByInventory = Infinity;
-          if(nonPurchased.length>0){
-            batchesByInventory = nonPurchased.reduce(function(min,i){
-              var avail=inventory[i.name]||0;
-              var need=Math.max(1, num(i.qty));
-              var can=Math.floor(avail/need);
-              return Math.min(min, can);
-            }, Infinity);
-          } else { batchesByInventory = 999999; }
-          if(batchesByInventory<=0) break;
-
-          var kgBatch = totalInputKgPerBatch;
-          var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
-          if(kgBatch>0 && batchesByBackpack<=0) break;
-
-          var batchesThisRun = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
-
-          nonPurchased.forEach(function(i){
-            var need=Math.max(0, num(i.qty));
-            inventory[i.name]=(inventory[i.name]||0) - need*batchesThisRun;
-          });
-          purchased.forEach(function(i){
-            var need=Math.max(0, num(i.qty));
-            var price=Math.max(0, num(i.price));
-            purchaseCost += need*batchesThisRun*price;
-          });
-
-          var qPerBatchArr = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
-          outputs.forEach(function(o,ix){
-            var qPerBatch = Math.max(0, num(o.qty)) || qPerBatchArr[ix] || 0;
-            inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
-          });
-
-          procTime += durMin; // Zeit/Run
-          runs++; batchesTotal+=batchesThisRun;
-          if(batchesThisRun<=0) break;
-        }
-
-        // Einmalige Verarbeitungskosten dieses Schritts
-        var stepCost = Math.max(0, num(s.processCost));
-        if(stepCost>0){
-          processingCostTotal += stepCost;
-          log.push('Verarbeitungskosten @'+(s.where||'?')+': +'+cf.format(stepCost)+' (einmalig für diesen Schritt)');
-        }
-
-        var inputsTxt = inputs.map(function(i){
-          var t=fmt(num(i.qty))+'× '+i.name;
-          if(i.source) t+=' ['+i.source+']';
-          if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
-          return t;
-        }).join(' + ');
-        var auto = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
-        var dbgOut = outputs.map(function(o,ix){
-          var q = Math.max(0, num(o.qty)) || auto[ix] || 0;
-          return fmt(q)+'× '+o.name;
-        }).join(' + ');
-        var durSecTxt = Math.round(durMin*60);
-        log.push('Verarbeitung @'+(s.where||'?')+': '+runs+' Runs, '+fmt(batchesTotal)+' Batches/Run: '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Run: '+fmt(durSecTxt)+' s');
+        // Ort aktualisieren
+        if(thisPlace){ lastPlace=thisPlace; }
       });
 
       var totalMinutes = miningTime + driveTime + procTime;
 
       // === Endprodukte laut Verkaufsliste ===
       var sellList = (route.sellList||[]).filter(function(x){return x && x.name;});
-      // Erzeuge Map für schnelle Abfrage
-      var priceMap = {};
-      sellList.forEach(function(x){ priceMap[x.name]= (x.price>0? x.price : null); });
-
-      // Stückzahlen je Endprodukt
       var endProducts = sellList.map(function(x){
-        var units = Math.max(0, Math.floor(inventory[x.name]||0));
-        return {name:x.name, units:units, price: x.price>0? x.price : null};
+        var units = Math.max(0, Math.floor((inventory[x.name]||0)));
+        return {name:x.name, units:units, price: (x.price>0? x.price : null)};
       });
 
       // Kosten
       var totalCost = purchaseCost + transportCostTotal + processingCostTotal;
       var hours = totalMinutes/60;
 
-      // Umsatz/Gewinn
+      // ---- Preisvorschläge (≤ 500k €/h) ----
+      var totalUnits = endProducts.reduce(function(s,ep){return s+ep.units;},0);
+      var BE_avg = totalUnits>0 ? (totalCost / totalUnits) : 0;
+      var targetRevenue = (hours>0) ? (500000*hours + totalCost) : totalCost; // damit Gewinn/h ≤ 500k, bei 0h → nur Kosten
+      var fixedRevenue = endProducts.reduce(function(s,ep){ return s + ((ep.price>0)? ep.price*ep.units : 0); }, 0);
+      var varUnits = endProducts.reduce(function(s,ep){ return s + ((ep.price>0)? 0 : ep.units); }, 0);
+
+      var suggested = {}; // name -> suggested price
+      if(totalUnits>0){
+        if(varUnits>0){
+          // fehlende Preise so setzen, dass Ziel erreicht wird
+          var perUnitVar = (targetRevenue - fixedRevenue) / Math.max(1, varUnits);
+          var perUnitVarCapped = Math.max(0, Math.max(BE_avg, perUnitVar));
+          endProducts.forEach(function(ep){
+            if(!(ep.price>0)){ suggested[ep.name] = perUnitVarCapped; }
+            else { suggested[ep.name] = ep.price; }
+          });
+        }else{
+          // alle haben Preise → ggf. proportional absenken
+          if(fixedRevenue>0 && fixedRevenue>targetRevenue){
+            var f = targetRevenue / fixedRevenue; // <1
+            endProducts.forEach(function(ep){
+              var sp = (ep.price>0? ep.price : 0)*f;
+              suggested[ep.name] = Math.max(BE_avg, sp);
+            });
+          }else{
+            endProducts.forEach(function(ep){ suggested[ep.name] = (ep.price>0? ep.price : BE_avg); });
+          }
+        }
+      }
+
+      // Umsatz/Gewinn mit "effektivem" Preis (Preis falls gesetzt, sonst Vorschlag)
       var revenue = endProducts.reduce(function(sum, ep){
-        var p = ep.price>0 ? ep.price : 0; // Falls kein Preis angegeben → 0 Umsatz
-        return sum + p * ep.units;
+        var eff = (ep.price>0) ? ep.price : (suggested[ep.name]||0);
+        return sum + eff * ep.units;
       }, 0);
       var profit = revenue - totalCost;
       var hourlyProfit = hours>0 ? (profit / hours) : 0;
 
-      // Zusatzkennzahlen für Routenliste (lineares Modell entfällt bei Multi-Produkten; wir speichern nur Totale)
+      // Endprodukte anreichern (für Tabelle)
+      var endProductsRich = endProducts.map(function(ep){
+        var s = suggested[ep.name] || null;
+        var effective = (ep.price>0) ? ep.price : (s||0);
+        var revenueEP = effective * ep.units;
+        return { name: ep.name, units: ep.units, price: ep.price, suggested: s, effective: effective, revenue: revenueEP };
+      });
+
       return {
         miningTime, driveTime, procTime, totalMinutes,
         purchaseCost, transportCostTotal, processingCostTotal, totalCost,
-        endProducts, revenue, profit, hourlyProfit,
-        log
+        endProducts: endProductsRich, revenue, profit, hourlyProfit,
+        BE_avg, targetRevenue, log
       };
     }
 
@@ -772,6 +809,7 @@
         : '–';
       qs('#kpiYield').textContent = yieldTxt;
 
+      // Struktur – bereits in Schritt-Reihenfolge aufgebaut
       var box=qs('#summary'); box.innerHTML='';
       function row(label, value){
         var r=document.createElement('div'); r.className='row';
@@ -792,31 +830,43 @@
       calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
       det.appendChild(ul); box.appendChild(det);
 
-      // Preis & Gewinn Tabelle
+      // Preis & Gewinn Tabelle (mit Vorschlag ≤ 500k €/h)
       var pBox=qs('#priceTable'); pBox.innerHTML='';
       if(calc.endProducts.length===0){
         pBox.innerHTML='<div class="mini muted">Keine Endprodukte in der Verkaufsliste.</div>';
       }else{
         var tbl=document.createElement('div');
-        tbl.style.display='grid'; tbl.style.gridTemplateColumns='1.2fr .6fr .6fr .6fr'; tbl.style.gap='8px';
-        tbl.innerHTML='<div><strong>Endprodukt</strong></div><div><strong>Menge</strong></div><div><strong>Preis</strong></div><div><strong>Umsatz</strong></div>';
+        tbl.style.display='grid'; tbl.style.gridTemplateColumns='1.2fr .6fr .8fr .9fr .8fr .9fr'; tbl.style.gap='8px';
+        tbl.innerHTML='<div><strong>Endprodukt</strong></div><div><strong>Menge</strong></div><div><strong>Dein Preis</strong></div><div><strong>Vorschlag (≤ 500k/h)</strong></div><div><strong>eff. Preis</strong></div><div><strong>Umsatz</strong></div>';
         calc.endProducts.forEach(function(ep){
           var priceDisp = (ep.price>0)? cf.format(ep.price) : '<span class="muted">–</span>';
-          var revenue = (ep.price>0)? (ep.price*ep.units) : 0;
-          var row=document.createElement('div'); row.textContent=ep.name; tbl.appendChild(row);
-          var r2=document.createElement('div'); r2.textContent=fmt(ep.units); tbl.appendChild(r2);
-          var r3=document.createElement('div'); r3.innerHTML=priceDisp; tbl.appendChild(r3);
-          var r4=document.createElement('div'); r4.textContent=cf.format(revenue); tbl.appendChild(r4);
+          var suggDisp  = (ep.suggested!=null)? cf.format(ep.suggested) : '<span class="muted">–</span>';
+          var row1=document.createElement('div'); row1.textContent=ep.name; tbl.appendChild(row1);
+          var row2=document.createElement('div'); row2.textContent=fmt(ep.units); tbl.appendChild(row2);
+          var row3=document.createElement('div'); row3.innerHTML=priceDisp; tbl.appendChild(row3);
+          var row4=document.createElement('div'); row4.innerHTML=suggDisp; tbl.appendChild(row4);
+          var row5=document.createElement('div'); row5.textContent=cf.format(ep.effective); tbl.appendChild(row5);
+          var row6=document.createElement('div'); row6.textContent=cf.format(ep.revenue); tbl.appendChild(row6);
         });
         var tot1=document.createElement('div'); tot1.innerHTML='<strong>Gesamtumsatz</strong>'; tbl.appendChild(tot1);
-        var tot2=document.createElement('div'); tot2.textContent=''; tbl.appendChild(tot2);
-        var tot3=document.createElement('div'); tot3.textContent=''; tbl.appendChild(tot3);
-        var tot4=document.createElement('div'); tot4.innerHTML='<strong>'+cf.format(calc.revenue)+'</strong>'; tbl.appendChild(tot4);
-        var tot5=document.createElement('div'); tot5.innerHTML='<strong>Gesamtgewinn</strong>'; tbl.appendChild(tot5);
-        var tot6=document.createElement('div'); tot6.textContent=''; tbl.appendChild(tot6);
-        var tot7=document.createElement('div'); tot7.textContent=''; tbl.appendChild(tot7);
-        var tot8=document.createElement('div'); tot8.innerHTML='<strong>'+cf.format(calc.profit)+'</strong>'; tbl.appendChild(tot8);
+        var t2=document.createElement('div'); t2.textContent=''; tbl.appendChild(t2);
+        var t3=document.createElement('div'); t3.textContent=''; tbl.appendChild(t3);
+        var t4=document.createElement('div'); t4.textContent=''; tbl.appendChild(t4);
+        var t5=document.createElement('div'); t5.textContent=''; tbl.appendChild(t5);
+        var t6=document.createElement('div'); t6.innerHTML='<strong>'+cf.format(calc.revenue)+'</strong>'; tbl.appendChild(t6);
+        var g1=document.createElement('div'); g1.innerHTML='<strong>Gesamtgewinn</strong>'; tbl.appendChild(g1);
+        var g2=document.createElement('div'); g2.textContent=''; tbl.appendChild(g2);
+        var g3=document.createElement('div'); g3.textContent=''; tbl.appendChild(g3);
+        var g4=document.createElement('div'); g4.textContent=''; tbl.appendChild(g4);
+        var g5=document.createElement('div'); g5.textContent=''; tbl.appendChild(g5);
+        var g6=document.createElement('div'); g6.innerHTML='<strong>'+cf.format(calc.revenue - calc.totalCost)+'</strong>'; tbl.appendChild(g6);
         pBox.appendChild(tbl);
+
+        var hint=document.createElement('div');
+        hint.className='mini muted';
+        hint.style.marginTop='6px';
+        hint.textContent='Vorschläge berücksichtigen den Zielwert ≤ 500 000 €/h. Untergrenze je Produkt ist der durchschnittliche Break-even pro Einheit.';
+        pBox.appendChild(hint);
       }
 
       qs('#sumHourly').textContent = cf.format(calc.hourlyProfit);
@@ -835,7 +885,7 @@
       });
     }
 
-    // ===== Routenliste (neuer Menüpunkt) =====
+    // ===== Routenliste =====
     function buildListData(){
       var store=readStore(); var list=[];
       Object.keys(store.routes||{}).forEach(function(id){
@@ -876,10 +926,6 @@
 
       // Drag & Drop für Reihenfolge
       enableListDnD(container, function(newOrderIds){
-        // Für Multi-Endprodukte gibt es kein einfaches lineares p->profit Modell.
-        // Wir schlagen minimale Anpassungen vor, indem wir den Gewinn/h der Routen angleichen:
-        // Für Routen ohne Preise (alle 0) können wir keinen Vorschlag machen -> Hinweis.
-        var store=readStore();
         var dataById={};
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
 
@@ -887,50 +933,24 @@
         var targets = {};
         var any=false;
 
-        // Wir empfehlen pro Route einen proportionalen Aufschlag auf alle gesetzten Preise,
-        // um die Zielreihenfolge zu erreichen (Heuristik).
-        function totalPrice(r){
-          return (r.endProducts||[]).reduce(function(s,ep){ return s + (ep.price||0); },0);
-        }
-
         var ul=qs('#adjustmentsList'); ul.innerHTML='';
         var note=qs('#adjustmentsNote'); note.textContent='';
         var panel=qs('#adjustmentsPanel');
 
-        // Wenn irgendeine Route gar keine Preise hat, Hinweis ausgeben:
-        var priceMissing = newOrderIds.some(function(id){
-          var d=dataById[id]; return !d || !(d.endProducts||[]).some(function(ep){return ep.price>0;});
-        });
-
-        // Heuristik: Von oben nach unten – wenn Gewinn/h zu klein für Reihenfolge,
-        // skaliere alle vorhandenen Preise dieser Route um Faktor f >=1.
-        var lastTarget = Infinity;
-        for(var i=0;i<newOrderIds.length;i++){
-          var id=newOrderIds[i];
-          var d=dataById[id]; if(!d) continue;
-          var desiredBelow = (i<newOrderIds.length-1) ? (dataById[newOrderIds[i+1]]?.hourlyProfit || 0) + margin : -Infinity;
+        // Heuristik: Wenn der aktuelle Gewinn/h einer Route zu niedrig ist, Hinweis "Preise pro Route proportional erhöhen".
+        newOrderIds.forEach(function(id, i){
+          var d=dataById[id]; if(!d) return;
+          var desiredBelow = (i<newOrderIds.length-1) ? ((dataById[newOrderIds[i+1]]?.hourlyProfit)||0) + margin : -Infinity;
           var current = d.hourlyProfit||0;
-          var need = Math.max(current, desiredBelow);
-          if(current < need - 1e-9){
+          if(current < desiredBelow - 1e-9){
             any=true;
-            // Faktor: wir schätzen linearen Zusammenhang Umsatz ~ Sum(preise)*Menge
-            var baseSum = totalPrice(d);
-            var f = baseSum>0 ? (need/current) : null; // crude: proportional
             var li=document.createElement('li');
-            if(f && isFinite(f) && f>1){
-              li.innerHTML = `<strong>${d.name}</strong>: Preise ca. ×${fmt(f)} erhöhen (alle gesetzten Preise proportional), um ~ ${cf.format(need)} Gewinn/h zu erreichen.`;
-            }else{
-              li.innerHTML = `<strong>${d.name}</strong>: Keine klare Preisempfehlung möglich (fehlende oder 0-Preise).`;
-            }
+            li.innerHTML = `<strong>${d.name}</strong>: Preise proportional erhöhen, bis ~ ${cf.format(desiredBelow)} Gewinn/h erreicht sind.`;
             ul.appendChild(li);
           }
-        }
+        });
 
-        if(priceMissing){
-          note.textContent = 'Für einige Routen fehlen Preise. Ohne Preise sind genaue Anpassungsvorschläge nicht möglich.';
-        }else{
-          note.textContent = 'Heuristische Vorschläge: proportionale Erhöhung gesetzter Preise, Abstand 1 €/h zwischen benachbarten Einträgen.';
-        }
+        note.textContent = 'Vorschläge sind heuristisch (Multi-Endprodukt). Genaue Ziele kannst du über die Produktpreise im Builder setzen.';
         panel.style.display = any ? 'block' : 'none';
       });
     }
@@ -992,7 +1012,7 @@
       qs('#saveBtn')?.addEventListener('click', function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){
-          var n=prompt('Name der Route?', r.sellList?.map(x=>x.name).filter(Boolean).join(', ') || 'Unbenannt');
+          var n=prompt('Name der Route?', r.sellList?.map(function(x){return x.name;}).filter(Boolean).join(', ') || 'Unbenannt');
           if(n) r.name=n;
         }
         if(!r.id) r.id = uid();
@@ -1081,7 +1101,7 @@
 
       // Initial
       refreshRouteSelect(null);
-      setSellList([]); // initiale leere Verkaufsliste (mit einer Zeile)
+      setSellList([]); // initiale leere Verkaufsliste
       if(qs('#steps').children.length===0){ addStep('start'); }
       recalc();
     });
