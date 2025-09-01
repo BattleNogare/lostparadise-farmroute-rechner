@@ -32,7 +32,8 @@
       border-bottom:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,.25);}
     .wrap{max-width:1200px; margin:0 auto; padding:16px;}
     .brand{display:flex; align-items:center; gap:12px;}
-    .logo{width:28px; height:28px; border-radius:8px; background:conic-gradient(from 180deg,var(--green),#0ff,var(--green));}
+    /* Logo als Bild (permalinker Raw-Link) */
+    .logo{height:28px; width:auto; border-radius:6px; display:block}
     h1{font-size:18px; margin:0; letter-spacing:.3px}
 
     .toolbar{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; margin-top:10px;}
@@ -111,7 +112,9 @@
     <header>
       <div class="wrap">
         <div class="brand">
-          <div class="logo" aria-hidden="true"></div>
+          <!-- Permalinker RAW-Link: bleibt stabil auf genau diesem Commit -->
+          <img class="logo" alt="Routes Logo"
+               src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
           <h1>Farmrouten-Preisrechner</h1>
           <span class="tag green" title="Daten sind in dieser Datei gespeichert">In-Page Speicher</span>
         </div>
@@ -930,7 +933,6 @@
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
 
         var margin = 1; // € pro Stunde Abstand
-        var targets = {};
         var any=false;
 
         var ul=qs('#adjustmentsList'); ul.innerHTML='';
