@@ -4,6 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Farmrouten-Preisrechner</title>
+
+  <!-- Favicon (permanenter Raw-GitHub-Link) -->
+  <link rel="icon" type="image/x-icon"
+        href="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/4755eff9d2f03a8171689a9f9a0b2b635a10e903/Routes-Logo.ico" />
+
   <style>
     :root{
       --bg:#0b0f14; --panel:#0f141b; --muted:#161c24; --text:#e6f0ff; --soft:#9bb2c9;
@@ -141,7 +146,7 @@
             <button id="deleteBtn" class="danger">Löschen</button>
             <button id="exportBtn">Export</button>
             <label for="importFile" class="ghost" style="padding:10px 12px; cursor:pointer">Import<input id="importFile" type="file" accept="application/json" style="display:none"></label>
-            <!-- Demo-Button entfernt -->
+            <!-- Kein Demo-Button -->
           </div>
         </div>
       </div>
@@ -597,7 +602,7 @@
       if(anySet){ return outputs.map(function(o){ return Math.max(0, num(o.qty)); }); }
       var count = outputs.length;
       if(count===1){
-        var ow = Math.max(0.0001, weights[outputs[0].name] || 1); /* FIX */
+        var ow = Math.max(0.0001, weights[outputs[0].name] || 1);
         return [ Math.max(0, Math.floor(totalInputKg / ow)) ];
       }
       var shareKg = totalInputKg / count;
