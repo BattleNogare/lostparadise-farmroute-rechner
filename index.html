@@ -8,6 +8,7 @@
     :root{
       --bg:#0b0f14; --panel:#0f141b; --muted:#161c24; --text:#e6f0ff; --soft:#9bb2c9;
       --green:#00e676; --red:#ff4d4f; --accent:#1aff95; --grid:#0d2a1f; --border:#1f2a36; --warn:#ffd666;
+      --logo-max-h:96px; /* maximale Logo-Höhe */
     }
     html,body{height:100%}
     body{
@@ -32,16 +33,16 @@
       background:linear-gradient(180deg,rgba(11,15,20,.92),rgba(11,15,20,.65));
       border-bottom:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,.25);
     }
-    /* Header-Grid: Logo links, spannt beide Reihen */
+    /* Header-Layout: Grid mit zwei Zeilen; Logo links spannt beide Reihen */
     .wrap{max-width:1200px; margin:0 auto; padding:0 16px;}
     .header-grid{
       display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto;
-      column-gap:12px; align-items:center; min-height:120px; /* Gesamthöhe des Headers */
-      padding:12px 0;
+      column-gap:12px; align-items:center; padding:12px 0;
     }
     .logo{
       grid-column:1; grid-row:1 / span 2;
-      height:100%; width:auto; object-fit:contain; border-radius:6px; display:block;
+      max-height:var(--logo-max-h); /* Logo dehnt den Header nicht mehr auf Vollbild */
+      height:auto; width:auto; object-fit:contain; border-radius:6px; display:block;
     }
     .brand{display:flex; align-items:center; gap:12px;}
     h1{font-size:18px; margin:0; letter-spacing:.3px}
@@ -121,7 +122,7 @@
   <div class="content">
     <header>
       <div class="wrap header-grid">
-        <!-- Logo füllt die gesamte Header-Höhe -->
+        <!-- Logo, stabiler Raw-Link -->
         <img class="logo" alt="Routes Logo"
              src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
 
@@ -139,7 +140,7 @@
             <select id="routeSelect" title="Gespeicherte Routen (in dieser Seite)"></select>
             <button id="saveBtn">Route speichern</button>
             <button id="deleteBtn" class="danger">Löschen</button>
-            <!-- Button 'Seite mit Routen herunterladen' entfernt -->
+            <!-- Download-Button & Funktion entfernt -->
             <button id="exportBtn">Export</button>
             <label for="importFile" class="ghost" style="padding:10px 12px; cursor:pointer">Import<input id="importFile" type="file" accept="application/json" style="display:none"></label>
             <button id="demoBtn">Demo laden</button>
@@ -723,7 +724,7 @@
 
             var inputsTxt = inputs.map(function(i){
               var t=fmt(num(i.qty))+'× '+i.name;
-              if(i.source) t+=' ['+i.source+']';
+              if(i.source) t+=' [''+i.source+'']';
               if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
               return t;
             }).join(' + ');
@@ -760,14 +761,13 @@
       // ---- Preisvorschläge (≤ 500k €/h) ----
       var totalUnits = endProducts.reduce(function(s,ep){return s+ep.units;},0);
       var BE_avg = totalUnits>0 ? (totalCost / totalUnits) : 0;
-      var targetRevenue = (hours>0) ? (500000*hours + totalCost) : totalCost; // damit Gewinn/h ≤ 500k, bei 0h → nur Kosten
+      var targetRevenue = (hours>0) ? (500000*hours + totalCost) : totalCost;
       var fixedRevenue = endProducts.reduce(function(s,ep){ return s + ((ep.price>0)? ep.price*ep.units : 0); }, 0);
       var varUnits = endProducts.reduce(function(s,ep){ return s + ((ep.price>0)? 0 : ep.units); }, 0);
 
-      var suggested = {}; // name -> suggested price
+      var suggested = {};
       if(totalUnits>0){
         if(varUnits>0){
-          // fehlende Preise so setzen, dass Ziel erreicht wird
           var perUnitVar = (targetRevenue - fixedRevenue) / Math.max(1, varUnits);
           var perUnitVarCapped = Math.max(0, Math.max(BE_avg, perUnitVar));
           endProducts.forEach(function(ep){
@@ -775,9 +775,8 @@
             else { suggested[ep.name] = ep.price; }
           });
         }else{
-          // alle haben Preise → ggf. proportional absenken
           if(fixedRevenue>0 && fixedRevenue>targetRevenue){
-            var f = targetRevenue / fixedRevenue; // <1
+            var f = targetRevenue / fixedRevenue;
             endProducts.forEach(function(ep){
               var sp = (ep.price>0? ep.price : 0)*f;
               suggested[ep.name] = Math.max(BE_avg, sp);
@@ -788,7 +787,6 @@
         }
       }
 
-      // Umsatz/Gewinn mit "effektivem" Preis (Preis falls gesetzt, sonst Vorschlag)
       var revenue = endProducts.reduce(function(sum, ep){
         var eff = (ep.price>0) ? ep.price : (suggested[ep.name]||0);
         return sum + eff * ep.units;
@@ -796,7 +794,6 @@
       var profit = revenue - totalCost;
       var hourlyProfit = hours>0 ? (profit / hours) : 0;
 
-      // Endprodukte anreichern (für Tabelle)
       var endProductsRich = endProducts.map(function(ep){
         var s = suggested[ep.name] || null;
         var effective = (ep.price>0) ? ep.price : (s||0);
@@ -815,14 +812,11 @@
     function renderSummary(calc){
       qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
       qs('#kpiCost').textContent = cf.format(calc.totalCost);
-
-      // Ausbeute: Liste der Endprodukte + Stückzahlen
       var yieldTxt = calc.endProducts.length
         ? calc.endProducts.map(function(ep){ return fmt(ep.units)+' × '+ep.name; }).join(', ')
         : '–';
       qs('#kpiYield').textContent = yieldTxt;
 
-      // Struktur – bereits in Schritt-Reihenfolge aufgebaut
       var box=qs('#summary'); box.innerHTML='';
       function row(label, value){
         var r=document.createElement('div'); r.className='row';
@@ -843,7 +837,6 @@
       calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
       det.appendChild(ul); box.appendChild(det);
 
-      // Preis & Gewinn Tabelle (mit Vorschlag ≤ 500k €/h)
       var pBox=qs('#priceTable'); pBox.innerHTML='';
       if(calc.endProducts.length===0){
         pBox.innerHTML='<div class="mini muted">Keine Endprodukte in der Verkaufsliste.</div>';
@@ -868,10 +861,6 @@
         var t5=document.createElement('div'); t5.textContent=''; tbl.appendChild(t5);
         var t6=document.createElement('div'); t6.innerHTML='<strong>'+cf.format(calc.revenue)+'</strong>'; tbl.appendChild(t6);
         var g1=document.createElement('div'); g1.innerHTML='<strong>Gesamtgewinn</strong>'; tbl.appendChild(g1);
-        var g2=document.createElement('div'); g2.textContent=''; tbl.appendChild(g2);
-        var g3=document.createElement('div'); g3.textContent=''; tbl.appendChild(g3);
-        var g4=document.createElement('div'); g4.textContent=''; tbl.appendChild(g4);
-        var g5=document.createElement('div'); g5.textContent=''; tbl.appendChild(g5);
         var g6=document.createElement('div'); g6.innerHTML='<strong>'+cf.format(calc.revenue - calc.totalCost)+'</strong>'; tbl.appendChild(g6);
         pBox.appendChild(tbl);
 
@@ -937,19 +926,17 @@
         container.appendChild(row);
       });
 
-      // Drag & Drop für Reihenfolge
       enableListDnD(container, function(newOrderIds){
         var dataById={};
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
 
-        var margin = 1; // € pro Stunde Abstand
+        var margin = 1;
         var any=false;
 
         var ul=qs('#adjustmentsList'); ul.innerHTML='';
         var note=qs('#adjustmentsNote'); note.textContent='';
         var panel=qs('#adjustmentsPanel');
 
-        // Heuristik: Wenn der aktuelle Gewinn/h einer Route zu niedrig ist, Hinweis "Preise pro Route proportional erhöhen".
         newOrderIds.forEach(function(id, i){
           var d=dataById[id]; if(!d) return;
           var desiredBelow = (i<newOrderIds.length-1) ? ((dataById[newOrderIds[i+1]]?.hourlyProfit)||0) + margin : -Infinity;
@@ -1009,18 +996,12 @@
 
     // ===== Events =====
     window.addEventListener('DOMContentLoaded', function(){
-      // Verkaufsliste
       document.getElementById('addSell').addEventListener('click', function(){ addSellRow('', null); });
-
-      // Add step
       document.getElementById('addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); });
-
-      // Basisdaten -> Recalc
       ['lkwSize','backpackKg'].forEach(function(id){
         var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
-      // Save – sofort ins Dropdown, auswählen
       document.getElementById('saveBtn')?.addEventListener('click', function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){
@@ -1035,19 +1016,16 @@
         if(!document.getElementById('listView').hidden){ renderListView(); }
       });
 
-      // Delete
       document.getElementById('deleteBtn')?.addEventListener('click', function(){
         var id=document.getElementById('routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
         if(confirm('Route wirklich löschen?')){ var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null); if(!document.getElementById('listView').hidden){ renderListView(); } }
       });
 
-      // Load
       document.getElementById('routeSelect')?.addEventListener('change', function(e){
         var id=e.target.value; if(!id) return;
         var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
       });
 
-      // Export / Import
       document.getElementById('exportBtn')?.addEventListener('click', function(){
         var data=readStore(); var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='routen.json'; a.click(); URL.revokeObjectURL(a.href);
@@ -1069,7 +1047,6 @@
         rd.readAsText(f); e.target.value='';
       });
 
-      // Demo
       document.getElementById('demoBtn')?.addEventListener('click', function(){
         var demo={
           id: uid(),
@@ -1104,13 +1081,11 @@
         setRoute(demo);
       });
 
-      // Tabs
       document.getElementById('tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
       document.getElementById('tabList').addEventListener('click', function(){ switchTab('list'); });
 
-      // Initial
       refreshRouteSelect(null);
-      setSellList([]); // initiale leere Verkaufsliste
+      setSellList([]);
       if(document.getElementById('steps').children.length===0){ addStep('start'); }
       recalc();
     });
