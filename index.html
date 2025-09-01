@@ -16,6 +16,7 @@
       font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
       position:relative;
     }
+    /* Börsen-Raster */
     body::before{
       content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
       background:
@@ -62,6 +63,7 @@
     .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f}
     .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
 
+    /* Layout: Builder breiter, Ergebnis schmaler */
     .grid{display:grid; grid-template-columns:1.2fr .8fr; gap:16px; margin-top:16px}
     .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
     .card h2{margin:0 0 6px; font-size:16px}
@@ -69,6 +71,7 @@
     .hr{height:1px; background:linear-gradient(90deg,transparent, var(--border), transparent); margin:12px 0}
     .mini{font-size:12px; color:#9bb2c9}
 
+    /* Builder Steps */
     #steps{min-height:20px}
     .step{border:1px dashed var(--border); border-radius:14px; padding:12px; margin:10px 0; position:relative; display:grid; gap:8px; background:#0f141b}
     .step .bar{display:flex; align-items:center; gap:8px; justify-content:space-between}
@@ -84,17 +87,20 @@
     .summary .row{display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px solid var(--border)}
     .summary .row:last-child{border-bottom:none}
 
+    /* KPI */
     .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
     .kpi .box{background:#0c171f;border:1px solid var(--border);border-radius:12px;padding:10px}
     .kpi .label{color:#9bb2c9;font-size:12px}
     .kpi .val{font-size:18px;font-weight:700}
 
+    /* Modal */
     .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:5}
     .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(520px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
     .modal h3{margin:0 0 8px 0}
     .modal .row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
     .modal .actions{display:flex; gap:8px; justify-content:flex-end}
 
+    /* Routenliste */
     #listView{grid-column:1/-1}
     .route-row{display:grid; grid-template-columns: 32px 1.2fr 1fr .8fr auto; gap:10px; align-items:center; padding:10px; border:1px dashed var(--border); border-radius:12px; background:#0f141b; margin:8px 0}
     .route-row .drag{cursor:grab; user-select:none; text-align:center; border:1px solid var(--border); border-radius:8px; padding:6px}
@@ -105,6 +111,7 @@
     .adjustments{margin-top:12px; border:1px solid var(--border); border-radius:12px; padding:10px; background:#0e171f}
     .adjustments ul{margin:8px 0 0 18px}
 
+    /* Verkaufsliste (Endprodukte) */
     .sell-list .row{display:grid; grid-template-columns:1.4fr .8fr auto; gap:8px; margin:6px 0}
     .sell-list .row input[type="text"]{width:100%}
     .sell-list .row input[type="number"]{width:100%}
@@ -114,6 +121,7 @@
   <div class="content">
     <header>
       <div class="wrap header-grid">
+        <!-- Logo -->
         <img class="logo" alt="Routes Logo"
              src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
 
@@ -133,13 +141,14 @@
             <button id="deleteBtn" class="danger">Löschen</button>
             <button id="exportBtn">Export</button>
             <label for="importFile" class="ghost" style="padding:10px 12px; cursor:pointer">Import<input id="importFile" type="file" accept="application/json" style="display:none"></label>
-            <button id="demoBtn">Demo laden</button>
+            <!-- Demo-Button entfernt -->
           </div>
         </div>
       </div>
     </header>
 
     <main class="wrap grid">
+      <!-- Builder Ansicht -->
       <section class="card" id="builderView">
         <h2>Route zusammenstellen</h2>
         <div class="sub">
@@ -149,6 +158,7 @@
         </div>
 
         <div class="hr"></div>
+        <!-- Basisdaten -->
         <div class="two">
           <label>LKW-Größe (kg)<br/>
             <input id="lkwSize" type="number" min="1" step="1" value="2000">
@@ -200,6 +210,7 @@
         </details>
       </aside>
 
+      <!-- Routenliste Ansicht -->
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
         <div class="sub">Alle gespeicherten Routen. Standardmäßig nach <strong>Gewinn/Stunde</strong> sortiert. Ziehe an der Griffspalte, um die Reihenfolge zu ändern.</div>
@@ -216,10 +227,12 @@
     </main>
   </div>
 
+  <!-- In-Page Speicher (Routen + Fahrzeiten) -->
   <!--DATA-START-->
   <script id="app-data" type="application/json">{"routes":{},"travelTimes":{}}</script>
   <!--DATA-END-->
 
+  <!-- Schritt-Vorlagen -->
   <template id="tpl-start">
     <div class="step" data-type="start" draggable="true">
       <div class="bar">
@@ -320,6 +333,7 @@
     </div>
   </template>
 
+  <!-- Verkaufsliste-Row -->
   <template id="tpl-sell-row">
     <div class="row">
       <input data-k="pname" type="text" placeholder="Endprodukt-Name (z. B. Aluminiumbarren)">
@@ -328,6 +342,7 @@
     </div>
   </template>
 
+  <!-- Fahrzeit-Modal -->
   <div id="travelModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal">
       <h3>Fahrzeit eintragen</h3>
@@ -345,6 +360,7 @@
 
   <script>
   (function(){
+    // ===== Utils =====
     function qs(s, e){return (e||document).querySelector(s);}
     function qsa(s, e){return Array.prototype.slice.call((e||document).querySelectorAll(s));}
     function uid(){return Math.random().toString(36).slice(2,9);}
@@ -354,9 +370,11 @@
     function num(v){ if(v==null) return 0; if(typeof v==='number') return v; var s=String(v).trim().replace(/\./g,'').replace(',', '.'); var n=parseFloat(s); return isNaN(n)?0:n; }
     function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
 
+    // ===== In-Page Speicher =====
     function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{}}; }catch(e){ return {routes:{},travelTimes:{}}; } }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
+    // ===== Verkaufsliste =====
     function addSellRow(pname, price){
       var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
       var list=qs('#sellList'); list.appendChild(row);
@@ -379,6 +397,7 @@
       if((arr||[]).length===0){ addSellRow('', null); }
     }
 
+    // ===== Templates / Steps =====
     var TPLS={
       start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
       abbau: function(){return qs('#tpl-abbau').content.firstElementChild.cloneNode(true);},
@@ -403,8 +422,10 @@
       qs('.addInput',stepEl)?.addEventListener('click', function(){ addInputRow(stepEl); });
       qs('.addOutput',stepEl)?.addEventListener('click', function(){ addOutputRow(stepEl); });
       stepEl.addEventListener('input', function(){ recalc(); });
+      // Drag
       stepEl.addEventListener('dragstart', function(e){ stepEl.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','drag'); });
       stepEl.addEventListener('dragend', function(){ stepEl.classList.remove('dragging'); recalc(); });
+      // Fahrzeit-Abfrage bei Ortswechsel (on blur)
       var where=qs('[data-key="where"]', stepEl);
       if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
     }
@@ -412,6 +433,7 @@
       var el=TPLS[type]?TPLS[type]():null; if(!el) return null;
       el.dataset.type=type; attachStepControls(el); qs('#steps').appendChild(el); return el;
     }
+    // DnD Container für Steps
     (function(){
       var container=qs('#steps');
       function afterEl(container,y){
@@ -431,6 +453,7 @@
       });
     })();
 
+    // ===== Route Build/Load =====
     var currentRouteId=null;
     function getRoute(){
       var steps=[];
@@ -458,14 +481,14 @@
           var outputs=qsa('[data-key="outputs"] .output-row',step).map(function(row){
             return {
               name: qs('[data-k="name"]',row).value.trim(),
-              qty: num(qs('[data-k="qty"]',row).value),
+              qty: num(qs('[data-k="qty"]',row).value), // optional
               unitWeight: num(qs('[data-k="unitWeight"]',row).value)
             };
           }).filter(function(o){return o.name;});
           steps.push({type:type,
             where: qs('[data-key="where"]',step).value.trim(),
-            duration: num(qs('[data-key="duration"]',step).value),
-            processCost: num(qs('[data-key="processCost"]',step).value),
+            duration: num(qs('[data-key="duration"]',step).value), // Sekunden pro Run
+            processCost: num(qs('[data-key="processCost"]',step).value), // einmalig
             inputs: inputs,
             outputs: outputs
           });
@@ -481,7 +504,7 @@
         name: (qs('#routeSelect') && qs('#routeSelect').selectedOptions[0]) ? qs('#routeSelect').selectedOptions[0].textContent : 'Unbenannt',
         lkwSize: Math.max(1, num(qs('#lkwSize').value)||2000),
         backpackKg: Math.max(1, num(qs('#backpackKg').value)||150),
-        sellList: getSellList(),
+        sellList: getSellList(), // [{name, price}]
         steps: steps,
         travelTimes: store.travelTimes || {}
       };
@@ -520,7 +543,7 @@
             addOutputRow(el);
             var row=listO.lastElementChild;
             qs('[data-k="name"]',row).value=out.name||'';
-            qs('[data-k="qty"]',row).value=out.qty||'';
+            qs('[data-k="qty"]',row).value=out.qty||''; // optional
             qs('[data-k="unitWeight"]',row).value=out.unitWeight||'';
           });
         } else if(s.type==='transportkosten'){
@@ -532,6 +555,7 @@
       recalc();
     }
 
+    // ===== Fahrzeit-Popup (on blur) =====
     function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
     function openTravelModal(from,to, cb){
       var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
@@ -559,10 +583,11 @@
       }catch(e){}
     }
 
+    // ===== Automatik-Hilfen =====
     function kgPerBatchAllInputs(inputs, weights){
       var sum=0;
       inputs.forEach(function(i){
-        var w = weights[i.name] || 1;
+        var w = weights[i.name] || 1; // Default 1 kg
         sum += Math.max(0, num(i.qty)) * w;
       });
       return sum;
@@ -572,7 +597,7 @@
       if(anySet){ return outputs.map(function(o){ return Math.max(0, num(o.qty)); }); }
       var count = outputs.length;
       if(count===1){
-        var ow = Math.max(0.0001, weights[outputs[0]].name || 1);
+        var ow = Math.max(0.0001, weights[outputs[0].name] || 1); /* FIX */
         return [ Math.max(0, Math.floor(totalInputKg / ow)) ];
       }
       var shareKg = totalInputKg / count;
@@ -582,22 +607,25 @@
       });
     }
 
+    // ===== Berechnung einer Route (Schritt-Reihenfolge + Preisvorschläge) =====
     function compute(route){
-      var baseKg = route.lkwSize>0? route.lkwSize : 2000;
+      var baseKg = route.lkwSize>0? route.lkwSize : 2000; // LKW-Größe
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
 
-      var inventory = {};
-      var weights = {};
-      var miningTime=0, driveTime=0, procTime=0;
+      var inventory = {};   // item -> units
+      var weights = {};     // item -> kg per unit
+      var miningTime=0, driveTime=0, procTime=0; // Minuten
       var purchaseCost=0, transportCostTotal=0, processingCostTotal=0;
       var log=[];
 
       var store=readStore();
       var lastPlace=null;
 
+      // --- Schrittweise durchgehen, Fahrten genau dazwischen einfügen ---
       (route.steps||[]).forEach(function(s, idx){
         var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verkauf'||s.type==='verarbeitung') ? (s.where||'') : '';
 
+        // Fahrzeit falls Ortswechsel zwischen vorherigem Ort und diesem Schritt
         if(thisPlace && lastPlace && lastPlace!==thisPlace){
           var key= (lastPlace||'?')+'|'+(thisPlace||'?');
           var m=store.travelTimes[key];
@@ -609,6 +637,7 @@
           }
         }
 
+        // Schritt ausführen
         if(s.type==='start'){
           log.push('Start @ '+(s.where||'?'));
         }
@@ -633,9 +662,10 @@
           if(inputs.length===0 || outputs.length===0){
             log.push('Verarbeitung @ '+(s.where||'?')+': Input/Output unvollständig – übersprungen.');
           }else{
+            // Gewichte der Outputs sichern
             outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
-            var durSec = Math.max(0, num(s.duration));
+            var durSec = Math.max(0, num(s.duration));  // Sekunden pro RUN
             var durMin = durSec/60;
 
             var nonPurchased=inputs.filter(function(i){return !i.purchased;});
@@ -678,11 +708,12 @@
                 inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
               });
 
-              procTime += durMin;
+              procTime += durMin; // Zeit/Run
               runs++; batchesTotal+=batchesThisRun;
               if(batchesThisRun<=0) break;
             }
 
+            // Einmalige Verarbeitungskosten
             var stepCost = Math.max(0, num(s.processCost));
             if(stepCost>0){
               processingCostTotal += stepCost;
@@ -691,7 +722,7 @@
 
             var inputsTxt = inputs.map(function(i){
               var t=fmt(num(i.qty))+'× '+i.name;
-              if(i.source) t+=' ['+i.source+']';  /* <-- FIXED HERE */
+              if(i.source) t+=' ['+i.source+']';
               if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
               return t;
             }).join(' + ');
@@ -708,29 +739,34 @@
           log.push('Verkaufsort: '+(s.where||'?'));
         }
 
+        // Ort aktualisieren
         if(thisPlace){ lastPlace=thisPlace; }
       });
 
       var totalMinutes = miningTime + driveTime + procTime;
 
+      // === Endprodukte laut Verkaufsliste ===
       var sellList = (route.sellList||[]).filter(function(x){return x && x.name;});
       var endProducts = sellList.map(function(x){
         var units = Math.max(0, Math.floor((inventory[x.name]||0)));
         return {name:x.name, units:units, price: (x.price>0? x.price : null)};
       });
 
+      // Kosten
       var totalCost = purchaseCost + transportCostTotal + processingCostTotal;
       var hours = totalMinutes/60;
 
+      // ---- Preisvorschläge (≤ 500k €/h) ----
       var totalUnits = endProducts.reduce(function(s,ep){return s+ep.units;},0);
       var BE_avg = totalUnits>0 ? (totalCost / totalUnits) : 0;
-      var targetRevenue = (hours>0) ? (500000*hours + totalCost) : totalCost;
+      var targetRevenue = (hours>0) ? (500000*hours + totalCost) : totalCost; // damit Gewinn/h ≤ 500k
       var fixedRevenue = endProducts.reduce(function(s,ep){ return s + ((ep.price>0)? ep.price*ep.units : 0); }, 0);
       var varUnits = endProducts.reduce(function(s,ep){ return s + ((ep.price>0)? 0 : ep.units); }, 0);
 
-      var suggested = {};
+      var suggested = {}; // name -> suggested price
       if(totalUnits>0){
         if(varUnits>0){
+          // fehlende Preise so setzen, dass Ziel erreicht wird
           var perUnitVar = (targetRevenue - fixedRevenue) / Math.max(1, varUnits);
           var perUnitVarCapped = Math.max(0, Math.max(BE_avg, perUnitVar));
           endProducts.forEach(function(ep){
@@ -738,8 +774,9 @@
             else { suggested[ep.name] = ep.price; }
           });
         }else{
+          // alle haben Preise → ggf. proportional absenken
           if(fixedRevenue>0 && fixedRevenue>targetRevenue){
-            var f = targetRevenue / fixedRevenue;
+            var f = targetRevenue / fixedRevenue; // <1
             endProducts.forEach(function(ep){
               var sp = (ep.price>0? ep.price : 0)*f;
               suggested[ep.name] = Math.max(BE_avg, sp);
@@ -750,6 +787,7 @@
         }
       }
 
+      // Umsatz/Gewinn mit "effektivem" Preis
       var revenue = endProducts.reduce(function(sum, ep){
         var eff = (ep.price>0) ? ep.price : (suggested[ep.name]||0);
         return sum + eff * ep.units;
@@ -757,6 +795,7 @@
       var profit = revenue - totalCost;
       var hourlyProfit = hours>0 ? (profit / hours) : 0;
 
+      // Detail für Tabelle
       var endProductsRich = endProducts.map(function(ep){
         var s = suggested[ep.name] || null;
         var effective = (ep.price>0) ? ep.price : (s||0);
@@ -776,11 +815,13 @@
       qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
       qs('#kpiCost').textContent = cf.format(calc.totalCost);
 
+      // Ausbeute: Liste der Endprodukte + Stückzahlen
       var yieldTxt = calc.endProducts.length
         ? calc.endProducts.map(function(ep){ return fmt(ep.units)+' × '+ep.name; }).join(', ')
         : '–';
       qs('#kpiYield').textContent = yieldTxt;
 
+      // Struktur – in Schritt-Reihenfolge
       var box=qs('#summary'); box.innerHTML='';
       function row(label, value){
         var r=document.createElement('div'); r.className='row';
@@ -801,6 +842,7 @@
       calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
       det.appendChild(ul); box.appendChild(det);
 
+      // Preis & Gewinn Tabelle
       var pBox=qs('#priceTable'); pBox.innerHTML='';
       if(calc.endProducts.length===0){
         pBox.innerHTML='<div class="mini muted">Keine Endprodukte in der Verkaufsliste.</div>';
@@ -844,6 +886,7 @@
 
     function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
 
+    // ===== Routenverwaltung (Speichern/Laden) =====
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
@@ -854,6 +897,7 @@
       });
     }
 
+    // ===== Routenliste =====
     function buildListData(){
       var store=readStore(); var list=[];
       Object.keys(store.routes||{}).forEach(function(id){
@@ -892,17 +936,19 @@
         container.appendChild(row);
       });
 
+      // Drag & Drop für Reihenfolge
       enableListDnD(container, function(newOrderIds){
         var dataById={};
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
 
-        var margin = 1;
+        var margin = 1; // € pro Stunde Abstand
         var any=false;
 
         var ul=qs('#adjustmentsList'); ul.innerHTML='';
         var note=qs('#adjustmentsNote'); note.textContent='';
         var panel=qs('#adjustmentsPanel');
 
+        // Heuristik: Wenn der aktuelle Gewinn/h einer Route zu niedrig ist, Hinweis "Preise pro Route proportional erhöhen".
         newOrderIds.forEach(function(id, i){
           var d=dataById[id]; if(!d) return;
           var desiredBelow = (i<newOrderIds.length-1) ? ((dataById[newOrderIds[i+1]]?.hourlyProfit)||0) + margin : -Infinity;
@@ -947,6 +993,7 @@
       });
     }
 
+    // ===== UI: Tabs =====
     function switchTab(name){
       var isList = (name==='list');
       document.getElementById('tabBuilder').classList.toggle('active', !isList);
@@ -959,15 +1006,20 @@
 
     function renderSummaryAndMaybeList(){ recalc(); if(!document.getElementById('listView').hidden){ renderListView(); } }
 
+    // ===== Events =====
     window.addEventListener('DOMContentLoaded', function(){
+      // Verkaufsliste
       document.getElementById('addSell').addEventListener('click', function(){ addSellRow('', null); });
 
+      // Add step
       document.getElementById('addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); });
 
+      // Basisdaten -> Recalc
       ['lkwSize','backpackKg'].forEach(function(id){
         var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
+      // Save – sofort ins Dropdown, auswählen
       document.getElementById('saveBtn')?.addEventListener('click', function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){
@@ -982,16 +1034,19 @@
         if(!document.getElementById('listView').hidden){ renderListView(); }
       });
 
+      // Delete
       document.getElementById('deleteBtn')?.addEventListener('click', function(){
         var id=document.getElementById('routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
         if(confirm('Route wirklich löschen?')){ var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null); if(!document.getElementById('listView').hidden){ renderListView(); } }
       });
 
+      // Load
       document.getElementById('routeSelect')?.addEventListener('change', function(e){
         var id=e.target.value; if(!id) return;
         var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
       });
 
+      // Export / Import
       document.getElementById('exportBtn')?.addEventListener('click', function(){
         var data=readStore(); var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='routen.json'; a.click(); URL.revokeObjectURL(a.href);
@@ -1013,45 +1068,13 @@
         rd.readAsText(f); e.target.value='';
       });
 
-      document.getElementById('demoBtn')?.addEventListener('click', function(){
-        var demo={
-          id: uid(),
-          name: 'Metallschmelze Demo (Multi-Output)',
-          lkwSize: 2000,
-          backpackKg: 150,
-          sellList: [
-            {name:'Aluminiumbarren', price: 120},
-            {name:'Schlacke', price: 10}
-          ],
-          steps: [
-            {type:'start', where:'HQ'},
-            {type:'abbau', what:'Rohes Bauxit', unitWeight:3, where:'Bauxitmine', timeLkw: 180},
-            {type:'verarbeitung', where:'Ingenieurbüro', duration: 480, processCost: 200,
-              inputs:[{name:'Rohes Bauxit', qty:10, source:'Bauxitmine', purchased:false}],
-              outputs:[{name:'Feingemahlenes Bauxitpulver', unitWeight:3}]},
-            {type:'verarbeitung', where:'Ingenieurbüro', duration: 720, processCost: 0,
-              inputs:[{name:'Feingemahlenes Bauxitpulver', qty:10, source:'Ingenieurbüro', purchased:false},{name:'Schwefelsäure', qty:3, source:'Chemiewerk', purchased:true, price:85}],
-              outputs:[{name:'Verunreinigtes Aluminiumoxid', unitWeight:2}]},
-            {type:'transportkosten', transportCost: 500},
-            {type:'verarbeitung', where:'Metallschmelze', duration: 900, processCost: 150,
-              inputs:[{name:'Verunreinigtes Aluminiumoxid', qty:10, source:'Ingenieurbüro', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
-              outputs:[{name:'Unreiner Aluminiumschrott', unitWeight:2}]},
-            {type:'verarbeitung', where:'Metallschmelze', duration: 600, processCost: 0,
-              inputs:[{name:'Unreiner Aluminiumschrott', qty:4, source:'Metallschmelze', purchased:false},{name:'Schlacke', qty:1, source:'Metallschmelze', purchased:true, price:0}],
-              outputs:[{name:'Aluminiumbarren', unitWeight:1},{name:'Schlacke', unitWeight:1}]},
-            {type:'verkauf', where:'Großhändler'}
-          ]
-        };
-        var store=readStore(); store.routes[demo.id]=demo; writeStore(store); refreshRouteSelect(demo.id);
-        if(!document.getElementById('listView').hidden){ renderListView(); }
-        setRoute(demo);
-      });
-
+      // Tabs
       document.getElementById('tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
       document.getElementById('tabList').addEventListener('click', function(){ switchTab('list'); });
 
+      // Initial
       refreshRouteSelect(null);
-      setSellList([]);
+      setSellList([]); // initiale leere Verkaufsliste
       if(document.getElementById('steps').children.length===0){ addStep('start'); }
       recalc();
     });
