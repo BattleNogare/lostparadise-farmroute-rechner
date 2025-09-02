@@ -149,7 +149,6 @@
             <button id="saveBtn">Route speichern</button>
             <button id="deleteBtn" class="danger">Löschen</button>
             <button id="exportCurrentBtn" class="ghost">Export aktuelle Route</button>
-            <!-- Import/Export ALL sind in der Routenliste -->
           </div>
         </div>
       </div>
@@ -560,7 +559,7 @@
             qs('[data-k="qty"]',row).value=inp.qty||'';
             qs('[data-k="source"]',row).value=inp.source||'';
             qs('[data-k="purchased"]',row).checked=!!inp.purchased;
-            qs('[data-k="price"]',row).value=inp.price||';
+            qs('[data-k="price"]',row).value = (inp.price != null ? inp.price : '');
           });
           var listO=qs('[data-key="outputs"]',el); listO.innerHTML='';
           (s.outputs||[]).forEach(function(out){
@@ -822,7 +821,7 @@
       };
     }
 
-    // ===== UI-Rendering der Zusammenfassung (FEHLTE – jetzt wieder drin) =====
+    // ===== UI-Rendering der Zusammenfassung =====
     function renderSummary(calc){
       // KPIs
       qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
@@ -969,7 +968,7 @@
           route: r
         });
       });
-      list.sort(function(a,b){ return (b.hourlyProfit||0) - (a.hourlyProfit||0); });
+      list.sort(function(a,b){ return (b.hourlyProfit||0) - (a.hourlyProfit||0) ;});
       return list;
     }
 
@@ -1154,7 +1153,6 @@
             breakEvenAvg: calc.BE_avg,
             targetRevenue: calc.targetRevenue,
             text: (function(route, calc){
-              // inline buildReportText, um Export unabhängig zu halten
               var nf=new Intl.NumberFormat('de-DE',{maximumFractionDigits:2});
               var cf=new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:2});
               function fmt(n){return nf.format(n);}
