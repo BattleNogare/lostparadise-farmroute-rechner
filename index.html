@@ -149,6 +149,11 @@
             <button id="saveBtn">Route speichern</button>
             <button id="deleteBtn" class="danger">Löschen</button>
             <button id="exportCurrentBtn" class="ghost">Export aktuelle Route</button>
+            <!-- NEW: Import einzelne Route -->
+            <label for="importCurrentFile" class="ghost" style="padding:10px 12px; cursor:pointer">Import aktuelle Route
+              <input id="importCurrentFile" type="file" accept="application/json" style="display:none">
+            </label>
+            <!-- Import/Export ALL sind in der Routenliste -->
           </div>
         </div>
       </div>
@@ -559,7 +564,7 @@
             qs('[data-k="qty"]',row).value=inp.qty||'';
             qs('[data-k="source"]',row).value=inp.source||'';
             qs('[data-k="purchased"]',row).checked=!!inp.purchased;
-            qs('[data-k="price"]',row).value = (inp.price != null ? inp.price : '');
+            qs('[data-k="price"]',row).value=inp.price || '';
           });
           var listO=qs('[data-key="outputs"]',el); listO.innerHTML='';
           (s.outputs||[]).forEach(function(out){
@@ -895,7 +900,7 @@
       qs('#sumHourly').textContent = cf.format(calc.hourlyProfit);
     }
 
-    // ===== Report-Text (für Export) =====
+    // ===== Report-Text (für Exporte) =====
     function buildReportText(route, calc){
       var lines=[];
       lines.push('Ergebnis & Struktur');
@@ -968,7 +973,7 @@
           route: r
         });
       });
-      list.sort(function(a,b){ return (b.hourlyProfit||0) - (a.hourlyProfit||0) ;});
+      list.sort(function(a,b){ return (b.hourlyProfit||0) - (a.hourlyProfit||0); });
       return list;
     }
 
@@ -1202,6 +1207,64 @@
         };
         var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download= slug(r.name || 'route') + '.json'; a.click(); URL.revokeObjectURL(a.href);
+      });
+
+      // === NEW: Import EINZELNE Route ===
+      document.getElementById('importCurrentFile')?.addEventListener('change', function(e){
+        var f=e.target.files && e.target.files[0]; if(!f) return;
+        var rd=new FileReader();
+        rd.onload=function(){
+          try{
+            var incoming=JSON.parse(rd.result||'{}');
+            var store=readStore();
+
+            // travelTimes mergen, falls vorhanden
+            if(incoming.travelTimes && typeof incoming.travelTimes==='object'){
+              store.travelTimes = Object.assign({}, store.travelTimes||{}, incoming.travelTimes||{});
+            }
+
+            // Route-Objekt herausziehen
+            var route = null;
+
+            if(incoming.route && incoming.route.steps){
+              route = incoming.route;
+            } else if(Array.isArray(incoming.routes)){
+              // falls jemand ein Array schickt, nimm die erste
+              route = incoming.routes[0];
+            } else if(incoming.routes && typeof incoming.routes==='object'){
+              // falls ein Map mit routes kommt (selten)
+              var firstId = Object.keys(incoming.routes)[0];
+              route = incoming.routes[firstId];
+            } else if(incoming.steps){
+              // nackte Route
+              route = incoming;
+            }
+
+            if(!route || !Array.isArray(route.steps)){
+              alert('Keine gültige Route in der Datei gefunden.');
+              return;
+            }
+
+            // ID & Name absichern
+            route.id = route.id || uid();
+            route.name = route.name || 'Importierte Route';
+
+            // Speichern
+            store.routes[route.id] = route;
+            writeStore(store);
+
+            // UI: Dropdown & Builder aktualisieren
+            refreshRouteSelect(route.id);
+            var sel=document.getElementById('routeSelect'); if(sel){ sel.value=route.id; }
+            setRoute(route); currentRouteId = route.id;
+
+            alert('Route importiert und geladen: '+route.name);
+            if(!document.getElementById('listView').hidden){ renderListView(); }
+          }catch(err){
+            alert('Import fehlgeschlagen: '+err.message);
+          }
+        };
+        rd.readAsText(f); e.target.value='';
       });
 
       // === LIST VIEW: Export ALL ===
