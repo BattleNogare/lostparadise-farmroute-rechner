@@ -68,7 +68,7 @@
     .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f}
     .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
 
-    /* Layout: Builder breiter, Ergebnis schmaler */
+    /* Layout */
     .grid{display:grid; grid-template-columns:1.2fr .8fr; gap:16px; margin-top:16px}
     .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
     .card h2{margin:0 0 6px; font-size:16px}
@@ -108,15 +108,20 @@
     /* Routenliste */
     #listView{grid-column:1/-1}
     .list-toolbar{display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap}
-    .route-row{display:grid; grid-template-columns: 32px 1.2fr 1fr .8fr auto; gap:10px; align-items:center; padding:10px; border:1px dashed var(--border); border-radius:12px; background:#0f141b; margin:8px 0}
-    .route-row .drag{cursor:grab; user-select:none; text-align:center; border:1px solid var(--border); border-radius:8px; padding:6px}
-    .route-row.dragging{opacity:.6; outline:2px dashed var(--accent)}
+
+    /* NEU: Wrapper pro Eintrag (Header + Details) wird zusammen gezogen */
+    .route-item{margin:8px 0; border-radius:12px; background:#0f141b; border:1px dashed var(--border)}
+    .route-item.dragging{opacity:.6; outline:2px dashed var(--accent)}
+
+    .route-row{display:grid; grid-template-columns: 32px 1.2fr 1fr .8fr auto; gap:10px; align-items:center; padding:10px;}
+    .route-row .drag{cursor:grab; user-select:none; text-align:center; border:1px solid var(--border); border-radius:8px; padding:6px; background:#0e171f}
     .pill{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f; font-size:12px}
     .muted{color:#9bb2c9}
     .warn{color:#2b2300; background:linear-gradient(180deg,#ffe58f,#ffd666); border-color:#e8c14c}
     .adjustments{margin-top:12px; border:1px solid var(--border); border-radius:12px; padding:10px; background:#0e171f}
     .adjustments ul{margin:8px 0 0 18px}
-    .row-details{margin:-4px 0 12px 42px; border-left:2px dashed var(--border); padding-left:12px}
+
+    .row-details{margin:0 10px 10px 42px; border-left:2px dashed var(--border); padding:8px 0 0 12px}
     .row-details .kpis{display:flex; gap:12px; flex-wrap:wrap; margin:6px 0}
     .row-details .kpis .k{background:#0c171f;border:1px solid var(--border);border-radius:10px;padding:6px 10px;font-size:12px}
 
@@ -149,11 +154,9 @@
             <button id="saveBtn">Route speichern</button>
             <button id="deleteBtn" class="danger">Löschen</button>
             <button id="exportCurrentBtn" class="ghost">Export aktuelle Route</button>
-            <!-- NEW: Import einzelne Route -->
             <label for="importCurrentFile" class="ghost" style="padding:10px 12px; cursor:pointer">Import aktuelle Route
               <input id="importCurrentFile" type="file" accept="application/json" style="display:none">
             </label>
-            <!-- Import/Export ALL sind in der Routenliste -->
           </div>
         </div>
       </div>
@@ -233,7 +236,7 @@
       <!-- Routenliste Ansicht -->
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
-        <div class="sub">Alle gespeicherten Routen. Standardmäßig nach <strong>Gewinn/Stunde</strong> sortiert. Ziehe an der Griffspalte, um die Reihenfolge zu ändern. Routen lassen sich aufklappen für Details.</div>
+        <div class="sub">Alle gespeicherten Routen. Standardmäßig nach <strong>Gewinn/Stunde</strong> sortiert. Ziehe am Griff, um <strong>Block (Route + Details)</strong> zu verschieben.</div>
         <div class="hr"></div>
 
         <div class="list-toolbar">
@@ -826,9 +829,8 @@
       };
     }
 
-    // ===== UI-Rendering der Zusammenfassung =====
+    // ===== UI-Rendering Zusammenfassung =====
     function renderSummary(calc){
-      // KPIs
       qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
       qs('#kpiCost').textContent = cf.format(calc.totalCost);
 
@@ -837,7 +839,6 @@
         : '–';
       qs('#kpiYield').textContent = yieldTxt;
 
-      // Struktur
       var box=qs('#summary'); box.innerHTML='';
       function row(label, value){
         var r=document.createElement('div'); r.className='row';
@@ -858,7 +859,7 @@
       calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
       det.appendChild(ul); box.appendChild(det);
 
-      // Preis & Gewinn Tabelle
+      // Preis & Gewinn
       var pBox=qs('#priceTable'); pBox.innerHTML='';
       if(calc.endProducts.length===0){
         pBox.innerHTML='<div class="mini muted">Keine Endprodukte in der Verkaufsliste.</div>';
@@ -900,7 +901,7 @@
       qs('#sumHourly').textContent = cf.format(calc.hourlyProfit);
     }
 
-    // ===== Report-Text (für Exporte) =====
+    // ===== Report-Text (Export) =====
     function buildReportText(route, calc){
       var lines=[];
       lines.push('Ergebnis & Struktur');
@@ -986,18 +987,23 @@
           ? item.endProducts.map(function(ep){ return ep.name + (ep.price? ' ('+cf.format(ep.price)+')' : ' (–)'); }).join(', ')
           : '–';
 
+        // NEU: Wrapper pro Eintrag (draggable)
+        var wrap=document.createElement('div');
+        wrap.className='route-item';
+        wrap.draggable=true;
+        wrap.dataset.id=item.id;
+
+        // Header-Zeile
         var row=document.createElement('div');
         row.className='route-row';
-        row.draggable=true;
-        row.dataset.id=item.id;
         row.innerHTML = `
-          <div class="drag">▤</div>
+          <div class="drag" title="Ziehen, um die Reihenfolge zu ändern">▤</div>
           <div><div><strong>${item.name}</strong></div><div class="muted">${labelEP}</div></div>
           <div><span class="pill">${item.endProducts.length? item.endProducts.length+' Produkte' : '—'}</span></div>
           <div><strong>${cf.format(item.hourlyProfit)}</strong><div class="mini muted">Gewinn/h</div></div>
           <div class="mini muted"></div>
         `;
-        container.appendChild(row);
+        wrap.appendChild(row);
 
         // Details (aufklappbar)
         var det=document.createElement('details');
@@ -1020,10 +1026,11 @@
         item.calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
         det.appendChild(ul);
 
-        container.appendChild(det);
+        wrap.appendChild(det);
+        container.appendChild(wrap);
       });
 
-      // Drag & Drop für Reihenfolge
+      // Drag & Drop für gesamte Blöcke
       enableListDnD(container, function(newOrderIds){
         var dataById={};
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
@@ -1054,20 +1061,28 @@
 
     function enableListDnD(container, onOrderChanged){
       var dragEl=null;
+
+      // Dragstart auf dem gesamten Block
       container.addEventListener('dragstart', function(e){
-        var row=e.target.closest('.route-row'); if(!row) return;
-        dragEl=row; row.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','drag');
+        var item=e.target.closest('.route-item'); if(!item) return;
+        dragEl=item; item.classList.add('dragging');
+        e.dataTransfer.effectAllowed='move';
+        e.dataTransfer.setData('text/plain','drag');
       });
-      container.addEventListener('dragend', function(e){
+
+      container.addEventListener('dragend', function(){
         if(dragEl){ dragEl.classList.remove('dragging'); dragEl=null; }
-        var ids=[].map.call(container.querySelectorAll('.route-row'), function(r){return r.dataset.id;});
+        var ids=[].map.call(container.querySelectorAll('.route-item'), function(r){return r.dataset.id;});
         if(typeof onOrderChanged==='function'){ onOrderChanged(ids); }
       });
+
       container.addEventListener('dragover', function(e){
         e.preventDefault();
-        var dragging=container.querySelector('.route-row.dragging'); if(!dragging) return;
+        var dragging=container.querySelector('.route-item.dragging'); if(!dragging) return;
+
+        // An welcher Position einfügen?
         var after = (function(){
-          var els=[].slice.call(container.querySelectorAll('.route-row:not(.dragging)'));
+          var els=[].slice.call(container.querySelectorAll('.route-item:not(.dragging)'));
           return els.reduce(function(closest,child){
             var box=child.getBoundingClientRect();
             var offset=e.clientY - box.top - box.height/2;
@@ -1075,7 +1090,9 @@
             else { return closest; }
           }, {offset:Number.NEGATIVE_INFINITY}).element;
         })();
-        if(after==null){ container.appendChild(dragging); } else { container.insertBefore(dragging, after); }
+
+        if(after==null){ container.appendChild(dragging); }
+        else { container.insertBefore(dragging, after); }
       });
     }
 
@@ -1209,7 +1226,7 @@
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download= slug(r.name || 'route') + '.json'; a.click(); URL.revokeObjectURL(a.href);
       });
 
-      // === NEW: Import EINZELNE Route ===
+      // === Import EINZELNE Route ===
       document.getElementById('importCurrentFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
@@ -1218,42 +1235,26 @@
             var incoming=JSON.parse(rd.result||'{}');
             var store=readStore();
 
-            // travelTimes mergen, falls vorhanden
             if(incoming.travelTimes && typeof incoming.travelTimes==='object'){
               store.travelTimes = Object.assign({}, store.travelTimes||{}, incoming.travelTimes||{});
             }
 
-            // Route-Objekt herausziehen
             var route = null;
-
-            if(incoming.route && incoming.route.steps){
-              route = incoming.route;
-            } else if(Array.isArray(incoming.routes)){
-              // falls jemand ein Array schickt, nimm die erste
-              route = incoming.routes[0];
-            } else if(incoming.routes && typeof incoming.routes==='object'){
-              // falls ein Map mit routes kommt (selten)
-              var firstId = Object.keys(incoming.routes)[0];
-              route = incoming.routes[firstId];
-            } else if(incoming.steps){
-              // nackte Route
-              route = incoming;
-            }
+            if(incoming.route && incoming.route.steps){ route = incoming.route; }
+            else if(Array.isArray(incoming.routes)){ route = incoming.routes[0]; }
+            else if(incoming.routes && typeof incoming.routes==='object'){ var firstId = Object.keys(incoming.routes)[0]; route = incoming.routes[firstId]; }
+            else if(incoming.steps){ route = incoming; }
 
             if(!route || !Array.isArray(route.steps)){
               alert('Keine gültige Route in der Datei gefunden.');
               return;
             }
-
-            // ID & Name absichern
             route.id = route.id || uid();
             route.name = route.name || 'Importierte Route';
 
-            // Speichern
             store.routes[route.id] = route;
             writeStore(store);
 
-            // UI: Dropdown & Builder aktualisieren
             refreshRouteSelect(route.id);
             var sel=document.getElementById('routeSelect'); if(sel){ sel.value=route.id; }
             setRoute(route); currentRouteId = route.id;
