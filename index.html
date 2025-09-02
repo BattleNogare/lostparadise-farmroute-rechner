@@ -431,6 +431,27 @@
     function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{}}; }catch(e){ return {routes:{},travelTimes:{}}; } }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
+    // ===== JSONP Helper =====
+    function jsonp(url){
+      return new Promise(function(resolve,reject){
+        const cb = 'cb_' + Math.random().toString(36).slice(2);
+        const sep = url.includes('?') ? '&' : '?';
+        const s = document.createElement('script');
+        s.src = url + sep + 'callback=' + cb;
+        s.async = true;
+        window[cb] = function(data){
+          resolve(data);
+          cleanup();
+        };
+        s.onerror = function(){ reject(new Error('JSONP load error')); cleanup(); };
+        function cleanup(){
+          delete window[cb];
+          if (s.parentNode) s.parentNode.removeChild(s);
+        }
+        document.head.appendChild(s);
+      });
+    }
+
     // ===== Verkaufsliste =====
     function addSellRow(pname, price){
       var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
@@ -688,7 +709,7 @@
           var m=store.travelTimes[key];
           if(m!=null){
             driveTime += Math.max(0,num(m));
-            log.push('Fahrt '+lastPlace+' → '+thisPlace+': +'+fmt(m)+' min.');
+            log.push('Fahrt '+lastPlace+' → '+thisPlace: '+fmt(m)+' min.');
           } else {
             log.push('Fahrt '+lastPlace+' → '+thisPlace+': (keine Zeit hinterlegt)');
           }
@@ -1113,7 +1134,7 @@
       });
     }
 
-    // ===== Google Apps Script / Drive Sync =====
+    // ===== Google Apps Script / Drive Sync (JSONP/NO-CORS) =====
     const DRIVE_AUTO_LOAD = true;   // beim Start automatisch aus Drive laden
     const DRIVE_AUTO_SAVE = true;   // beim Speichern automatisch nach Drive schreiben
 
@@ -1134,37 +1155,39 @@
     function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
     function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
 
+    // LIST/GET via JSONP
     async function gasListRoutes(){
-      const res = await fetch(GAS_URL + '?action=list', { headers: { 'X-Auth': getToken() } });
-      const data = await res.json();
+      const url = GAS_URL + '?action=list&token=' + encodeURIComponent(getToken());
+      const data = await jsonp(url);
       if(!data.ok) throw new Error(data.error || 'List failed');
       return data.routes || [];
     }
     async function gasGetRoute(id){
-      const res = await fetch(GAS_URL + '?action=get&id=' + encodeURIComponent(id), { headers: { 'X-Auth': getToken() } });
-      const data = await res.json();
+      const url = GAS_URL + '?action=get&id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(getToken());
+      const data = await jsonp(url);
       if(!data.ok) throw new Error(data.error || 'Get failed');
       return data.route;
     }
+    // SAVE/DELETE via POST no-cors (und danach prüfen)
     async function gasSaveRoute(route){
-      const res = await fetch(GAS_URL, {
+      await fetch(GAS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Auth': getToken() },
-        body: JSON.stringify({ action: 'save', route: route })
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', token: getToken(), route })
       });
-      const data = await res.json();
-      if(!data.ok) throw new Error(data.error || 'Save failed');
-      return data;
+      await new Promise(r => setTimeout(r, 500));
+      return true;
     }
     async function gasDeleteRoute(id){
-      const res = await fetch(GAS_URL, {
+      await fetch(GAS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Auth': getToken() },
-        body: JSON.stringify({ action: 'delete', id })
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', token: getToken(), id })
       });
-      const data = await res.json();
-      if(!data.ok) throw new Error(data.error || 'Delete failed');
-      return data;
+      await new Promise(r => setTimeout(r, 500));
+      return true;
     }
 
     async function syncFromDriveIntoPage(){
@@ -1195,7 +1218,7 @@
         showAuth();
         return;
       }
-      // Verifikation via /list
+      // Verifikation via /list (JSONP)
       try{
         await gasListRoutes();
         // Erfolg
@@ -1205,7 +1228,7 @@
           await syncFromDriveIntoPage();
         }
       }catch(err){
-        // Fehler (z. B. 401) -> Token verwerfen und Meldung zeigen
+        // Fehler -> Token verwerfen und Meldung zeigen
         setToken('');
         showAuth('Zugriff verweigert – falsches Token.');
         updateDriveStateTag(false);
@@ -1214,7 +1237,6 @@
 
     function showAuth(msg){
       const overlay=qs('#authOverlay');
-      const card=qs('#authCard');
       const err=qs('#authError');
       if(msg){ err.textContent=msg; err.style.display='block'; } else { err.style.display='none'; }
       overlay.style.display='flex';
@@ -1262,7 +1284,7 @@
         var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
-      // Save – lokal + Drive (nach Auth)
+      // Save – lokal + Drive
       document.getElementById('saveBtn')?.addEventListener('click', async function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){
