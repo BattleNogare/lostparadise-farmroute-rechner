@@ -606,7 +606,7 @@
           qs('[data-key="timeLkw"]',el).value=s.timeLkw||'';
         } else if(s.type==='verarbeitung'){
           qs('[data-key="where"]',el).value=s.where||'';
-          qs('[data-key="duration"]',el).value=s.duration||'';
+          qs('[data-key="duration"]',el).value=s.duration||';
           qs('[data-key="processCost"]',el).value=s.processCost||'';
           var listI=qs('[data-key="inputs"]',el); listI.innerHTML='';
           (s.inputs||[]).forEach(function(inp){
@@ -709,7 +709,7 @@
           var m=store.travelTimes[key];
           if(m!=null){
             driveTime += Math.max(0,num(m));
-            log.push('Fahrt '+lastPlace+' → '+thisPlace: '+fmt(m)+' min.');
+            log.push('Fahrt '+lastPlace+' → '+thisPlace+': +'+fmt(m)+' min.');
           } else {
             log.push('Fahrt '+lastPlace+' → '+thisPlace+': (keine Zeit hinterlegt)');
           }
