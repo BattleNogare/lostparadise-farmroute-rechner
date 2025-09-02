@@ -560,7 +560,7 @@
             qs('[data-k="qty"]',row).value=inp.qty||'';
             qs('[data-k="source"]',row).value=inp.source||'';
             qs('[data-k="purchased"]',row).checked=!!inp.purchased;
-            qs('[data-k="price"]',row).value=inp.price||'';
+            qs('[data-k="price"]',row).value=inp.price||';
           });
           var listO=qs('[data-key="outputs"]',el); listO.innerHTML='';
           (s.outputs||[]).forEach(function(out){
@@ -631,7 +631,7 @@
       });
     }
 
-    // ===== Berechnung einer Route (Schritt-Reihenfolge + Preisvorschläge) =====
+    // ===== Berechnung einer Route =====
     function compute(route){
       var baseKg = route.lkwSize>0? route.lkwSize : 2000; // LKW-Größe
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
@@ -822,7 +822,81 @@
       };
     }
 
-    // ===== Report-Text =====
+    // ===== UI-Rendering der Zusammenfassung (FEHLTE – jetzt wieder drin) =====
+    function renderSummary(calc){
+      // KPIs
+      qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
+      qs('#kpiCost').textContent = cf.format(calc.totalCost);
+
+      var yieldTxt = calc.endProducts.length
+        ? calc.endProducts.map(function(ep){ return fmt(ep.units)+' × '+ep.name; }).join(', ')
+        : '–';
+      qs('#kpiYield').textContent = yieldTxt;
+
+      // Struktur
+      var box=qs('#summary'); box.innerHTML='';
+      function row(label, value){
+        var r=document.createElement('div'); r.className='row';
+        r.style.display='grid'; r.style.gridTemplateColumns='1fr auto'; r.style.gap='8px';
+        r.style.padding='6px 0'; r.style.borderBottom='1px solid var(--border)';
+        r.innerHTML = '<span>'+label+'</span><strong>'+value+'</strong>'; box.appendChild(r);
+      }
+      row('Mining', minutesToH(calc.miningTime)+' ('+fmt(calc.miningTime)+' min)');
+      row('Fahrten', minutesToH(calc.driveTime)+' ('+fmt(calc.driveTime)+' min)');
+      row('Verarbeitung', minutesToH(calc.procTime)+' ('+fmt(calc.procTime)+' min)');
+      row('Kosten (Einkauf)', cf.format(calc.purchaseCost));
+      row('Transportkosten', cf.format(calc.transportCostTotal));
+      row('Verarbeitungskosten (fix)', cf.format(calc.processingCostTotal));
+      row('Gesamtkosten', cf.format(calc.totalCost));
+
+      var det=document.createElement('details'); det.open=true; det.innerHTML='<summary>Routenstruktur</summary>';
+      var ul=document.createElement('ul'); ul.style.marginTop='8px';
+      calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
+      det.appendChild(ul); box.appendChild(det);
+
+      // Preis & Gewinn Tabelle
+      var pBox=qs('#priceTable'); pBox.innerHTML='';
+      if(calc.endProducts.length===0){
+        pBox.innerHTML='<div class="mini muted">Keine Endprodukte in der Verkaufsliste.</div>';
+      }else{
+        var tbl=document.createElement('div');
+        tbl.style.display='grid'; tbl.style.gridTemplateColumns='1.2fr .6fr .8fr .9fr .8fr .9fr'; tbl.style.gap='8px';
+        tbl.innerHTML='<div><strong>Endprodukt</strong></div><div><strong>Menge</strong></div><div><strong>Dein Preis</strong></div><div><strong>Vorschlag (≤ 500k/h)</strong></div><div><strong>eff. Preis</strong></div><div><strong>Umsatz</strong></div>';
+        calc.endProducts.forEach(function(ep){
+          var priceDisp = (ep.price>0)? cf.format(ep.price) : '<span class="muted">–</span>';
+          var suggDisp  = (ep.suggested!=null)? cf.format(ep.suggested) : '<span class="muted">–</span>';
+          var row1=document.createElement('div'); row1.textContent=ep.name; tbl.appendChild(row1);
+          var row2=document.createElement('div'); row2.textContent=fmt(ep.units); tbl.appendChild(row2);
+          var row3=document.createElement('div'); row3.innerHTML=priceDisp; tbl.appendChild(row3);
+          var row4=document.createElement('div'); row4.innerHTML=suggDisp; tbl.appendChild(row4);
+          var row5=document.createElement('div'); row5.textContent=cf.format(ep.effective); tbl.appendChild(row5);
+          var row6=document.createElement('div'); row6.textContent=cf.format(ep.revenue); tbl.appendChild(row6);
+        });
+        var tot1=document.createElement('div'); tot1.innerHTML='<strong>Gesamtumsatz</strong>'; tbl.appendChild(tot1);
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        var t6=document.createElement('div'); t6.innerHTML='<strong>'+cf.format(calc.revenue)+'</strong>'; tbl.appendChild(t6);
+        var g1=document.createElement('div'); g1.innerHTML='<strong>Gesamtgewinn</strong>'; tbl.appendChild(g1);
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        var g6=document.createElement('div'); g6.innerHTML='<strong>'+cf.format(calc.revenue - calc.totalCost)+'</strong>'; tbl.appendChild(g6);
+        pBox.appendChild(tbl);
+
+        var hint=document.createElement('div');
+        hint.className='mini muted';
+        hint.style.marginTop='6px';
+        hint.textContent='Vorschläge berücksichtigen den Zielwert ≤ 500 000 €/h. Untergrenze je Produkt ist der durchschnittliche Break-even pro Einheit.';
+        pBox.appendChild(hint);
+      }
+
+      qs('#sumHourly').textContent = cf.format(calc.hourlyProfit);
+    }
+
+    // ===== Report-Text (für Export) =====
     function buildReportText(route, calc){
       var lines=[];
       lines.push('Ergebnis & Struktur');
@@ -1079,7 +1153,53 @@
             log: calc.log,
             breakEvenAvg: calc.BE_avg,
             targetRevenue: calc.targetRevenue,
-            text: buildReportText(r, calc)
+            text: (function(route, calc){
+              // inline buildReportText, um Export unabhängig zu halten
+              var nf=new Intl.NumberFormat('de-DE',{maximumFractionDigits:2});
+              var cf=new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:2});
+              function fmt(n){return nf.format(n);}
+              function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
+              var lines=[];
+              lines.push('Ergebnis & Struktur');
+              lines.push('Gesamtdauer');
+              lines.push(minutesToH(calc.totalMinutes)+' ('+fmt(calc.totalMinutes)+' min)');
+              lines.push('Gesamtkosten');
+              lines.push(cf.format(calc.totalCost));
+              var yieldTxt = calc.endProducts.length
+                ? calc.endProducts.map(function(ep){ return fmt(ep.units)+' × '+ep.name; }).join(', ')
+                : '–';
+              lines.push('Ausbeute');
+              lines.push(yieldTxt);
+              lines.push('Mining');
+              lines.push(minutesToH(calc.miningTime)+' ('+fmt(calc.miningTime)+' min)');
+              lines.push('Fahrten');
+              lines.push(minutesToH(calc.driveTime)+' ('+fmt(calc.driveTime)+' min)');
+              lines.push('Verarbeitung');
+              lines.push(minutesToH(calc.procTime)+' ('+fmt(calc.procTime)+' min)');
+              lines.push('Kosten (Einkauf)');
+              lines.push(cf.format(calc.purchaseCost));
+              lines.push('Transportkosten');
+              lines.push(cf.format(calc.transportCostTotal));
+              lines.push('Verarbeitungskosten (fix)');
+              lines.push(cf.format(calc.processingCostTotal));
+              lines.push('Gesamtkosten');
+              lines.push(cf.format(calc.totalCost));
+              lines.push('Routenstruktur');
+              calc.log.forEach(function(t){ lines.push(t); });
+              if(calc.endProducts.length){
+                lines.push('Preis & Gewinn');
+                lines.push('Endprodukt | Menge | Dein Preis | Vorschlag (≤500k/h) | eff. Preis | Umsatz');
+                calc.endProducts.forEach(function(ep){
+                  var priceDisp = (ep.price>0)? cf.format(ep.price) : '–';
+                  var suggDisp  = (ep.suggested!=null)? cf.format(ep.suggested) : '–';
+                  lines.push([ep.name, fmt(ep.units), priceDisp, suggDisp, cf.format(ep.effective), cf.format(ep.revenue)].join(' | '));
+                });
+                lines.push('Gesamtumsatz: '+cf.format(calc.revenue));
+                lines.push('Gesamtgewinn: '+cf.format(calc.revenue - calc.totalCost));
+                lines.push('Gesamt: Gewinn/Stunde: '+cf.format(calc.hourlyProfit));
+              }
+              return lines.join('\n');
+            })(r, calc)
           }
         };
         var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
@@ -1108,8 +1228,7 @@
             endProducts: calc.endProducts,
             log: calc.log,
             breakEvenAvg: calc.BE_avg,
-            targetRevenue: calc.targetRevenue,
-            text: buildReportText(r, calc)
+            targetRevenue: calc.targetRevenue
           };
         });
         var exportObj={
@@ -1132,8 +1251,7 @@
             var store=readStore();
             store.travelTimes = Object.assign({}, store.travelTimes||{}, incoming.travelTimes||{});
             var src = incoming.routes || incoming.route ? (incoming.routes || {[incoming.route?.id || uid()]: incoming.route}) : incoming;
-            // src ist Map<id, route> oder eine route
-            if(Array.isArray(src)){ // falls Fremdformat
+            if(Array.isArray(src)){
               src.forEach(function(r){ var id=r.id||uid(); r.id=id; store.routes[id]=r; });
             }else{
               Object.keys(src||{}).forEach(function(id){ var r=src[id]; if(!r.id) r.id=id; store.routes[r.id]=r; });
