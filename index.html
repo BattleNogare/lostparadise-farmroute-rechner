@@ -21,7 +21,6 @@
       font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
       position:relative;
     }
-    /* Börsen-Raster */
     body::before{
       content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
       background:
@@ -69,7 +68,6 @@
     .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
     .tag.yellow{border-color:#665500; background:#2b2600; color:#ffe58f}
 
-    /* Layout */
     .grid{display:grid; grid-template-columns:1.2fr .8fr; gap:16px; margin-top:16px}
     .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
     .card h2{margin:0 0 6px; font-size:16px}
@@ -77,7 +75,6 @@
     .hr{height:1px; background:linear-gradient(90deg,transparent, var(--border), transparent); margin:12px 0}
     .mini{font-size:12px; color:#9bb2c9}
 
-    /* Builder Steps */
     #steps{min-height:20px}
     .step{border:1px dashed var(--border); border-radius:14px; padding:12px; margin:10px 0; position:relative; display:grid; gap:8px; background:#0f141b}
     .step .bar{display:flex; align-items:center; gap:8px; justify-content:space-between}
@@ -93,20 +90,17 @@
     .summary .row{display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px solid var(--border)}
     .summary .row:last-child{border-bottom:none}
 
-    /* KPI */
     .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
     .kpi .box{background:#0c171f;border:1px solid var(--border);border-radius:12px;padding:10px}
     .kpi .label{color:#9bb2c9;font-size:12px}
     .kpi .val{font-size:18px;font-weight:700}
 
-    /* Modal */
     .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:5}
     .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(520px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
     .modal h3{margin:0 0 8px 0}
     .modal .row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
     .modal .actions{display:flex; gap:8px; justify-content:flex-end}
 
-    /* Auth Overlay */
     #authOverlay{position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:10}
     #authCard{background:var(--panel); border:1px solid var(--border); border-radius:16px; width:min(420px,95vw); padding:18px}
     #authCard h2{margin:0 0 8px; font-size:18px}
@@ -114,7 +108,6 @@
     #authForm{display:grid; gap:10px}
     #authForm input{width:100%}
 
-    /* Routenliste */
     #listView{grid-column:1/-1}
     .list-toolbar{display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap}
 
@@ -133,7 +126,6 @@
     .row-details .kpis{display:flex; gap:12px; flex-wrap:wrap; margin:6px 0}
     .row-details .kpis .k{background:#0c171f;border:1px solid var(--border);border-radius:10px;padding:6px 10px;font-size:12px}
 
-    /* Verkaufsliste (Endprodukte) */
     .sell-list .row{display:grid; grid-template-columns:1.4fr .8fr auto; gap:8px; margin:6px 0}
     .sell-list .row input[type="text"]{width:100%}
     .sell-list .row input[type="number"]{width:100%}
@@ -160,7 +152,6 @@
   <div class="content" style="visibility:hidden">
     <header>
       <div class="wrap header-grid">
-        <!-- Logo -->
         <img class="logo" alt="Routes Logo"
              src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
 
@@ -188,11 +179,9 @@
     </header>
 
     <main class="wrap grid">
-      <!-- Builder Ansicht -->
       <section class="card" id="builderView">
         <h2>Route zusammenstellen</h2>
 
-        <!-- Routenname -->
         <div class="two" style="margin-bottom:8px">
           <label>Routenname<br/>
             <input id="routeName" type="text" placeholder="z. B. Kupfer → Barren (Schnell)">
@@ -206,7 +195,6 @@
         </div>
 
         <div class="hr"></div>
-        <!-- Basisdaten -->
         <div class="two">
           <label>LKW-Größe (kg)<br/>
             <input id="lkwSize" type="number" min="1" step="1" value="2000">
@@ -258,7 +246,6 @@
         </details>
       </aside>
 
-      <!-- Routenliste Ansicht -->
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
         <div class="sub">Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde</strong> sortiert. Ziehe am Griff, um <strong>Block (Route + Details)</strong> zu verschieben.</div>
@@ -280,12 +267,10 @@
     </main>
   </div>
 
-  <!-- In-Page Speicher (Routen + Fahrzeiten) -->
   <!--DATA-START-->
   <script id="app-data" type="application/json">{"routes":{},"travelTimes":{}}</script>
   <!--DATA-END-->
 
-  <!-- Schritt-Vorlagen (Start/Abbau/Verarbeitung/Transportkosten/Verkauf) -->
   <template id="tpl-start">
     <div class="step" data-type="start" draggable="true">
       <div class="bar">
@@ -386,7 +371,6 @@
     </div>
   </template>
 
-  <!-- Verkaufsliste-Row -->
   <template id="tpl-sell-row">
     <div class="row">
       <input data-k="pname" type="text" placeholder="Endprodukt-Name (z. B. Aluminiumbarren)">
@@ -395,7 +379,6 @@
     </div>
   </template>
 
-  <!-- Fahrzeit-Modal -->
   <div id="travelModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal">
       <h3>Fahrzeit eintragen</h3>
@@ -413,10 +396,8 @@
 
   <script>
   (function(){
-    // ====== Feste GAS Web-App URL ======
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbzFHZwQI9KxXhJvR6aZRR0zyqyijb46gaqWpYhCsxdfow2U5Y5A5D4gBg3jmRyaa_hh/exec';
 
-    // ===== Utils =====
     function qs(s, e){return (e||document).querySelector(s);}
     function qsa(s, e){return Array.prototype.slice.call((e||document).querySelectorAll(s));}
     function uid(){return Math.random().toString(36).slice(2,9);}
@@ -427,11 +408,9 @@
     function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
     function slug(s){ return (s||'route').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 
-    // ===== In-Page Speicher =====
     function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{}}; }catch(e){ return {routes:{},travelTimes:{}}; } }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
-    // ===== JSONP Helper =====
     function jsonp(url){
       return new Promise(function(resolve,reject){
         const cb = 'cb_' + Math.random().toString(36).slice(2);
@@ -439,20 +418,13 @@
         const s = document.createElement('script');
         s.src = url + sep + 'callback=' + cb;
         s.async = true;
-        window[cb] = function(data){
-          resolve(data);
-          cleanup();
-        };
+        window[cb] = function(data){ resolve(data); cleanup(); };
         s.onerror = function(){ reject(new Error('JSONP load error')); cleanup(); };
-        function cleanup(){
-          delete window[cb];
-          if (s.parentNode) s.parentNode.removeChild(s);
-        }
+        function cleanup(){ delete window[cb]; if (s.parentNode) s.parentNode.removeChild(s); }
         document.head.appendChild(s);
       });
     }
 
-    // ===== Verkaufsliste =====
     function addSellRow(pname, price){
       var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
       var list=qs('#sellList'); list.appendChild(row);
@@ -475,7 +447,6 @@
       if((arr||[]).length===0){ addSellRow('', null); }
     }
 
-    // ===== Templates / Steps =====
     var TPLS={
       start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
       abbau: function(){return qs('#tpl-abbau').content.firstElementChild.cloneNode(true);},
@@ -500,10 +471,6 @@
       qs('.addInput',stepEl)?.addEventListener('click', function(){ addInputRow(stepEl); });
       qs('.addOutput',stepEl)?.addEventListener('click', function(){ addOutputRow(stepEl); });
       stepEl.addEventListener('input', function(){ recalc(); });
-      // Drag
-      stepEl.addEventListener('dragstart', function(e){ stepEl.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','drag'); });
-      stepEl.addEventListener('dragend', function(){ stepEl.classList.remove('dragging'); recalc(); });
-      // Fahrzeit-Abfrage bei Ortswechsel (on blur)
       var where=qs('[data-key="where"]', stepEl);
       if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
     }
@@ -511,7 +478,6 @@
       var el=TPLS[type]?TPLS[type]():null; if(!el) return null;
       el.dataset.type=type; attachStepControls(el); qs('#steps').appendChild(el); return el;
     }
-    // DnD Container für Steps
     (function(){
       var container=qs('#steps');
       function afterEl(container,y){
@@ -531,7 +497,6 @@
       });
     })();
 
-    // ===== Route Build/Load =====
     var currentRouteId=null;
     function getRoute(){
       var name = (qs('#routeName')?.value || '').trim() || 'Unbenannt';
@@ -560,14 +525,14 @@
           var outputs=qsa('[data-key="outputs"] .output-row',step).map(function(row){
             return {
               name: qs('[data-k="name"]',row).value.trim(),
-              qty: num(qs('[data-k="qty"]',row).value), // optional
+              qty: num(qs('[data-k="qty"]',row).value),
               unitWeight: num(qs('[data-k="unitWeight"]',row).value)
             };
           }).filter(function(o){return o.name;});
           steps.push({type:type,
             where: qs('[data-key="where"]',step).value.trim(),
-            duration: num(qs('[data-key="duration"]',step).value), // Sekunden pro Run
-            processCost: num(qs('[data-key="processCost"]',step).value), // einmalig
+            duration: num(qs('[data-key="duration"]',step).value),
+            processCost: num(qs('[data-key="processCost"]',step).value),
             inputs: inputs,
             outputs: outputs
           });
@@ -583,13 +548,22 @@
         name: name,
         lkwSize: Math.max(1, num(qs('#lkwSize').value)||2000),
         backpackKg: Math.max(1, num(qs('#backpackKg').value)||150),
-        sellList: getSellList(), // [{name, price}]
+        sellList: getSellList(),
         steps: steps,
         travelTimes: store.travelTimes || {}
       };
     }
     function setRoute(route){
       currentRouteId = route.id || uid();
+
+      // >>> FIX: TravelTimes der Route in den Store mergen <<<
+      if(route.travelTimes && typeof route.travelTimes === 'object'){
+        var st = readStore();
+        st.travelTimes = Object.assign({}, st.travelTimes||{}, route.travelTimes||{});
+        writeStore(st);
+      }
+      // <<< FIX ENDE
+
       qs('#routeName').value = route.name || '';
       qs('#lkwSize').value = route.lkwSize || 2000;
       qs('#backpackKg').value = route.backpackKg || 150;
@@ -623,7 +597,7 @@
             addOutputRow(el);
             var row=listO.lastElementChild;
             qs('[data-k="name"]',row).value=out.name||'';
-            qs('[data-k="qty"]',row).value=out.qty||''; // optional
+            qs('[data-k="qty"]',row).value=out.qty||'';
             qs('[data-k="unitWeight"]',row).value=out.unitWeight||'';
           });
         } else if(s.type==='transportkosten'){
@@ -635,7 +609,6 @@
       recalc();
     }
 
-    // ===== Fahrzeit-Popup (on blur) =====
     function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
     function openTravelModal(from,to, cb){
       var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
@@ -663,11 +636,10 @@
       }catch(e){}
     }
 
-    // ===== Automatik-Hilfen =====
     function kgPerBatchAllInputs(inputs, weights){
       var sum=0;
       inputs.forEach(function(i){
-        var w = weights[i.name] || 1; // Default 1 kg
+        var w = weights[i.name] || 1;
         sum += Math.max(0, num(i.qty)) * w;
       });
       return sum;
@@ -687,14 +659,13 @@
       });
     }
 
-    // ===== Berechnung einer Route =====
     function compute(route){
-      var baseKg = route.lkwSize>0? route.lkwSize : 2000; // LKW-Größe
+      var baseKg = route.lkwSize>0? route.lkwSize : 2000;
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
 
-      var inventory = {};   // item -> units
-      var weights = {};     // item -> kg per unit
-      var miningTime=0, driveTime=0, procTime=0; // Minuten
+      var inventory = {};
+      var weights = {};
+      var miningTime=0, driveTime=0, procTime=0;
       var purchaseCost=0, transportCostTotal=0, processingCostTotal=0;
       var log=[];
 
@@ -741,7 +712,7 @@
           }else{
             outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
-            var durSec = Math.max(0, num(s.duration));  // Sekunden pro RUN
+            var durSec = Math.max(0, num(s.duration));
             var durMin = durSec/60;
 
             var nonPurchased=inputs.filter(function(i){return !i.purchased;});
@@ -784,7 +755,7 @@
                 inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
               });
 
-              procTime += durMin; // Zeit/Run
+              procTime += durMin;
               runs++; batchesTotal+=batchesThisRun;
               if(batchesThisRun<=0) break;
             }
@@ -878,7 +849,6 @@
       };
     }
 
-    // ===== UI-Rendering Zusammenfassung =====
     function renderSummary(calc){
       qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
       qs('#kpiCost').textContent = cf.format(calc.totalCost);
@@ -908,7 +878,6 @@
       calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
       det.appendChild(ul); box.appendChild(det);
 
-      // Preis & Gewinn
       var pBox=qs('#priceTable'); pBox.innerHTML='';
       if(calc.endProducts.length===0){
         pBox.innerHTML='<div class="mini muted">Keine Endprodukte in der Verkaufsliste.</div>';
@@ -950,7 +919,6 @@
       qs('#sumHourly').textContent = cf.format(calc.hourlyProfit);
     }
 
-    // ===== Report-Text (Export) =====
     function buildReportText(route, calc){
       var lines=[];
       lines.push('Ergebnis & Struktur');
@@ -997,7 +965,6 @@
 
     function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
 
-    // ===== Routenverwaltung (Speichern/Laden in-Page) =====
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
@@ -1008,7 +975,6 @@
       });
     }
 
-    // ===== Routenliste =====
     function buildListData(){
       var store=readStore(); var list=[];
       Object.keys(store.routes||{}).forEach(function(id){
@@ -1080,7 +1046,7 @@
         var dataById={};
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
 
-        var margin = 1; // € pro Stunde Abstand
+        var margin = 1;
         var any=false;
 
         var ul=qs('#adjustmentsList'); ul.innerHTML='';
@@ -1134,9 +1100,8 @@
       });
     }
 
-    // ===== Google Apps Script / Drive Sync (JSONP/NO-CORS) =====
-    const DRIVE_AUTO_LOAD = true;   // beim Start automatisch aus Drive laden
-    const DRIVE_AUTO_SAVE = true;   // beim Speichern automatisch nach Drive schreiben
+    const DRIVE_AUTO_LOAD = true;
+    const DRIVE_AUTO_SAVE = true;
 
     function updateDriveStateTag(connected){
       const el = qs('#driveState');
@@ -1155,7 +1120,6 @@
     function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
     function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
 
-    // LIST/GET via JSONP
     async function gasListRoutes(){
       const url = GAS_URL + '?action=list&token=' + encodeURIComponent(getToken());
       const data = await jsonp(url);
@@ -1168,7 +1132,6 @@
       if(!data.ok) throw new Error(data.error || 'Get failed');
       return data.route;
     }
-    // SAVE/DELETE via POST no-cors (und danach prüfen)
     async function gasSaveRoute(route){
       await fetch(GAS_URL, {
         method: 'POST',
@@ -1192,7 +1155,7 @@
 
     async function syncFromDriveIntoPage(){
       try{
-        const list = await gasListRoutes(); // [{id,name,size,updated}]
+        const list = await gasListRoutes();
         if(!Array.isArray(list)) return;
         const store = readStore();
         for(const meta of list){
@@ -1200,6 +1163,11 @@
           if(!id) continue;
           const route = await gasGetRoute(id);
           if(route && route.id && Array.isArray(route.steps)){
+            // >>> FIX: TravelTimes beim Laden aus Drive mergen <<<
+            if(route.travelTimes && typeof route.travelTimes === 'object'){
+              store.travelTimes = Object.assign({}, store.travelTimes||{}, route.travelTimes||{});
+            }
+            // <<< FIX ENDE
             store.routes[route.id] = route;
           }
         }
@@ -1211,24 +1179,20 @@
       }
     }
 
-    // ===== Auth-Flow =====
     async function tryAuthAndLoad(initial=false){
       const token = getToken();
       if(!token){
         showAuth();
         return;
       }
-      // Verifikation via /list (JSONP)
       try{
         await gasListRoutes();
-        // Erfolg
         hideAuth();
         updateDriveStateTag(true);
         if(initial && DRIVE_AUTO_LOAD){
           await syncFromDriveIntoPage();
         }
       }catch(err){
-        // Fehler -> Token verwerfen und Meldung zeigen
         setToken('');
         showAuth('Zugriff verweigert – falsches Token.');
         updateDriveStateTag(false);
@@ -1250,7 +1214,6 @@
       qs('.content').style.visibility='visible';
     }
 
-    // ===== UI: Tabs =====
     function switchTab(name){
       var isList = (name==='list');
       document.getElementById('tabBuilder').classList.toggle('active', !isList);
@@ -1262,9 +1225,7 @@
     }
     function renderSummaryAndMaybeList(){ recalc(); if(!document.getElementById('listView').hidden){ renderListView(); } }
 
-    // ===== Events =====
     window.addEventListener('DOMContentLoaded', async function(){
-      // Auth-Form submit
       qs('#authForm').addEventListener('submit', async function(ev){
         ev.preventDefault();
         const t = qs('#authToken').value.trim();
@@ -1273,18 +1234,14 @@
         await tryAuthAndLoad(true);
       });
 
-      // Verkaufsliste
       document.getElementById('addSell').addEventListener('click', function(){ addSellRow('', null); });
 
-      // Add step
       document.getElementById('addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); });
 
-      // Basisdaten -> Recalc
       ['lkwSize','backpackKg','routeName'].forEach(function(id){
         var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
-      // Save – lokal + Drive
       document.getElementById('saveBtn')?.addEventListener('click', async function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){
@@ -1312,7 +1269,6 @@
         if(!document.getElementById('listView').hidden){ renderListView(); }
       });
 
-      // Delete – lokal + Drive
       document.getElementById('deleteBtn')?.addEventListener('click', async function(){
         var id=document.getElementById('routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
         if(!confirm('Route wirklich löschen?')) return;
@@ -1329,13 +1285,11 @@
         }
       });
 
-      // Load (lokal aus Dropdown)
       document.getElementById('routeSelect')?.addEventListener('change', function(e){
         var id=e.target.value; if(!id) return;
         var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
       });
 
-      // Export NUR aktuelle Route
       document.getElementById('exportCurrentBtn')?.addEventListener('click', function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){ alert('Bitte Routenname setzen.'); return; }
@@ -1367,7 +1321,6 @@
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download= slug(r.name || 'route') + '.json'; a.click(); URL.revokeObjectURL(a.href);
       });
 
-      // Import EINZELNE Route
       document.getElementById('importCurrentFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
@@ -1413,7 +1366,6 @@
         rd.readAsText(f); e.target.value='';
       });
 
-      // LIST VIEW: Export ALL
       document.getElementById('exportAllBtn')?.addEventListener('click', function(){
         var store=readStore();
         var reports={};
@@ -1448,7 +1400,6 @@
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='alle_routen.json'; a.click(); URL.revokeObjectURL(a.href);
       });
 
-      // LIST VIEW: Import ALL
       document.getElementById('importAllFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
@@ -1470,17 +1421,14 @@
         rd.readAsText(f); e.target.value='';
       });
 
-      // Tabs
       document.getElementById('tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
       document.getElementById('tabList').addEventListener('click', function(){ switchTab('list'); });
 
-      // Initial UI Setups
       refreshRouteSelect(null);
-      setSellList([]); // leere Verkaufsliste
+      setSellList([]);
       if(document.getElementById('steps').children.length===0){ addStep('start'); }
       recalc();
 
-      // Start: Auth erzwingen
       await tryAuthAndLoad(true);
     });
   })();
