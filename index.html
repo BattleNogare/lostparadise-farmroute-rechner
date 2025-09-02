@@ -67,6 +67,7 @@
     .ghost{background:transparent; border:1px dashed var(--border)}
     .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f}
     .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
+    .tag.yellow{border-color:#665500; background:#2b2600; color:#ffe58f}
 
     /* Layout */
     .grid{display:grid; grid-template-columns:1.2fr .8fr; gap:16px; margin-top:16px}
@@ -105,11 +106,18 @@
     .modal .row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
     .modal .actions{display:flex; gap:8px; justify-content:flex-end}
 
+    /* Auth Overlay */
+    #authOverlay{position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:10}
+    #authCard{background:var(--panel); border:1px solid var(--border); border-radius:16px; width:min(420px,95vw); padding:18px}
+    #authCard h2{margin:0 0 8px; font-size:18px}
+    #authError{color:#ffd1d1; background:#3a0d0d; border:1px solid #5a1a1a; padding:8px 10px; border-radius:10px; display:none; margin-bottom:8px}
+    #authForm{display:grid; gap:10px}
+    #authForm input{width:100%}
+
     /* Routenliste */
     #listView{grid-column:1/-1}
     .list-toolbar{display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap}
 
-    /* NEU: Wrapper pro Eintrag (Header + Details) wird zusammen gezogen */
     .route-item{margin:8px 0; border-radius:12px; background:#0f141b; border:1px dashed var(--border)}
     .route-item.dragging{opacity:.6; outline:2px dashed var(--accent)}
 
@@ -132,7 +140,24 @@
   </style>
 </head>
 <body>
-  <div class="content">
+  <!-- Auth-Overlay -->
+  <div id="authOverlay">
+    <div id="authCard">
+      <h2>Login</h2>
+      <div class="mini" style="margin-bottom:8px">Bitte gib dein <strong>Token</strong> ein, um die Seite zu entsperren.</div>
+      <div id="authError">Zugriff verweigert – falsches Token.</div>
+      <form id="authForm">
+        <label>Token<br><input id="authToken" type="password" placeholder="●●●●●●●●" autocomplete="current-password" required></label>
+        <div class="actions" style="justify-content:space-between">
+          <span class="tag yellow" title="Google Apps Script">Drive-Backend aktiv</span>
+          <button id="authSubmit" type="submit" class="primary">Entsperren</button>
+        </div>
+      </form>
+      <div class="mini" style="margin-top:8px;opacity:.8">Hinweis: Token wird nur <strong>in dieser Sitzung</strong> (sessionStorage) gehalten.</div>
+    </div>
+  </div>
+
+  <div class="content" style="visibility:hidden">
     <header>
       <div class="wrap header-grid">
         <!-- Logo -->
@@ -141,7 +166,7 @@
 
         <div class="brand">
           <h1>Farmrouten-Preisrechner</h1>
-          <span class="tag green" title="Daten sind in dieser Datei gespeichert">In-Page Speicher</span>
+          <span id="driveState" class="tag yellow" title="Drive-Verbindung">Drive: nicht verbunden</span>
         </div>
 
         <div class="toolbar">
@@ -176,7 +201,7 @@
 
         <div class="sub">
           Verarbeitungszeit gilt pro <strong>Run</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet.
-          Verarbeitungskosten gelten <strong>einmalig pro Verarbeitungsschritt</strong>.  
+          Verarbeitungskosten gelten <strong>einmalig für diesen Verarbeitungsschritt</strong>.  
           Endprodukte & Preise pflegst du unten in der <strong>Verkaufsliste</strong> (mehrere möglich).
         </div>
 
@@ -236,7 +261,7 @@
       <!-- Routenliste Ansicht -->
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
-        <div class="sub">Alle gespeicherten Routen. Standardmäßig nach <strong>Gewinn/Stunde</strong> sortiert. Ziehe am Griff, um <strong>Block (Route + Details)</strong> zu verschieben.</div>
+        <div class="sub">Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde</strong> sortiert. Ziehe am Griff, um <strong>Block (Route + Details)</strong> zu verschieben.</div>
         <div class="hr"></div>
 
         <div class="list-toolbar">
@@ -260,7 +285,7 @@
   <script id="app-data" type="application/json">{"routes":{},"travelTimes":{}}</script>
   <!--DATA-END-->
 
-  <!-- Schritt-Vorlagen -->
+  <!-- Schritt-Vorlagen (Start/Abbau/Verarbeitung/Transportkosten/Verkauf) -->
   <template id="tpl-start">
     <div class="step" data-type="start" draggable="true">
       <div class="bar">
@@ -388,6 +413,9 @@
 
   <script>
   (function(){
+    // ====== Feste GAS Web-App URL ======
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzFHZwQI9KxXhJvR6aZRR0zyqyijb46gaqWpYhCsxdfow2U5Y5A5D4gBg3jmRyaa_hh/exec';
+
     // ===== Utils =====
     function qs(s, e){return (e||document).querySelector(s);}
     function qsa(s, e){return Array.prototype.slice.call((e||document).querySelectorAll(s));}
@@ -948,7 +976,7 @@
 
     function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
 
-    // ===== Routenverwaltung (Speichern/Laden) =====
+    // ===== Routenverwaltung (Speichern/Laden in-Page) =====
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
@@ -987,13 +1015,11 @@
           ? item.endProducts.map(function(ep){ return ep.name + (ep.price? ' ('+cf.format(ep.price)+')' : ' (–)'); }).join(', ')
           : '–';
 
-        // NEU: Wrapper pro Eintrag (draggable)
         var wrap=document.createElement('div');
         wrap.className='route-item';
         wrap.draggable=true;
         wrap.dataset.id=item.id;
 
-        // Header-Zeile
         var row=document.createElement('div');
         row.className='route-row';
         row.innerHTML = `
@@ -1005,7 +1031,6 @@
         `;
         wrap.appendChild(row);
 
-        // Details (aufklappbar)
         var det=document.createElement('details');
         det.className='row-details';
         var sum=document.createElement('summary');
@@ -1030,7 +1055,6 @@
         container.appendChild(wrap);
       });
 
-      // Drag & Drop für gesamte Blöcke
       enableListDnD(container, function(newOrderIds){
         var dataById={};
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
@@ -1061,26 +1085,20 @@
 
     function enableListDnD(container, onOrderChanged){
       var dragEl=null;
-
-      // Dragstart auf dem gesamten Block
       container.addEventListener('dragstart', function(e){
         var item=e.target.closest('.route-item'); if(!item) return;
         dragEl=item; item.classList.add('dragging');
         e.dataTransfer.effectAllowed='move';
         e.dataTransfer.setData('text/plain','drag');
       });
-
       container.addEventListener('dragend', function(){
         if(dragEl){ dragEl.classList.remove('dragging'); dragEl=null; }
         var ids=[].map.call(container.querySelectorAll('.route-item'), function(r){return r.dataset.id;});
         if(typeof onOrderChanged==='function'){ onOrderChanged(ids); }
       });
-
       container.addEventListener('dragover', function(e){
         e.preventDefault();
         var dragging=container.querySelector('.route-item.dragging'); if(!dragging) return;
-
-        // An welcher Position einfügen?
         var after = (function(){
           var els=[].slice.call(container.querySelectorAll('.route-item:not(.dragging)'));
           return els.reduce(function(closest,child){
@@ -1090,10 +1108,124 @@
             else { return closest; }
           }, {offset:Number.NEGATIVE_INFINITY}).element;
         })();
-
         if(after==null){ container.appendChild(dragging); }
         else { container.insertBefore(dragging, after); }
       });
+    }
+
+    // ===== Google Apps Script / Drive Sync =====
+    const DRIVE_AUTO_LOAD = true;   // beim Start automatisch aus Drive laden
+    const DRIVE_AUTO_SAVE = true;   // beim Speichern automatisch nach Drive schreiben
+
+    function updateDriveStateTag(connected){
+      const el = qs('#driveState');
+      if(!el) return;
+      if(connected){
+        el.textContent = 'Drive: verbunden';
+        el.classList.remove('yellow'); el.classList.add('green');
+        el.title = 'Web-App verbunden';
+      }else{
+        el.textContent = 'Drive: nicht verbunden';
+        el.classList.add('yellow'); el.classList.remove('green');
+        el.title = 'Nicht authentifiziert';
+      }
+    }
+
+    function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
+    function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
+
+    async function gasListRoutes(){
+      const res = await fetch(GAS_URL + '?action=list', { headers: { 'X-Auth': getToken() } });
+      const data = await res.json();
+      if(!data.ok) throw new Error(data.error || 'List failed');
+      return data.routes || [];
+    }
+    async function gasGetRoute(id){
+      const res = await fetch(GAS_URL + '?action=get&id=' + encodeURIComponent(id), { headers: { 'X-Auth': getToken() } });
+      const data = await res.json();
+      if(!data.ok) throw new Error(data.error || 'Get failed');
+      return data.route;
+    }
+    async function gasSaveRoute(route){
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Auth': getToken() },
+        body: JSON.stringify({ action: 'save', route: route })
+      });
+      const data = await res.json();
+      if(!data.ok) throw new Error(data.error || 'Save failed');
+      return data;
+    }
+    async function gasDeleteRoute(id){
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Auth': getToken() },
+        body: JSON.stringify({ action: 'delete', id })
+      });
+      const data = await res.json();
+      if(!data.ok) throw new Error(data.error || 'Delete failed');
+      return data;
+    }
+
+    async function syncFromDriveIntoPage(){
+      try{
+        const list = await gasListRoutes(); // [{id,name,size,updated}]
+        if(!Array.isArray(list)) return;
+        const store = readStore();
+        for(const meta of list){
+          const id = (meta.id || '').replace(/\.json$/,'');
+          if(!id) continue;
+          const route = await gasGetRoute(id);
+          if(route && route.id && Array.isArray(route.steps)){
+            store.routes[route.id] = route;
+          }
+        }
+        writeStore(store);
+        refreshRouteSelect(null);
+        renderSummaryAndMaybeList();
+      }catch(err){
+        console.warn('Drive Sync (load) fehlgeschlagen:', err);
+      }
+    }
+
+    // ===== Auth-Flow =====
+    async function tryAuthAndLoad(initial=false){
+      const token = getToken();
+      if(!token){
+        showAuth();
+        return;
+      }
+      // Verifikation via /list
+      try{
+        await gasListRoutes();
+        // Erfolg
+        hideAuth();
+        updateDriveStateTag(true);
+        if(initial && DRIVE_AUTO_LOAD){
+          await syncFromDriveIntoPage();
+        }
+      }catch(err){
+        // Fehler (z. B. 401) -> Token verwerfen und Meldung zeigen
+        setToken('');
+        showAuth('Zugriff verweigert – falsches Token.');
+        updateDriveStateTag(false);
+      }
+    }
+
+    function showAuth(msg){
+      const overlay=qs('#authOverlay');
+      const card=qs('#authCard');
+      const err=qs('#authError');
+      if(msg){ err.textContent=msg; err.style.display='block'; } else { err.style.display='none'; }
+      overlay.style.display='flex';
+      qs('.content').style.visibility='hidden';
+      updateDriveStateTag(false);
+      setTimeout(()=>{ qs('#authToken').focus(); }, 50);
+    }
+    function hideAuth(){
+      const overlay=qs('#authOverlay');
+      overlay.style.display='none';
+      qs('.content').style.visibility='visible';
     }
 
     // ===== UI: Tabs =====
@@ -1106,11 +1238,19 @@
       document.getElementById('listView').hidden    = !isList;
       if(isList){ renderListView(); }
     }
-
     function renderSummaryAndMaybeList(){ recalc(); if(!document.getElementById('listView').hidden){ renderListView(); } }
 
     // ===== Events =====
-    window.addEventListener('DOMContentLoaded', function(){
+    window.addEventListener('DOMContentLoaded', async function(){
+      // Auth-Form submit
+      qs('#authForm').addEventListener('submit', async function(ev){
+        ev.preventDefault();
+        const t = qs('#authToken').value.trim();
+        if(!t){ showAuth('Bitte Token eingeben.'); return; }
+        setToken(t);
+        await tryAuthAndLoad(true);
+      });
+
       // Verkaufsliste
       document.getElementById('addSell').addEventListener('click', function(){ addSellRow('', null); });
 
@@ -1122,8 +1262,8 @@
         var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
-      // Save – nutzt den Routenname-Input
-      document.getElementById('saveBtn')?.addEventListener('click', function(){
+      // Save – lokal + Drive (nach Auth)
+      document.getElementById('saveBtn')?.addEventListener('click', async function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){
           alert('Bitte einen Routenname eintragen.');
@@ -1133,17 +1273,41 @@
         var store=readStore(); store.routes[r.id]=r; writeStore(store);
         refreshRouteSelect(r.id);
         var sel=document.getElementById('routeSelect'); if(sel){ sel.value=r.id; }
-        alert('Route gespeichert.');
+        alert('Route lokal gespeichert.');
+
+        if(DRIVE_AUTO_SAVE && getToken()){
+          try{
+            await gasSaveRoute(r);
+            updateDriveStateTag(true);
+            alert('Route zusätzlich in Google Drive gespeichert.');
+          }catch(err){
+            console.warn('Speichern nach Drive fehlgeschlagen:', err.message);
+            updateDriveStateTag(false);
+            showAuth('Zugriff verweigert oder Fehler beim Speichern. Bitte Token prüfen.');
+          }
+        }
+
         if(!document.getElementById('listView').hidden){ renderListView(); }
       });
 
-      // Delete
-      document.getElementById('deleteBtn')?.addEventListener('click', function(){
+      // Delete – lokal + Drive
+      document.getElementById('deleteBtn')?.addEventListener('click', async function(){
         var id=document.getElementById('routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
-        if(confirm('Route wirklich löschen?')){ var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null); if(!document.getElementById('listView').hidden){ renderListView(); } }
+        if(!confirm('Route wirklich löschen?')) return;
+        var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null);
+        if(!document.getElementById('listView').hidden){ renderListView(); }
+        if(getToken()){
+          try{
+            await gasDeleteRoute(id);
+            alert('Route auch in Google Drive gelöscht.');
+          }catch(err){
+            console.warn('Drive-Delete fehlgeschlagen:', err.message);
+            showAuth('Zugriff verweigert oder Fehler beim Löschen. Bitte Token prüfen.');
+          }
+        }
       });
 
-      // Load
+      // Load (lokal aus Dropdown)
       document.getElementById('routeSelect')?.addEventListener('change', function(e){
         var id=e.target.value; if(!id) return;
         var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
@@ -1174,63 +1338,18 @@
             log: calc.log,
             breakEvenAvg: calc.BE_avg,
             targetRevenue: calc.targetRevenue,
-            text: (function(route, calc){
-              var nf=new Intl.NumberFormat('de-DE',{maximumFractionDigits:2});
-              var cf=new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:2});
-              function fmt(n){return nf.format(n);}
-              function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
-              var lines=[];
-              lines.push('Ergebnis & Struktur');
-              lines.push('Gesamtdauer');
-              lines.push(minutesToH(calc.totalMinutes)+' ('+fmt(calc.totalMinutes)+' min)');
-              lines.push('Gesamtkosten');
-              lines.push(cf.format(calc.totalCost));
-              var yieldTxt = calc.endProducts.length
-                ? calc.endProducts.map(function(ep){ return fmt(ep.units)+' × '+ep.name; }).join(', ')
-                : '–';
-              lines.push('Ausbeute');
-              lines.push(yieldTxt);
-              lines.push('Mining');
-              lines.push(minutesToH(calc.miningTime)+' ('+fmt(calc.miningTime)+' min)');
-              lines.push('Fahrten');
-              lines.push(minutesToH(calc.driveTime)+' ('+fmt(calc.driveTime)+' min)');
-              lines.push('Verarbeitung');
-              lines.push(minutesToH(calc.procTime)+' ('+fmt(calc.procTime)+' min)');
-              lines.push('Kosten (Einkauf)');
-              lines.push(cf.format(calc.purchaseCost));
-              lines.push('Transportkosten');
-              lines.push(cf.format(calc.transportCostTotal));
-              lines.push('Verarbeitungskosten (fix)');
-              lines.push(cf.format(calc.processingCostTotal));
-              lines.push('Gesamtkosten');
-              lines.push(cf.format(calc.totalCost));
-              lines.push('Routenstruktur');
-              calc.log.forEach(function(t){ lines.push(t); });
-              if(calc.endProducts.length){
-                lines.push('Preis & Gewinn');
-                lines.push('Endprodukt | Menge | Dein Preis | Vorschlag (≤500k/h) | eff. Preis | Umsatz');
-                calc.endProducts.forEach(function(ep){
-                  var priceDisp = (ep.price>0)? cf.format(ep.price) : '–';
-                  var suggDisp  = (ep.suggested!=null)? cf.format(ep.suggested) : '–';
-                  lines.push([ep.name, fmt(ep.units), priceDisp, suggDisp, cf.format(ep.effective), cf.format(ep.revenue)].join(' | '));
-                });
-                lines.push('Gesamtumsatz: '+cf.format(calc.revenue));
-                lines.push('Gesamtgewinn: '+cf.format(calc.revenue - calc.totalCost));
-                lines.push('Gesamt: Gewinn/Stunde: '+cf.format(calc.hourlyProfit));
-              }
-              return lines.join('\n');
-            })(r, calc)
+            text: buildReportText(r, calc)
           }
         };
         var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download= slug(r.name || 'route') + '.json'; a.click(); URL.revokeObjectURL(a.href);
       });
 
-      // === Import EINZELNE Route ===
+      // Import EINZELNE Route
       document.getElementById('importCurrentFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
-        rd.onload=function(){
+        rd.onload=async function(){
           try{
             var incoming=JSON.parse(rd.result||'{}');
             var store=readStore();
@@ -1259,6 +1378,10 @@
             var sel=document.getElementById('routeSelect'); if(sel){ sel.value=route.id; }
             setRoute(route); currentRouteId = route.id;
 
+            if(DRIVE_AUTO_SAVE && getToken()){
+              try{ await gasSaveRoute(route); }catch(err){ console.warn('Drive-Save nach Import fehlgeschlagen:', err.message); }
+            }
+
             alert('Route importiert und geladen: '+route.name);
             if(!document.getElementById('listView').hidden){ renderListView(); }
           }catch(err){
@@ -1268,7 +1391,7 @@
         rd.readAsText(f); e.target.value='';
       });
 
-      // === LIST VIEW: Export ALL ===
+      // LIST VIEW: Export ALL
       document.getElementById('exportAllBtn')?.addEventListener('click', function(){
         var store=readStore();
         var reports={};
@@ -1303,7 +1426,7 @@
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='alle_routen.json'; a.click(); URL.revokeObjectURL(a.href);
       });
 
-      // === LIST VIEW: Import ALL ===
+      // LIST VIEW: Import ALL
       document.getElementById('importAllFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
@@ -1329,11 +1452,14 @@
       document.getElementById('tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
       document.getElementById('tabList').addEventListener('click', function(){ switchTab('list'); });
 
-      // Initial
+      // Initial UI Setups
       refreshRouteSelect(null);
-      setSellList([]); // initiale leere Verkaufsliste
+      setSellList([]); // leere Verkaufsliste
       if(document.getElementById('steps').children.length===0){ addStep('start'); }
       recalc();
+
+      // Start: Auth erzwingen
+      await tryAuthAndLoad(true);
     });
   })();
   </script>
