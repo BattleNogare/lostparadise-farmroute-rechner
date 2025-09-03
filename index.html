@@ -1,1217 +1,1567 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <title>Crafting-System - Lostparadise.eu</title>
-	<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/BattleNogare/lostparadise-herstellung/main/favicon-96x96.png" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Farmrouten-Preisrechner</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon"
+        href="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/4755eff9d2f03a8171689a9f9a0b2b635a10e903/Routes-Logo.ico" />
+
   <style>
-    body {
-      font-family: Arial;
-      margin: 2rem;
-      background-color: #0d1117;
-      color: #f0f0f0;
-    background-image: url('https://raw.githubusercontent.com/BattleNogare/lostparadise-herstellung/main/Lostparadise-Crafting2.png');
-  background-size: contain;        /* Bild vollständig anzeigen, ohne Abschneiden */
-  background-position: center center;  /* Horizontal & vertikal zentrieren */
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+    :root{
+      --bg:#0b0f14; --panel:#0f141b; --muted:#161c24; --text:#e6f0ff; --soft:#9bb2c9;
+      --green:#00e676; --red:#ff4d4f; --accent:#1aff95; --grid:#0d2a1f; --border:#1f2a36; --warn:#ffd666;
+      --logo-max-h:96px;
     }
-
-    select, pre {
-      font-size: 1rem;
-      padding: 0.5rem;
-      width: 47%;
-      background-color: #151b23;
-      color: #ffffff;
-      border: 1px solid #666;
-      margin-bottom: 1rem;
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
+      position:relative;
     }
-
-    pre {
-      background: #2e2e2e;
-      padding: 1rem;
-      white-space: pre-wrap;
-      border: 1px solid #666;
+    body::before{
+      content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+      background:
+        radial-gradient(1200px 1200px at 100% 0%,rgba(0,230,118,.06),transparent 40%),
+        radial-gradient(1200px 1200px at 0% 100%,rgba(0,230,118,.06),transparent 40%),
+        linear-gradient( var(--grid) 1px, transparent 1px) 0 0/ 100% 24px,
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/ 24px 100%;
+      opacity:.45;
     }
+    .content{position:relative; z-index:1;}
 
-    .kopfzeile {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
+    header{
+      position:sticky; top:0; z-index:2; backdrop-filter: blur(8px);
+      background:linear-gradient(180deg,rgba(11,15,20,.92),rgba(11,15,20,.65));
+      border-bottom:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,.25);
     }
-
-    .kopfzeile img {
-      max-height: 80px;
+    .wrap{max-width:1200px; margin:0 auto; padding:0 16px;}
+    .header-grid{
+      display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto;
+      column-gap:12px; align-items:center; padding:12px 0;
     }
-.hinweis-box {
-  background-color: #2e2e2e;
-  color: #ffd700;
-  padding: 1rem;
-  border-left: 5px solid #ffd700;
-  margin: 1rem 0;
-  width: 47%;
-	
-}
-.link-button {
-  display: inline-block;
-  padding: 0.6rem 1rem;
-  background-color: #151b23;
-  color: #ffd700;
-  text-decoration: none;
-  border: 1px solid #666;
-  border-radius: 5px;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
+    .logo{
+      grid-column:1; grid-row:1 / span 2;
+      max-height:var(--logo-max-h);
+      height:auto; width:auto; object-fit:contain; border-radius:6px; display:block;
+    }
+    .brand{display:flex; align-items:center; gap:12px;}
+    h1{font-size:18px; margin:0; letter-spacing:.3px}
 
-.link-button:hover {
-  background-color: #ffd700;
-  color: #151b23;
-}
-.ausgabe-wrapper {
-  display: flex;
-  gap: 2rem;
-  align-items: flex-start;
-  margin-top: 1rem;
-}
+    .toolbar{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; margin-top:6px;}
+    .menu{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+    .tabs{display:flex; gap:6px}
+    .tab{background:transparent; border:1px solid var(--border); color:var(--text); padding:8px 10px; border-radius:10px; cursor:pointer}
+    .tab.active{background:#0e171f}
 
-.ausgabe-wrapper pre {
-  width: 47%;
-}
+    select, input, button, textarea{background:var(--muted); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font:inherit; outline:none}
+    input[type="number"]{width:140px}
+    input::placeholder, textarea::placeholder{color:#88a0b7}
+    button{cursor:pointer; transition:.2s transform ease, .2s background ease;}
+    button:hover{transform:translateY(-1px)}
+    .primary{background:linear-gradient(180deg,var(--green),#09c966); color:#00160a; font-weight:700; border:none}
+    .danger{background:linear-gradient(180deg,#ff7676,#ff4d4f); color:#2b0004; font-weight:700; border:none}
+    .ghost{background:transparent; border:1px dashed var(--border)}
+    .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f}
+    .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
+    .tag.yellow{border-color:#665500; background:#2b2600; color:#ffe58f}
 
-#bildAnzeige {
-  max-width: 40%;
-  /*max-height: 1800px; */
-  display: none;
+    .grid{display:grid; grid-template-columns:1.2fr .8fr; gap:16px; margin-top:16px}
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
+    .card h2{margin:0 0 6px; font-size:16px}
+    .sub{color:var(--soft); font-size:13px}
+    .hr{height:1px; background:linear-gradient(90deg,transparent, var(--border), transparent); margin:12px 0}
+    .mini{font-size:12px; color:#9bb2c9}
 
-  /* Technischer Rahmen */
-  border: 3px double #ccc;           /* Doppellinie wie technische Zeichnungen */
-  border-radius: 4px;
-  padding: 6px;
-  background-color: #1b1f24;         /* Dunkles Hintergrundfeld */
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);  /* dezenter "Blueprint"-Glanz */
+    #steps{min-height:20px}
+    .step{border:1px dashed var(--border); border-radius:14px; padding:12px; margin:10px 0; position:relative; display:grid; gap:8px; background:#0f141b}
+    .step .bar{display:flex; align-items:center; gap:8px; justify-content:space-between}
+    .handle{cursor:grab; user-select:none; padding:6px 8px; border-radius:8px; background:#0e171f; border:1px solid var(--border); font-size:12px}
+    .handle:active{cursor:grabbing}
+    .step.dragging{opacity:.6; outline:2px dashed var(--accent)}
+    .step-body{display:grid; gap:8px}
+    .two{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+    .three{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
+    .actions{display:flex; gap:8px; flex-wrap:wrap}
 
-  /* "technischer" Stil */
-  font-family: 'Courier New', monospace;  /* Technik-Schrift */
-  position: relative;
-}
+    .summary{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:13px}
+    .summary .row{display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px solid var(--border)}
+    .summary .row:last-child{border-bottom:none}
 
+    .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+    .kpi .box{background:#0c171f;border:1px solid var(--border);border-radius:12px;padding:10px}
+    .kpi .label{color:#9bb2c9;font-size:12px}
+    .kpi .val{font-size:18px;font-weight:700}
 
+    .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:5}
+    .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(720px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
+    .modal h3{margin:0 0 8px 0}
+    .modal .row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
+    .modal .actions{display:flex; gap:8px; justify-content:flex-end}
 
-	  
+    #authOverlay{position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:10}
+    #authCard{background:var(--panel); border:1px solid var(--border); border-radius:16px; width:min(420px,95vw); padding:18px}
+    #authCard h2{margin:0 0 8px; font-size:18px}
+    #authError{color:#ffd1d1; background:#3a0d0d; border:1px solid #5a1a1a; padding:8px 10px; border-radius:10px; display:none; margin-bottom:8px}
+    #authForm{display:grid; gap:10px}
+    #authForm input{width:100%}
+
+    #listView{grid-column:1/-1}
+    .list-toolbar{display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap}
+
+    .route-item{margin:8px 0; border-radius:12px; background:#0f141b; border:1px dashed var(--border)}
+    .route-item.dragging{opacity:.6; outline:2px dashed var(--accent)}
+
+    .route-row{display:grid; grid-template-columns: 32px 1.2fr 1fr .8fr auto; gap:10px; align-items:center; padding:10px;}
+    .route-row .drag{cursor:grab; user-select:none; text-align:center; border:1px solid var(--border); border-radius:8px; padding:6px; background:#0e171f}
+    .pill{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f; font-size:12px}
+    .muted{color:#9bb2c9}
+    .warn{color:#2b2300; background:linear-gradient(180deg,#ffe58f,#ffd666); border-color:#e8c14c}
+    .adjustments{margin-top:12px; border:1px solid var(--border); border-radius:12px; padding:10px; background:#0e171f}
+    .adjustments ul{margin:8px 0 0 18px}
+
+    .row-details{margin:0 10px 10px 42px; border-left:2px dashed var(--border); padding:8px 0 0 12px}
+    .row-details .kpis{display:flex; gap:12px; flex-wrap:wrap; margin:6px 0}
+    .row-details .kpis .k{background:#0c171f;border:1px solid var(--border);border-radius:10px;padding:6px 10px;font-size:12px}
+
+    .sell-list .row{display:grid; grid-template-columns:1.4fr .8fr auto; gap:8px; margin:6px 0}
+    .sell-list .row input[type="text"]{width:100%}
+    .sell-list .row input[type="number"]{width:100%}
+
+    /* Travel Manager table */
+    .tm-table{width:100%; border-collapse:collapse; margin-top:8px}
+    .tm-table th,.tm-table td{border:1px solid var(--border); padding:6px 8px; text-align:left}
+    .tm-table th{background:#0c171f; font-weight:600}
+    .tm-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:10px}
   </style>
 </head>
 <body>
-  <div class="kopfzeile">
-    <img src="https://raw.githubusercontent.com/BattleNogare/lostparadise-herstellung/8c16ed8a0e0b9f02aaaca93c4970dc576722484c/Lostparadise-Crafting2.png" width="100" />
-    <h1>Lostparadise.eu - Fahrzeug - Crafting-System</h1>  
+  <!-- Auth-Overlay -->
+  <div id="authOverlay">
+    <div id="authCard">
+      <h2>Login</h2>
+      <div class="mini" style="margin-bottom:8px">Bitte gib dein <strong>Token</strong> ein, um die Seite zu entsperren.</div>
+      <div id="authError">Zugriff verweigert – falsches Token.</div>
+      <form id="authForm">
+        <label>Token<br><input id="authToken" type="password" placeholder="●●●●●●●●" autocomplete="current-password" required></label>
+        <div class="actions" style="justify-content:space-between">
+          <span class="tag yellow" title="Google Apps Script">Drive-Backend aktiv</span>
+          <button id="authSubmit" type="submit" class="primary">Entsperren</button>
+        </div>
+      </form>
+      <div class="mini" style="margin-top:8px;opacity:.8">Hinweis: Token wird nur <strong>in dieser Sitzung</strong> (sessionStorage) gehalten.</div>
+    </div>
   </div>
-<br>
-	<a href="waffen-crafting.html" class="link-button">Zum Waffen-Crafting</a>
-</br>
-<br>
-  <select id="startSelect">
-    <option value="">-- Optional: Startprodukt --</option>
-  </select>
 
-  <select id="endSelect">
-    <option value="">-- Zielprodukt auswählen --</option>
-  </select>
+  <div class="content" style="visibility:hidden">
+    <header>
+      <div class="wrap header-grid">
+        <img class="logo" alt="Routes Logo"
+             src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
+        <div class="brand">
+          <h1>Farmrouten-Preisrechner</h1>
+          <span id="driveState" class="tag yellow" title="Drive-Verbindung">Drive: nicht verbunden</span>
+        </div>
+        <div class="toolbar">
+          <div class="tabs">
+            <button class="tab active" id="tabBuilder">Builder</button>
+            <button class="tab" id="tabList">Routenliste</button>
+          </div>
+          <div class="menu">
+            <select id="routeSelect" title="Gespeicherte Routen (in dieser Seite)"></select>
+            <button id="saveBtn">Route speichern</button>
+            <button id="deleteBtn" class="danger">Löschen</button>
+            <button id="exportCurrentBtn" class="ghost">Export aktuelle Route</button>
+            <label for="importCurrentFile" class="ghost" style="padding:10px 12px; cursor:pointer">Import aktuelle Route
+              <input id="importCurrentFile" type="file" accept="application/json" style="display:none">
+            </label>
+          </div>
+        </div>
+      </div>
+    </header>
 
-<div class="hinweis-box">
-  💡 Hinweis! <br>
-	Die Werte sind berechnet und nicht garantiert! Bei Fehlern ➔ Marius Braun<br>
-	Der Rechner funktioniert immer nur für die nächste Stufe!<br>
-	Bei mehreren ausgewählten Fahrzeug-Upgrades auf einmal stimmen die Zahlen nicht mehr!<br>
-	Verwendung auf eigene Gefahr<br>
-</div>	
-<div class="ausgabe-wrapper">
-  <pre id="ausgabe"></pre>
-  <img id="bildAnzeige" style="display: none; margin-top: 1rem;" />
-</div>
+    <main class="wrap grid">
+      <!-- Builder -->
+      <section class="card" id="builderView">
+        <h2>Route zusammenstellen</h2>
 
-  
+        <div class="two" style="margin-bottom:8px">
+          <label>Routenname<br/>
+            <input id="routeName" type="text" placeholder="z. B. Kupfer → Barren (Schnell)">
+          </label>
+        </div>
 
+        <div class="sub">
+          Verarbeitungszeit gilt pro <strong>Run</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet.
+          Verarbeitungskosten gelten <strong>einmalig für diesen Verarbeitungsschritt</strong>.  
+          Endprodukte & Preise pflegst du unten in der <strong>Verkaufsliste</strong> (mehrere möglich).
+        </div>
+
+        <div class="hr"></div>
+        <div class="two">
+          <label>LKW-Größe (kg)<br/>
+            <input id="lkwSize" type="number" min="1" step="1" value="2000">
+          </label>
+          <label>Rucksack-Größe (kg)<br/>
+            <input id="backpackKg" type="number" min="1" step="1" value="150">
+          </label>
+        </div>
+
+        <div class="hr"></div>
+        <h3 style="margin:0 0 6px 0;font-size:15px">Verkaufsliste (Endprodukte & Preise)</h3>
+        <div id="sellList" class="sell-list"></div>
+        <div class="actions"><button id="addSell" type="button">+ Produkt hinzufügen</button></div>
+
+        <div class="hr"></div>
+        <div id="steps"></div>
+
+        <div class="actions" style="gap:12px; align-items:center">
+          <div style="display:flex; gap:8px; align-items:center">
+            <select id="addType">
+              <option value="start">➕ Startpunkt</option>
+              <option value="abbau">➕ Abbau</option>
+              <option value="verarbeitung">➕ Verarbeitung</option>
+              <option value="transportkosten">➕ Transportkosten</option>
+              <option value="verkauf">➕ Verkaufsort</option>
+            </select>
+            <button id="addBtn" type="button">Schritt hinzufügen</button>
+          </div>
+          <div class="mini" style="flex:1">Fahrzeiten werden beim Verlassen eines Ortsfelds per Popup abgefragt (wenn sich der Ort ändert).</div>
+          <button id="manageTravelBtn" type="button" class="ghost" title="Fahrzeiten nachträglich bearbeiten">Fahrzeiten bearbeiten</button>
+        </div>
+      </section>
+
+      <!-- Result -->
+      <aside class="card" id="resultView">
+        <h2>Ergebnis &amp; Struktur</h2>
+        <div class="kpi">
+          <div class="box"><div class="label">Gesamtdauer</div><div id="kpiTime" class="val">–</div></div>
+          <div class="box"><div class="label">Gesamtkosten</div><div id="kpiCost" class="val">–</div></div>
+          <div class="box"><div class="label">Ausbeute</div><div id="kpiYield" class="val">–</div></div>
+        </div>
+        <div class="hr"></div>
+
+        <div class="summary" id="summary"></div>
+
+        <div class="hr"></div>
+        <details open>
+          <summary>Preis &amp; Gewinn</summary>
+          <div id="priceTable" style="margin-top:8px"></div>
+          <div class="row" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-top:1px solid var(--border);margin-top:8px">
+            <span><strong>Gesamt: Gewinn/Stunde</strong></span> <strong id="sumHourly">–</strong>
+          </div>
+        </details>
+      </aside>
+
+      <!-- List -->
+      <section class="card" id="listView" hidden>
+        <h2>Routenliste</h2>
+        <div class="sub">Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde</strong> sortiert. Ziehe am Griff, um <strong>Block (Route + Details)</strong> zu verschieben.</div>
+        <div class="hr"></div>
+
+        <div class="list-toolbar">
+          <button id="exportAllBtn">Alle exportieren</button>
+          <label for="importAllFile" class="ghost" style="padding:10px 12px; cursor:pointer">Importieren<input id="importAllFile" type="file" accept="application/json" style="display:none"></label>
+        </div>
+
+        <div id="routesList"></div>
+
+        <div id="adjustmentsPanel" class="adjustments" style="display:none">
+          <strong>Anpassungen nötig, um diese Reihenfolge zu erreichen:</strong>
+          <ul id="adjustmentsList"></ul>
+          <div class="mini muted" id="adjustmentsNote" style="margin-top:6px"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!--DATA-START-->
+  <script id="app-data" type="application/json">{"routes":{},"travelTimes":{}}</script>
+  <!--DATA-END-->
+
+  <!-- Step Templates -->
+  <template id="tpl-start">
+    <div class="step" data-type="start" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Startpunkt</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body">
+        <input data-key="where" placeholder="Start-Ort">
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-abbau">
+    <div class="step" data-type="abbau" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Abbau</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body three">
+        <input data-key="what" placeholder="Was wird abgebaut? (z. B. Kupfererz)">
+        <input data-key="unitWeight" placeholder="Gewicht pro Einheit (kg)" type="number" step="0.01">
+        <input data-key="where" placeholder="Abbauort">
+      </div>
+      <div class="step-body">
+        <input data-key="timeLkw" placeholder="Zeit für LKW-Größe (Minuten)" type="number" step="1">
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-verarbeitung">
+    <div class="step" data-type="verarbeitung" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Verarbeitung</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body two">
+        <input data-key="where" placeholder="Wo wird verarbeitet?">
+        <input data-key="duration" placeholder="Dauer pro Run (Sekunden)" type="number" step="1">
+      </div>
+
+      <div class="mini" style="margin:4px 0">Verarbeitungskosten (einmalig für diesen Schritt, &euro;):</div>
+      <div class="step-body">
+        <input data-key="processCost" placeholder="z. B. 500" type="number" step="0.01">
+      </div>
+
+      <div class="mini" style="margin:4px 0">Inputs (pro Batch – Grundrezept):</div>
+      <div class="input-list" data-key="inputs"></div>
+      <div class="actions"><button class="addInput" type="button">+ Input</button></div>
+
+      <div class="mini" style="margin:4px 0">Outputs (Name + Gewicht/Einheit – Menge optional):</div>
+      <div class="output-list" data-key="outputs"></div>
+      <div class="actions"><button class="addOutput" type="button">+ Output</button></div>
+    </div>
+  </template>
+
+  <template id="tpl-transportkosten">
+    <div class="step" data-type="transportkosten" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Transportkosten</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body">
+        <input data-key="transportCost" placeholder="Transportkosten (&euro;), z. B. 1200" type="number" step="0.01">
+      </div>
+      <div class="mini">Dieser Betrag wird zu den Gesamtkosten addiert.</div>
+    </div>
+  </template>
+
+  <template id="tpl-verkauf">
+    <div class="step" data-type="verkauf" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Verkaufsort</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body">
+        <input data-key="where" placeholder="Wo wird verkauft?">
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-input-row">
+    <div class="input-row" style="display:grid;grid-template-columns:1.6fr .7fr 1.2fr .8fr 1fr auto;gap:6px">
+      <input data-k="name" placeholder="Item-Name">
+      <input data-k="qty" placeholder="Menge / Batch" type="number" step="0.01">
+      <input data-k="source" placeholder="Fundort (optional)">
+      <label style="display:flex;align-items:center;gap:6px"><input data-k="purchased" type="checkbox"> einkaufen?</label>
+      <input data-k="price" placeholder="Preis / Einheit (&euro;)" type="number" step="0.01" title="Nur relevant, wenn 'einkaufen?' aktiv ist">
+      <button class="delInput" type="button">✕</button>
+    </div>
+  </template>
+
+  <template id="tpl-output-row">
+    <div class="output-row" style="display:grid;grid-template-columns:2fr .8fr .8fr auto;gap:6px">
+      <input data-k="name" placeholder="Output-Name">
+      <input data-k="qty" placeholder="(optional) Menge / Batch" type="number" step="0.01">
+      <input data-k="unitWeight" placeholder="Gewicht / Einheit (kg)" type="number" step="0.01">
+      <button class="delOutput" type="button">✕</button>
+    </div>
+  </template>
+
+  <template id="tpl-sell-row">
+    <div class="row">
+      <input data-k="pname" type="text" placeholder="Endprodukt-Name (z. B. Aluminiumbarren)">
+      <input data-k="pprice" type="number" step="0.01" placeholder="Preis &euro;/Einheit">
+      <button class="delSell" type="button">✕</button>
+    </div>
+  </template>
+
+  <!-- Fahrzeit-Modal (einzeln) -->
+  <div id="travelModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <h3>Fahrzeit eintragen</h3>
+      <div class="row">
+        <label>Von<br><input id="travelFrom" readonly></label>
+        <label>Nach<br><input id="travelTo" readonly></label>
+      </div>
+      <label>Fahrzeit (Minuten)<br><input id="travelMinutes" type="number" min="0" step="1"></label>
+      <div class="actions" style="margin-top:10px">
+        <button id="travelCancel" type="button">Abbrechen</button>
+        <button id="travelSave" class="primary" type="button">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fahrzeiten-Manager (Liste bearbeiten) -->
+  <div id="travelManager" class="modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <h3>Fahrzeiten bearbeiten</h3>
+      <div class="mini" style="margin-bottom:6px">Ändere bestehende Fahrzeiten, füge neue hinzu oder entferne Einträge.</div>
+      <table class="tm-table" id="tmTable">
+        <thead>
+          <tr><th>Von</th><th>Nach</th><th>Minuten</th><th>Aktion</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="tm-actions">
+        <button id="tmAddRow" type="button" class="ghost">+ Zeile</button>
+        <span style="flex:1"></span>
+        <button id="tmCancel" type="button">Schließen</button>
+        <button id="tmSave" class="primary" type="button">Speichern</button>
+      </div>
+    </div>
+  </div>
 
   <script>
-    const rezepte = {
-      "craft_1": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_corvetteC2_63_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_1", 1],
-          ["craft1_karrosserie", 4],
-          ["craft1_motor", 2],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 6],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 2],
-          ["stoff", 50],
-          ["schwer_stoff", 25]
-        ]
-      },
-      
-      "craft_2": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_corvetteC2_63_L_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_1", 1],
-          ["schem_2", 1],
-          ["craft1_karrosserie", 3],
-          ["craft1_motor", 4],
-          ["craft1_reifen", 2],
-          ["craft1_getriebe", 8],
-          ["craft1_batterie", 2],
-          ["craft1_elektrik", 2],
-          ["stoff", 25],
-          ["schwer_stoff", 10]
-        ]
-      },
-      
-      "craft_3": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_teslaX_16_85_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_3", 1],
-          ["craft1_karrosserie", 4],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 2],
-          ["craft1_batterie", 5],
-          ["craft1_elektrik", 2],
-          ["craft1_elektronik", 3],
-          ["stoff", 50],
-          ["schwer_stoff", 25]
-        ]
-      },
-      
-      "craft_4": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_cyberTruck_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_4", 1],
-          ["craft1_karrosserie", 6],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 2],
-          ["craft1_batterie", 10],
-          ["craft1_elektrik", 4],
-          ["craft1_elektronik", 5],
-          ["stoff", 150],
-          ["schwer_stoff", 55]
-        ]
-      },
-      
-      "craft_5": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_cyberTruck_B_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_4", 1],
-          ["schem_5", 1],
-          ["craft1_karrosserie", 2],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 4],
-          ["craft1_batterie", 8],
-          ["craft1_elektrik", 6],
-          ["craft1_elektronik", 6],
-          ["stoff", 75],
-          ["schwer_stoff", 25]
-        ]
-      },
-      
-      "craft_6": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_javelin_72_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_6", 1],
-          ["craft1_karrosserie", 4],
-          ["craft1_motor", 3],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 6],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 4],
-          ["stoff", 75],
-          ["schwer_stoff", 50]
-        ]
-      },
-      
-      "craft_7": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_QUA_Regalia_23_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_7", 1],
-          ["craft1_karrosserie", 8],
-          ["craft1_motor", 6],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 6],
-          ["craft1_batterie", 2],
-          ["craft1_elektrik", 10],
-           ["craft1_elektronik", 8],
-          ["stoff", 75],
-          ["schwer_stoff", 50]
-        ]
-      },
-      
-      "craft_8": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_QUA_Regalia_23_D_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_7", 1],
-          ["schem_8", 1],
-          ["craft1_karrosserie", 15],
-          ["craft1_motor", 4],
-          ["craft1_reifen", 2],
-          ["craft1_getriebe", 8],
-          ["craft1_batterie", 4],
-          ["craft1_elektrik", 15],
-          ["craft1_elektronik", 10],
-          ["stoff", 150],
-          ["schwer_stoff", 25]
-        ]
-      },
-      
-      "craft_9": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_ztype_gtaV_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_9", 1],
-          ["craft1_karrosserie", 3],
-          ["craft1_motor", 2],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 4],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 2],
-          ["stoff", 50],
-          ["schwer_stoff", 20]
-        ]
-      },
-      
-      "craft_10": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_ztype_gtaV_S_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_9", 1],
-          ["schem_10", 1],
-          ["craft1_karrosserie", 3],
-          ["craft1_motor", 2],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 6],
-          ["craft1_batterie", 2],
-          ["craft1_elektrik", 2],
-          ["stoff", 50],
-          ["schwer_stoff", 20]
-        ]
-      },
-      
-      "craft_11": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_hotknife_gtaV_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_11", 1],
-          ["craft1_karrosserie", 2],
-          ["craft1_motor", 1],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 2],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 2],
-          ["stoff", 40],
-          ["schwer_stoff", 10]
-        ]
-      },
-      
-      "craft_12": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_hotknife_gtaV_2_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_11", 1],
-          ["schem_12", 1],
-          ["craft1_karrosserie", 2],
-          ["craft1_motor", 3],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 4],
-          ["craft1_batterie", 2],
-          ["craft1_elektrik", 3],
-          ["stoff", 40],
-          ["schwer_stoff", 10]
-        ]
-      },
-      "craft_13": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_Monobike_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_13", 1],
-          ["craft1_karrosserie", 1],
-          ["craft1_motor", 1],
-          ["craft1_reifen", 1],
-          ["craft1_getriebe", 1],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 1],
-          ["stoff", 10],
-          ["schwer_stoff", 5]
-        ]
-      },
-      
-      "craft_14": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_velociraptor_18_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_14", 1],
-          ["craft1_karrosserie", 10],
-          ["craft1_motor", 5],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 5],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 8],
-          ["craft1_elektronik", 6],
-          ["stoff", 80],
-          ["schwer_stoff", 40]
-        ]
-      },
-      
-      "craft_15": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_coronet_70_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_15", 1],
-          ["craft1_karrosserie", 3],
-          ["craft1_motor", 2],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 5],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 3],
-          ["stoff", 75],
-          ["schwer_stoff", 50]
-        ]
-      },
-      
-      "craft_16": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_hornet_52_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_15", 1],
-          ["schem_16", 1],
-          ["craft1_karrosserie", 4],
-          ["craft1_motor", 2],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 6],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 4],
-          ["stoff", 80],
-          ["schwer_stoff", 20]
-        ]
-      },
-      
-      "craft_17": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_eldorado_68_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_17", 1],
-          ["craft1_karrosserie", 4],
-          ["craft1_motor", 2],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 4],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 2],
-          ["stoff", 40],
-          ["schwer_stoff", 20]
-        ]
-      },
-      
-      "craft_18": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_vipersrt10acr_08_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_18", 1],
-          ["craft1_karrosserie", 6],
-          ["craft1_motor", 4],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 8],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 4],
-          ["stoff", 150],
-          ["schwer_stoff", 50]
-        ]
-      },
-      
-      "craft_19": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_vipersrt10acr_08_S_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_18", 1],
-          ["schem_19", 1],
-          ["craft1_karrosserie", 8],
-          ["craft1_motor", 6],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 10],
-          ["craft1_batterie", 2],
-          ["craft1_elektrik", 8],
-          ["craft1_elektronik", 2],
-          ["stoff", 150],
-          ["schwer_stoff", 50]
-        ]
-      },
-      
-      "craft_20": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_scania_16_ST2_LP_BASE.png",
-        itemsRequired: [
-          ["craft_24", 1],
-          ["schem_20", 1],
-          ["craft1_karrosserie", 20],
-          ["craft1_motor", 10],
-          ["craft1_reifen", 6],
-          ["craft1_getriebe", 20],
-          ["craft1_batterie", 4],
-          ["craft1_elektrik", 20],
-          ["craft1_elektronik", 12],
-          ["stoff", 250],
-          ["schwer_stoff", 50]
-        ]
-      },
-      
-      "craft_21": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_scania_16_ST3_LP_BASE.png",
-        itemsRequired: [
-          ["craft_20", 1],
-          ["schem_21", 1],
-          ["craft1_karrosserie", 25],
-          ["craft1_motor", 12],
-          ["craft1_reifen", 6],
-          ["craft1_getriebe", 25],
-          ["craft1_batterie", 6],
-          ["craft1_elektrik", 25],
-          ["craft1_elektronik", 14],
-          ["stoff", 300],
-          ["schwer_stoff", 150]
-        ]
-      },
-      
-      "craft_22": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_scania_16_ST4_LP_BASE.png",
-        itemsRequired: [
-          ["craft_21", 1],
-          ["schem_22", 1],
-          ["craft1_karrosserie", 30],
-          ["craft1_motor", 15],
-          ["craft1_reifen", 6],
-          ["craft1_getriebe", 30],
-          ["craft1_batterie", 8],
-          ["craft1_elektrik", 35],
-          ["craft1_elektronik", 18],
-          ["stoff", 400],
-          ["schwer_stoff", 200]
-        ]
-      },
-      
-      "craft_23": {
-        wert: 0,
-        dauer: 3720,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_brickade2_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_22", 1],
-          ["craft_25", 1],
-          ["schem_23", 1],
-          ["craft1_karrosserie", 50],
-          ["craft1_motor", 40],
-          ["craft1_reifen", 6],
-          ["craft1_getriebe", 55],
-          ["craft1_batterie", 16],
-          ["craft1_elektrik", 40],
-          ["craft1_elektronik", 25],
-          ["stoff", 800],
-          ["schwer_stoff", 600]
-        ]
-      },
-      "craft_26": {
-        wert: 0,
-        dauer: 120,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_donkervoort_17_LP_CRAFT.png",
-        itemsRequired: [
-	  ["craft_blanko", 1],
-          ["schem_26", 1],
-          ["craft1_karrosserie", 3],
-          ["craft1_motor", 2],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 3],
-          ["craft1_batterie", 2],
-          ["craft1_elektrik", 5],
-          ["stoff", 45],
-          ["schwer_stoff", 15]
-        ]
-      },
+  (function(){
+    // ===== GAS Web-App URL =====
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzFHZwQI9KxXhJvR6aZRR0zyqyijb46gaqWpYhCsxdfow2U5Y5A5D4gBg3jmRyaa_hh/exec';
 
-      "craft_27": {
-        wert: 0,
-        dauer: 120,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/d3s_donkervoort_17_BNC_LP_CRAFT.png",
-        itemsRequired: [
-          ["craft_26", 1],
-	  ["schem_27", 1],
-          ["craft1_karrosserie", 4],
-          ["craft1_motor", 4],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 5],
-          ["craft1_batterie", 3],
-          ["craft1_elektrik", 6],
-          ["stoff", 50],
-          ["schwer_stoff", 20]
-        ]
-      },
+    // ===== Utils =====
+    function qs(s, e){return (e||document).querySelector(s);}
+    function qsa(s, e){return Array.prototype.slice.call((e||document).querySelectorAll(s));}
+    function uid(){return Math.random().toString(36).slice(2,9);}
+    var nf=new Intl.NumberFormat('de-DE',{maximumFractionDigits:2});
+    var cf=new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:2});
+    function fmt(n){return nf.format(n);}
+    function num(v){ if(v==null) return 0; if(typeof v==='number') return v; var s=String(v).trim().replace(/\./g,'').replace(',', '.'); var n=parseFloat(s); return isNaN(n)?0:n; }
+    function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
+    function slug(s){ return (s||'route').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 
-      "craft_28": {
-        wert: 0,
-        dauer: 120,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/V12_STRALIS2_EV_ST1_LP_BASE.png",
-        itemsRequired: [
-          ["craft_blanko", 1],
-	  ["schem_28", 1],
-          ["craft1_karrosserie", 10],
-          ["craft1_motor", 1],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 1],
-          ["craft1_batterie", 45],
-          ["craft1_elektrik", 15],
-	  ["craft1_elektronik", 25],
-          ["stoff", 150],
-          ["schwer_stoff", 50]
-        ]
-      },
+    // ===== Store =====
+    function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{}}; }catch(e){ return {routes:{},travelTimes:{}}; } }
+    function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
-      "craft_29": {
-        wert: 0,
-        dauer: 120,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/V12_STRALIS2_EV_ST2_LP_BASE.png",
-        itemsRequired: [
-          ["craft_28", 1],
-	  ["schem_29", 1],
-          ["craft1_karrosserie", 5],
-          ["craft1_motor", 2],
-          ["craft1_getriebe", 1],
-          ["craft1_batterie", 35],
-          ["craft1_elektrik", 25],
-	  ["craft1_elektronik", 20],
-          ["stoff", 100],
-          ["schwer_stoff", 80]
-        ]
-      },
-
-      "craft_30": {
-        wert: 0,
-        dauer: 120,
-	picture: "https://lostparadise.eu/controlpanel/public/objects/V12_STRALIS2_EV_ST3_LP_BASE.png",
-        itemsRequired: [
-          ["craft_29", 1],
-	  ["schem_30", 1],
-          ["craft1_karrosserie", 10],
-          ["craft1_motor", 2],
-          ["craft1_getriebe", 1],
-          ["craft1_batterie", 25],
-          ["craft1_elektrik", 20],
-	  ["craft1_elektronik", 30],
-          ["stoff", 200],
-          ["schwer_stoff", 100]
-        ]
-      },
-	    
-      "craft1_karrosserie": {
-        wert: 0,
-        dauer: 120,
-        itemsRequired: [
-          ["aluPlatte", 50],
-          ["stahlPlatte", 10],
-          ["eisenStange", 25],
-          ["kupferFolie", 15],
-          ["kupferDraht", 5],
-        ]
-      },
-      
-      "craft1_motor": {
-        wert: 0,
-        dauer: 120,
-        itemsRequired: [
-          ["motoroil", 10],
-          ["aluBox", 3],
-          ["plastic", 35],
-          ["stahlBarren", 40],
-          ["kupferFolie", 20],
-        ]
-      },
-      
-      "craft1_reifen": {
-        wert: 0,
-        dauer: 120,
-        itemsRequired: [
-          ["gummi", 40],
-          ["stahlBarren", 2],
-          ["aluBarren", 40],
-          ["plastic", 5],
-        ]
-      },
-      
-      "craft1_carbon": {
-        wert: 0,
-        dauer: 120,
-        itemsRequired: [
-          ["aluPlatte", 20],
-          ["plastic", 10],
-          ["kohleStein", 5],
-          ["kohleBraun", 40],
-        ]
-      },
-      
-      "craft1_elektrik": {
-        wert: 0,
-        dauer: 120,
-        itemsRequired: [
-          ["eisenStange", 10],
-          ["kupferFolie", 25],
-          ["kupferDraht", 40],
-          ["plastic", 35],
-          ["gummi", 15],
-          ["aluPlatte", 2],
-        ]
-      },
-      
-      "craft1_batterie": {
-        wert: 0,
-        dauer: 120,
-        itemsRequired: [
-          ["aluBox", 10],
-          ["schwefelacid", 25],
-          ["plastic", 40],
-          ["gummi", 5],
-          ["craft1_elektrik", 5],
-        ]
-      },
-      
-      "craft1_getriebe": {
-        wert: 0,
-        dauer: 120,
-        itemsRequired: [
-          ["stahlBarren", 10],
-          ["stahlPlatte", 25],
-          ["eisenStange", 40],
-          ["getriebeoil", 20],
-        ]
-      },
-      
-      "craft1_elektronik": {
-        wert: 0,
-        dauer: 120,
-        itemsRequired: [
-          ["eisenStange", 15],
-          ["kupferFolie", 40],
-          ["kupferDraht", 60],
-          ["plastic", 50],
-          ["gummi", 20],
-          ["aluPlatte", 4],
-          ["craft1_elektrik", 3],
-          ["rubin", 5]
-        ]
-      },
-      
-      "schwer_stoff": {
-        wert: 0,
-        dauer: 4.8,
-        itemsRequired: [
-          ["stoff", 1],
-          ["aluBarren", 0.4],
-        ]
-      },
-      
-      "stoff": {
-        wert: 0,
-        dauer: 1.2,
-        itemsRequired: [
-          ["cotton", 2],
-        ]
-      },
-      
-      "kupferFolie": {
-        wert: 0,
-        dauer: 4.8,
-        itemsRequired: [
-          ["kupferBarren", 2],
-        ]
-      },
-      "kupferDraht": {
-        wert: 0,
-        dauer: 4.8,
-        itemsRequired: [
-          ["kupferBarren", 1],
-        ]
-      },
-      
-      "kupferPulver": {
-        wert: 0,
-        dauer: 4.8,
-        itemsRequired: [
-          ["kupferBarren", 2],
-        ]
-      },
-      "eisenPlatte": {
-        wert: 0,
-        dauer: 1.2,
-        itemsRequired: [
-          ["eisenBarren", 1],
-        ]
-      },
-      "eisenStange": {
-        wert: 0,
-        dauer: 1.2,
-        itemsRequired: [
-          ["eisenBarren", 1],
-        ]
-      },
-      
-      "aluPlatte": {
-        wert: 0,
-        dauer: 1.2,
-        itemsRequired: [
-          ["aluBarren", 1],
-        ]
-      },
-      
-      "stahlPlatte": {
-        wert: 0,
-        dauer: 1.2,
-        itemsRequired: [
-          ["stahlBarren", 1],
-        ]
-      },
-      
-      "aluBox": {
-        wert: 0,
-        dauer: 1.2,
-        itemsRequired: [
-          ["aluBarren", 3],
-        ]
-      },
-            
-      "craft_Rucksack": {
-        wert: 0,
-        dauer: 1320,
-	picture: "https://raw.githubusercontent.com/BattleNogare/lostparadise-herstellung/main/Rucksack.png",
-        itemsRequired: [
-          ["stoff", 200],
-          ["schwer_stoff", 100],
-          ["craft1_carbon", 25],
-          ["plastic", 15],
-          ["gummi", 15],
-        ]
-      },
-           
-      "Test": {
-        wert: 1000000000,
-        dauer: 0,
-        itemsRequired: [
-          ["craft_blanko", 1],
-          ["schem_1", 1],
-          ["craft1_karrosserie", 4],
-          ["craft1_motor", 2],
-          ["craft1_reifen", 4],
-          ["craft1_getriebe", 6],
-          ["craft1_batterie", 1],
-          ["craft1_elektrik", 2],
-          ["stoff", 50],
-          ["schwer_stoff", 25]
-        ]
-      },
-
-      
-    };
-	
-    const anzeigeNamen = {
-      "craft_1": "Corvette C2",
-      "craft_2": "Corvette C2 Stingray",
-      "craft_3": "Tesla Model X",
-      "craft_4": "Cybertruck",
-      "craft_5": "Cyberbeast",
-      "craft_6": "AMC Javelin",
-      "craft_7": "Quartz Regalia",
-      "craft_8": "Quarz Regalia D-Type",
-      "craft_9": "Truffade Z-Type",
-      "craft_10": "Truffade Z-Type-R",
-      "craft_11": "Vapid Hotknife",
-      "craft_12": "Vapid Hotknife RAW",
-      "craft_13": "Monobike",
-      "craft_14": "Velociraptor",
-      "craft_15": "Dodge Coronet",
-      "craft_16": "Hudson Hornet",
-      "craft_17": "Cadillac Eldorado",
-      "craft_18": "Dodge Viper SRT10",
-      "craft_19": "Dodge Viper SRT10-S",
-      "craft_20": "Scania S-520 ProfiLiner 8x4 ´16",
-      "craft_21": "Scania S-520 HardLiner 8x4 40ft ´16",
-      "craft_22": "Scania S-520 Hardliner 8x4 40ft Ext´16",
-      "craft_23": "MAN TGM HeavyDuty ´16",
-      "craft_24": "Kaufbarer Scania_v1 (6,6 Mio)",
-      "craft_25": "Kaufbarer Man-LKW (18,8 Mio)",
-      "craft_scaniat1": "Kaufbarer Scania-Bauplan",
-      "craft_mant1": "Kaufbarer MAN-Bauplan",
-      "craft_26": "Dunkervoort `17",
-      "craft_27": "Dunkervoort BNC `17",
-      "craft_28": "IVECO Stralis EV 300",
-      "craft_29": "IVECO Stralis EV 450",
-      "craft_30": "IVECO Stralis EV 600",
-      
-      
-      "schem_1": "Corvette C2 Schablone",
-      "schem_2": "Corvette C2 Stingray Schablone",
-      "schem_3": "Tesla Model X Schablone",
-      "schem_4": "Cybertruck Schablone",
-      "schem_5": "Cyberbeast Schablone",
-      "schem_6": "AMC Javelin Schablone",
-      "schem_7": "Quartz Regalia Schablone",
-      "schem_8": "Quarz Regalia D-Type Schablone",
-      "schem_9": "Truffade Z-Type Schablone",
-      "schem_10": "Truffade Z-Type-R Schablone",
-      "schem_11": "Vapid Hotknife Schablone",
-      "schem_12": "Vapid Hotknife RAW Schablone",
-      "schem_13": "Monobike Schablone",
-      "schem_14": "Velociraptor Schablone",
-      "schem_15": "Dodge Coronet Schablone",
-      "schem_16": "Hudson Hornet Schablone",
-      "schem_17": "Cadillac Eldorado Schablone",
-      "schem_18": "Dodge Viper SRT10 Schablone",
-      "schem_19": "Dodge Viper SRT10-S Schablone",
-      "schem_20": "Scania S-520 Hardliner 8x4 ´16 Schablone",
-      "schem_21": "Scania S-520 HardLiner 8x4 40ft ´16 Schablone",
-      "schem_22": "Scania S-520 Hardliner 8x4 40ft Ext´16 Schablone",
-      "schem_23": "MAN TGM HeavyDuty ´16 Schablone",
-      "schem_24": "Schablone",
-      "schem_25": "Schablone",
-      "schem_26": "Donkervoort `17 Schablone",
-      "schem_27": "Donkervoort BNC `17 Schablone",
-      "schem_28": "IVECO Stralis EV 300 Schablone",
-      "schem_29": "IVECO Stralis EV 450 Schablone",
-      "schem_30": "IVECO Stralis EV 600 Schablone",
-      
-      "craft_blanko": "Leerer Bauplan",
-      "craft1_karrosserie": "Karosserieteil",
-      "craft1_motor": "Motorteil",
-      "craft1_reifen": "Reifen",
-      "craft1_getriebe": "Getriebeteil",
-      "craft1_batterie": "Autobatterie",
-      "craft1_elektrik": "Elektrische Teile",
-      "craft1_elektronik": "Elektronische Teile",
-      "stoff": "Einfacher Stoff",
-      "schwer_stoff": "Schwerer Stoff",
-      "craft1_carbon": "Carbonteil",
-      "craft_Rucksack": "Rucksack (1000er)",
-	    
-
-      "aluPlatte": "Aluminiumplatte",
-      "stahlPlatte": "Stahlplatte",
-      "stahlBarren": "Stahlbarren",
-      "eisenStange": "Eisenstange",
-      "eisenBarren": "Eisenbarren",
-      "kupferFolie": "Kupferfolie",
-      "kupferBarren": "Kupferbarren",
-      "kupferDraht": "Kupferdraht",
-      "motoroil": "Motoröl",
-      "aluBox": "Aluminiumgehäuse",
-      "aluBarren": "Aluminiumbarren",
-      "plastic": "Kunststoff",
-      "gummi": "Gummi",
-      "getriebeoil": "Getriebeöl",
-      "schwefelacid": "Schwefelsäure",
-      "cotton": "Baumwolle",
-      "schlacke": "Schlacke",
-      "aluErz": "BauxitErz",
-      "eisenErz": "Eisenerz",
-      "kupferErz": "Kupfererz",
-      "kohleBraun": "Braunkohle",
-      "kohleStein": "Steinkohle",
-      "rubin": "Geschliffener Rubin",
-      
-      
-    };
-	
-	
-    const fundorte = {
-      "kohleBraun": "Kohlemine",
-      "kohleStein": "Kohlemine",
-      "kupferErz": "Kupfermine",
-      "eisenErz": "Eisenmine",
-      "aluErz": "Bauxitmine",
-      "schwefelacid": "Chemiewerk",
-      "aluErz": "Bauxitmine",
-      "plastic": "Chemiewerk",
-      "gummi": "Chemiewerk",
-      "getriebeoil": "Baumarkt",
-      "motoroil": "Baumarkt",
-      "craft_blanko": "Baumarkt",
-    
-    
-    };
-	
-	
-    const rohstoffPreise = {
-      "schwefelacid": 85,
-      "gummi": 255,
-      "plastic": 175,
-      "getriebeoil": 135,
-      "motoroil": 65,
-      "craft_blanko": 1000,
-      "aluBarren": 371,
-      "cotton": 150,
-      "stahlBarren": 233,
-      "eisenBarren": 81,
-      "kupferBarren": 96,
-      "rubin": 532,
-      "kohleBraun": 37,
-      "kohleStein": 29,
-    };
-
-
-    const startSelect = document.getElementById("startSelect");
-    const endSelect = document.getElementById("endSelect");
-    const ausgabe = document.getElementById("ausgabe");
-
-    const erlaubteItems = Object.keys(rezepte).filter(k => k.startsWith("craft_"));
-    erlaubteItems.forEach(key => {
-      const name = anzeigeNamen[key] || key;
-      [startSelect, endSelect].forEach(sel => {
-        const opt = document.createElement("option");
-        opt.value = key;
-        opt.textContent = name;
-        sel.appendChild(opt);
+    // ===== JSONP =====
+    function jsonp(url){
+      return new Promise(function(resolve,reject){
+        const cb = 'cb_' + Math.random().toString(36).slice(2);
+        const sep = url.includes('?') ? '&' : '?';
+        const s = document.createElement('script');
+        s.src = url + sep + 'callback=' + cb;
+        s.async = true;
+        window[cb] = function(data){ resolve(data); cleanup(); };
+        s.onerror = function(){ reject(new Error('JSONP load error')); cleanup(); };
+        function cleanup(){ delete window[cb]; if (s.parentNode) s.parentNode.removeChild(s); }
+        document.head.appendChild(s);
       });
+    }
+
+    // ===== Verkaufsliste =====
+    function addSellRow(pname, price){
+      var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
+      var list=qs('#sellList'); list.appendChild(row);
+      if(pname) qs('[data-k="pname"]',row).value=pname;
+      if(price!=null) qs('[data-k="pprice"]',row).value=price;
+      row.addEventListener('input', recalc);
+      qs('.delSell',row).addEventListener('click', function(){ row.remove(); recalc(); });
+    }
+    function getSellList(){
+      return qsa('#sellList .row').map(function(r){
+        var n=qs('[data-k="pname"]',r).value.trim();
+        var p=num(qs('[data-k="pprice"]',r).value);
+        if(!n) return null;
+        return {name:n, price:(p>0?p:null)};
+      }).filter(Boolean);
+    }
+    function setSellList(arr){
+      var list=qs('#sellList'); list.innerHTML='';
+      (arr||[]).forEach(function(x){ addSellRow(x.name, x.price); });
+      if((arr||[]).length===0){ addSellRow('', null); }
+    }
+
+    // ===== Templates / Steps =====
+    var TPLS={
+      start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
+      abbau: function(){return qs('#tpl-abbau').content.firstElementChild.cloneNode(true);},
+      verarbeitung: function(){ var el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); addOutputRow(el); return el; },
+      transportkosten: function(){return qs('#tpl-transportkosten').content.firstElementChild.cloneNode(true);},
+      verkauf: function(){return qs('#tpl-verkauf').content.firstElementChild.cloneNode(true);}
+    };
+    function addInputRow(stepEl){
+      var row=qs('#tpl-input-row').content.firstElementChild.cloneNode(true);
+      qs('[data-key="inputs"]', stepEl).appendChild(row);
+      qs('.delInput',row).addEventListener('click', function(){ row.remove(); recalc(); });
+      row.addEventListener('input', recalc);
+    }
+    function addOutputRow(stepEl){
+      var row=qs('#tpl-output-row').content.firstElementChild.cloneNode(true);
+      qs('[data-key="outputs"]', stepEl).appendChild(row);
+      qs('.delOutput',row).addEventListener('click', function(){ row.remove(); recalc(); });
+      row.addEventListener('input', recalc);
+    }
+    function attachStepControls(stepEl){
+      qs('.remove',stepEl)?.addEventListener('click', function(){ stepEl.remove(); recalc(); });
+      qs('.addInput',stepEl)?.addEventListener('click', function(){ addInputRow(stepEl); });
+      qs('.addOutput',stepEl)?.addEventListener('click', function(){ addOutputRow(stepEl); });
+      stepEl.addEventListener('input', function(){ recalc(); });
+      var where=qs('[data-key="where"]', stepEl);
+      if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
+      // Dragging
+      stepEl.addEventListener('dragstart', function(){ stepEl.classList.add('dragging'); });
+      stepEl.addEventListener('dragend', function(){ stepEl.classList.remove('dragging'); recalc(); });
+    }
+    function addStep(type){
+      var el=TPLS[type]?TPLS[type]():null; if(!el) return null;
+      el.dataset.type=type; attachStepControls(el); qs('#steps').appendChild(el); return el;
+    }
+    (function(){
+      var container=qs('#steps');
+      function afterEl(container,y){
+        var els=[].slice.call(container.querySelectorAll('.step:not(.dragging)'));
+        return els.reduce(function(closest,child){
+          var box=child.getBoundingClientRect();
+          var offset=y - box.top - box.height/2;
+          if(offset<0 && offset>closest.offset){ return {offset:offset, element:child}; }
+          else { return closest; }
+        }, {offset:Number.NEGATIVE_INFINITY}).element;
+      }
+      document.addEventListener('dragover', function(e){
+        var dragging=qs('.step.dragging'); if(!dragging) return;
+        e.preventDefault();
+        var a=afterEl(container, e.clientY);
+        if(a==null){ container.appendChild(dragging); } else { container.insertBefore(dragging, a); }
+      });
+    })();
+
+    // ===== Route Build/Load =====
+    var currentRouteId=null;
+    function getRoute(){
+      var name = (qs('#routeName')?.value || '').trim() || 'Unbenannt';
+      var steps=[];
+      qsa('#steps .step').forEach(function(step){
+        var type=step.dataset.type;
+        if(type==='start'){
+          steps.push({type:type, where: qs('[data-key="where"]',step).value.trim()});
+        } else if(type==='abbau'){
+          steps.push({type:type,
+            what: qs('[data-key="what"]',step).value.trim(),
+            unitWeight: num(qs('[data-key="unitWeight"]',step).value),
+            where: qs('[data-key="where"]',step).value.trim(),
+            timeLkw: num(qs('[data-key="timeLkw"]',step).value)
+          });
+        } else if(type==='verarbeitung'){
+          var inputs=qsa('[data-key="inputs"] .input-row',step).map(function(row){
+            return {
+              name: qs('[data-k="name"]',row).value.trim(),
+              qty: num(qs('[data-k="qty"]',row).value),
+              source: qs('[data-k="source"]',row).value.trim(),
+              purchased: qs('[data-k="purchased"]',row).checked,
+              price: num(qs('[data-k="price"]',row).value)
+            };
+          }).filter(function(i){return i.name && i.qty>0;});
+          var outputs=qsa('[data-key="outputs"] .output-row',step).map(function(row){
+            return {
+              name: qs('[data-k="name"]',row).value.trim(),
+              qty: num(qs('[data-k="qty"]',row).value),
+              unitWeight: num(qs('[data-k="unitWeight"]',row).value)
+            };
+          }).filter(function(o){return o.name;});
+          steps.push({type:type,
+            where: qs('[data-key="where"]',step).value.trim(),
+            duration: num(qs('[data-key="duration"]',step).value),
+            processCost: num(qs('[data-key="processCost"]',step).value),
+            inputs: inputs,
+            outputs: outputs
+          });
+        } else if(type==='transportkosten'){
+          steps.push({type:type, transportCost: num(qs('[data-key="transportCost"]',step).value)});
+        } else if(type==='verkauf'){
+          steps.push({type:type, where: qs('[data-key="where"]',step).value.trim()});
+        }
+      });
+      var store=readStore();
+      return {
+        id: currentRouteId || uid(),
+        name: name,
+        lkwSize: Math.max(1, num(qs('#lkwSize').value)||2000),
+        backpackKg: Math.max(1, num(qs('#backpackKg').value)||150),
+        sellList: getSellList(),
+        steps: steps,
+        travelTimes: store.travelTimes || {}
+      };
+    }
+    function setRoute(route){
+      currentRouteId = route.id || uid();
+
+      // TravelTimes der Route in den Store mergen
+      if(route.travelTimes && typeof route.travelTimes === 'object'){
+        var st = readStore();
+        st.travelTimes = Object.assign({}, st.travelTimes||{}, route.travelTimes||{});
+        writeStore(st);
+      }
+
+      qs('#routeName').value = route.name || '';
+      qs('#lkwSize').value = route.lkwSize || 2000;
+      qs('#backpackKg').value = route.backpackKg || 150;
+      setSellList(route.sellList||[]);
+      var box=qs('#steps'); box.innerHTML='';
+      (route.steps||[]).forEach(function(s){
+        var el=addStep(s.type); if(!el) return;
+        if(s.type==='start'){
+          qs('[data-key="where"]',el).value=s.where||'';
+        } else if(s.type==='abbau'){
+          qs('[data-key="what"]',el).value=s.what||'';
+          qs('[data-key="unitWeight"]',el).value=s.unitWeight||'';
+          qs('[data-key="where"]',el).value=s.where||'';
+          qs('[data-key="timeLkw"]',el).value=s.timeLkw||'';
+        } else if(s.type==='verarbeitung'){
+          qs('[data-key="where"]',el).value = s.where || '';
+          qs('[data-key="duration"]',el).value = s.duration || '';
+          qs('[data-key="processCost"]',el).value = s.processCost || '';
+          var listI=qs('[data-key="inputs"]',el); listI.innerHTML='';
+          (s.inputs||[]).forEach(function(inp){
+            addInputRow(el);
+            var row=listI.lastElementChild;
+            qs('[data-k="name"]',row).value=inp.name||'';
+            qs('[data-k="qty"]',row).value=inp.qty||'';
+            qs('[data-k="source"]',row).value=inp.source||'';
+            qs('[data-k="purchased"]',row).checked=!!inp.purchased;
+            qs('[data-k="price"]',row).value=inp.price || '';
+          });
+          var listO=qs('[data-key="outputs"]',el); listO.innerHTML='';
+          (s.outputs||[]).forEach(function(out){
+            addOutputRow(el);
+            var row=listO.lastElementChild;
+            qs('[data-k="name"]',row).value=out.name||'';
+            qs('[data-k="qty"]',row).value=out.qty||'';
+            qs('[data-k="unitWeight"]',row).value=out.unitWeight||'';
+          });
+        } else if(s.type==='transportkosten'){
+          qs('[data-key="transportCost"]',el).value=s.transportCost||'';
+        } else if(s.type==='verkauf'){
+          qs('[data-key="where"]',el).value=s.where||'';
+        }
+      });
+      recalc();
+    }
+
+    // ===== Fahrzeiten (Popup & Manager) =====
+    function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
+    function openTravelModal(from,to, cb){
+      var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
+      m.style.display='flex'; m.setAttribute('aria-hidden','false');
+      function close(){ m.style.display='none'; m.setAttribute('aria-hidden','true'); }
+      qs('#travelSave').onclick=function(){ var mins=Math.max(0, num(qs('#travelMinutes').value)); close(); cb(mins); };
+      qs('#travelCancel').onclick=function(){ close(); cb(null); };
+    }
+    function handlePlaceBlur(stepEl){
+      try{
+        var stepsNodes=qsa('#steps .step');
+        var idx=stepsNodes.findIndex(function(n){return n===stepEl;});
+        if(idx<0) return;
+        var currPlace=qs('[data-key="where"]', stepEl)?.value.trim(); if(!currPlace) return;
+        var prevPlace=null;
+        for(var i=idx-1;i>=0;i--){
+          var node=stepsNodes[i];
+          var w=qs('[data-key="where"]', node);
+          if(w && w.value.trim()){ prevPlace=w.value.trim(); break; }
+        }
+        if(!prevPlace || prevPlace===currPlace) return;
+        var store=readStore(); var key=travelKey(prevPlace, currPlace);
+        if(store.travelTimes[key]!=null) return;
+        openTravelModal(prevPlace, currPlace, function(mins){ if(mins==null) return; store.travelTimes[key]=mins; writeStore(store); recalc(); });
+      }catch(e){}
+    }
+
+    // ---- Fahrzeiten-Manager (Liste) ----
+    function openTravelManager(){
+      renderTravelManager();
+      var m=qs('#travelManager');
+      m.style.display='flex'; m.setAttribute('aria-hidden','false');
+    }
+    function closeTravelManager(){
+      var m=qs('#travelManager');
+      m.style.display='none'; m.setAttribute('aria-hidden','true');
+    }
+    function renderTravelManager(){
+      var store=readStore();
+      var tbody=qs('#tmTable tbody');
+      tbody.innerHTML='';
+      var entries = Object.entries(store.travelTimes||{}).map(function([k,v]){
+        var parts = k.split('|');
+        return { from: parts[0]||'', to: parts[1]||'', mins: Number(v)||0 };
+      });
+      // sortiere alphabetisch (from, dann to)
+      entries.sort(function(a,b){
+        var s = a.from.localeCompare(b.from,'de',{sensitivity:'base'});
+        if(s!==0) return s;
+        return a.to.localeCompare(b.to,'de',{sensitivity:'base'});
+      });
+      entries.forEach(function(e){ addTmRow(e.from, e.to, e.mins); });
+      if(entries.length===0){ addTmRow('','',0); }
+    }
+    function addTmRow(from,to,mins){
+      var tr=document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="tm-from" placeholder="Von" value="${from?from.replace(/"/g,'&quot;'):''}"></td>
+        <td><input class="tm-to" placeholder="Nach" value="${to?to.replace(/"/g,'&quot;'):''}"></td>
+        <td><input class="tm-mins" type="number" min="0" step="1" value="${Number(mins)||0}"></td>
+        <td><button type="button" class="danger tm-del">Löschen</button></td>
+      `;
+      qs('#tmTable tbody').appendChild(tr);
+      qs('.tm-del',tr).addEventListener('click', function(){ tr.remove(); });
+    }
+    function saveTravelManager(){
+      var rows=qsa('#tmTable tbody tr');
+      var obj={};
+      rows.forEach(function(r){
+        var f = (qs('.tm-from',r).value||'').trim();
+        var t = (qs('.tm-to',r).value||'').trim();
+        var m = Math.max(0, num(qs('.tm-mins',r).value));
+        if(!f || !t) return; // nur vollständige Einträge
+        obj[travelKey(f,t)] = m;
+      });
+      var store=readStore();
+      store.travelTimes = obj;
+      writeStore(store);
+      recalc();
+      closeTravelManager();
+    }
+
+    // ===== Automatik-Hilfen =====
+    function kgPerBatchAllInputs(inputs, weights){
+      var sum=0;
+      inputs.forEach(function(i){
+        var w = weights[i.name] || 1;
+        sum += Math.max(0, num(i.qty)) * w;
+      });
+      return sum;
+    }
+    function deriveOutputQuantities(outputs, weights, totalInputKg){
+      var anySet = outputs.some(function(o){ return num(o.qty)>0; });
+      if(anySet){ return outputs.map(function(o){ return Math.max(0, num(o.qty)); }); }
+      var count = outputs.length;
+      if(count===1){
+        var ow = Math.max(0.0001, weights[outputs[0].name] || 1);
+        return [ Math.max(0, Math.floor(totalInputKg / ow)) ];
+      }
+      var shareKg = totalInputKg / count;
+      return outputs.map(function(o){
+        var ow = Math.max(0.0001, weights[o.name] || 1);
+        return Math.max(0, Math.floor(shareKg / ow));
+      });
+    }
+
+    // ===== Berechnung =====
+    function compute(route){
+      var baseKg = route.lkwSize>0? route.lkwSize : 2000;
+      var backpackKg = route.backpackKg>0? route.backpackKg : 150;
+
+      var inventory = {};
+      var weights = {};
+      var miningTime=0, driveTime=0, procTime=0;
+      var purchaseCost=0, transportCostTotal=0, processingCostTotal=0;
+      var log=[];
+
+      var store=readStore();
+      var lastPlace=null;
+
+      (route.steps||[]).forEach(function(s, idx){
+        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verkauf'||s.type==='verarbeitung') ? (s.where||'') : '';
+
+        if(thisPlace && lastPlace && lastPlace!==thisPlace){
+          var key= (lastPlace||'?')+'|'+(thisPlace||'?');
+          var m=store.travelTimes[key];
+          if(m!=null){
+            driveTime += Math.max(0,num(m));
+            log.push('Fahrt '+lastPlace+' → '+thisPlace+': +'+fmt(m)+' min.');
+          } else {
+            log.push('Fahrt '+lastPlace+' → '+thisPlace+': (keine Zeit hinterlegt)');
+          }
+        }
+
+        if(s.type==='start'){
+          log.push('Start @ '+(s.where||'?'));
+        }
+        else if(s.type==='abbau'){
+          var perUnit=Math.max(0, num(s.unitWeight));
+          var units = perUnit>0 ? Math.floor(baseKg / perUnit) : 0;
+          var what = s.what || ('Rohstoff_'+(idx+1));
+          inventory[what]=(inventory[what]||0)+units;
+          if(perUnit>0) weights[what]=perUnit;
+          var t = Math.max(0, num(s.timeLkw));
+          miningTime += t;
+          log.push('Abbau '+what+' @ '+(s.where||'?')+': '+fmt(units)+' Einheiten (à '+(perUnit||1)+' kg). Zeit +'+fmt(t)+' min.');
+        }
+        else if(s.type==='transportkosten'){
+          var c=Math.max(0,num(s.transportCost));
+          transportCostTotal+=c;
+          log.push('Transportkosten: +'+cf.format(c));
+        }
+        else if(s.type==='verarbeitung'){
+          var inputs=s.inputs||[];
+          var outputs=s.outputs||[];
+          if(inputs.length===0 || outputs.length===0){
+            log.push('Verarbeitung @ '+(s.where||'?')+': Input/Output unvollständig – übersprungen.');
+          }else{
+            outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
+
+            var durSec = Math.max(0, num(s.duration));
+            var durMin = durSec/60;
+
+            var nonPurchased=inputs.filter(function(i){return !i.purchased;});
+            var purchased=inputs.filter(function(i){return i.purchased;});
+
+            var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
+
+            var runs=0, batchesTotal=0;
+            while(true){
+              var batchesByInventory = Infinity;
+              if(nonPurchased.length>0){
+                batchesByInventory = nonPurchased.reduce(function(min,i){
+                  var avail=inventory[i.name]||0;
+                  var need=Math.max(1, num(i.qty));
+                  var can=Math.floor(avail/need);
+                  return Math.min(min, can);
+                }, Infinity);
+              } else { batchesByInventory = 999999; }
+              if(batchesByInventory<=0) break;
+
+              var kgBatch = totalInputKgPerBatch;
+              var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
+              if(kgBatch>0 && batchesByBackpack<=0) break;
+
+              var batchesThisRun = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
+
+              nonPurchased.forEach(function(i){
+                var need=Math.max(0, num(i.qty));
+                inventory[i.name]=(inventory[i.name]||0) - need*batchesThisRun;
+              });
+              purchased.forEach(function(i){
+                var need=Math.max(0, num(i.qty));
+                var price=Math.max(0, num(i.price));
+                purchaseCost += need*batchesThisRun*price;
+              });
+
+              var qPerBatchArr = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
+              outputs.forEach(function(o,ix){
+                var qPerBatch = Math.max(0, num(o.qty)) || qPerBatchArr[ix] || 0;
+                inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
+              });
+
+              procTime += durMin; // pro Run
+              runs++; batchesTotal+=batchesThisRun;
+              if(batchesThisRun<=0) break;
+            }
+
+            var stepCost = Math.max(0, num(s.processCost));
+            if(stepCost>0){
+              processingCostTotal += stepCost;
+              log.push('Verarbeitungskosten @ '+(s.where||'?')+': +'+cf.format(stepCost)+' (einmalig)');
+            }
+
+            var inputsTxt = inputs.map(function(i){
+              var t=fmt(num(i.qty))+'× '+i.name;
+              if(i.source) t+=' ['+i.source+']';
+              if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
+              return t;
+            }).join(' + ');
+            var auto = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
+            var dbgOut = outputs.map(function(o,ix){
+              var q = Math.max(0, num(o.qty)) || auto[ix] || 0;
+              return fmt(q)+'× '+o.name;
+            }).join(' + ');
+            var durSecTxt = Math.round(durMin*60);
+            log.push('Verarbeitung @ '+(s.where||'?')+': '+runs+' Runs, '+fmt(batchesTotal)+' Batches/Run: '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Run: '+fmt(durSecTxt)+' s');
+          }
+        }
+        else if(s.type==='verkauf'){
+          log.push('Verkaufsort: '+(s.where||'?'));
+        }
+
+        if(thisPlace){ lastPlace=thisPlace; }
+      });
+
+      var totalMinutes = miningTime + driveTime + procTime;
+
+      var sellList = (route.sellList||[]).filter(function(x){return x && x.name;});
+      var endProducts = sellList.map(function(x){
+        var units = Math.max(0, Math.floor((inventory[x.name]||0)));
+        return {name:x.name, units:units, price: (x.price>0? x.price : null)};
+      });
+
+      var totalCost = purchaseCost + transportCostTotal + processingCostTotal;
+      var hours = totalMinutes/60;
+
+      var totalUnits = endProducts.reduce(function(s,ep){return s+ep.units;},0);
+      var BE_avg = totalUnits>0 ? (totalCost / totalUnits) : 0;
+      var targetRevenue = (hours>0) ? (500000*hours + totalCost) : totalCost;
+      var fixedRevenue = endProducts.reduce(function(s,ep){ return s + ((ep.price>0)? ep.price*ep.units : 0); }, 0);
+      var varUnits = endProducts.reduce(function(s,ep){ return s + ((ep.price>0)? 0 : ep.units); }, 0);
+
+      var suggested = {};
+      if(totalUnits>0){
+        if(varUnits>0){
+          var perUnitVar = (targetRevenue - fixedRevenue) / Math.max(1, varUnits);
+          var perUnitVarCapped = Math.max(0, Math.max(BE_avg, perUnitVar));
+          endProducts.forEach(function(ep){
+            if(!(ep.price>0)){ suggested[ep.name] = perUnitVarCapped; }
+            else { suggested[ep.name] = ep.price; }
+          });
+        }else{
+          if(fixedRevenue>0 && fixedRevenue>targetRevenue){
+            var f = targetRevenue / fixedRevenue;
+            endProducts.forEach(function(ep){
+              var sp = (ep.price>0? ep.price : 0)*f;
+              suggested[ep.name] = Math.max(BE_avg, sp);
+            });
+          }else{
+            endProducts.forEach(function(ep){ suggested[ep.name] = (ep.price>0? ep.price : BE_avg); });
+          }
+        }
+      }
+
+      var revenue = endProducts.reduce(function(sum, ep){
+        var eff = (ep.price>0) ? ep.price : (suggested[ep.name]||0);
+        return sum + eff * ep.units;
+      }, 0);
+      var profit = revenue - totalCost;
+      var hourlyProfit = hours>0 ? (profit / hours) : 0;
+
+      var endProductsRich = endProducts.map(function(ep){
+        var s = suggested[ep.name] || null;
+        var effective = (ep.price>0) ? ep.price : (s||0);
+        var revenueEP = effective * ep.units;
+        return { name: ep.name, units: ep.units, price: ep.price, suggested: s, effective: effective, revenue: revenueEP };
+      });
+
+      return {
+        miningTime, driveTime, procTime, totalMinutes,
+        purchaseCost, transportCostTotal, processingCostTotal, totalCost,
+        endProducts: endProductsRich, revenue, profit, hourlyProfit,
+        BE_avg, targetRevenue, log
+      };
+    }
+
+    // ===== UI: Zusammenfassung =====
+    function renderSummary(calc){
+      qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
+      qs('#kpiCost').textContent = cf.format(calc.totalCost);
+
+      var yieldTxt = calc.endProducts.length
+        ? calc.endProducts.map(function(ep){ return fmt(ep.units)+' × '+ep.name; }).join(', ')
+        : '–';
+      qs('#kpiYield').textContent = yieldTxt;
+
+      var box=qs('#summary'); box.innerHTML='';
+      function row(label, value){
+        var r=document.createElement('div'); r.className='row';
+        r.style.display='grid'; r.style.gridTemplateColumns='1fr auto'; r.style.gap='8px';
+        r.style.padding='6px 0'; r.style.borderBottom='1px solid var(--border)';
+        r.innerHTML = '<span>'+label+'</span><strong>'+value+'</strong>'; box.appendChild(r);
+      }
+      row('Mining', minutesToH(calc.miningTime)+' ('+fmt(calc.miningTime)+' min)');
+      row('Fahrten', minutesToH(calc.driveTime)+' ('+fmt(calc.driveTime)+' min)');
+      row('Verarbeitung', minutesToH(calc.procTime)+' ('+fmt(calc.procTime)+' min)');
+      row('Kosten (Einkauf)', cf.format(calc.purchaseCost));
+      row('Transportkosten', cf.format(calc.transportCostTotal));
+      row('Verarbeitungskosten (fix)', cf.format(calc.processingCostTotal));
+      row('Gesamtkosten', cf.format(calc.totalCost));
+
+      var det=document.createElement('details'); det.open=true; det.innerHTML='<summary>Routenstruktur</summary>';
+      var ul=document.createElement('ul'); ul.style.marginTop='8px';
+      calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
+      det.appendChild(ul); box.appendChild(det);
+
+      var pBox=qs('#priceTable'); pBox.innerHTML='';
+      if(calc.endProducts.length===0){
+        pBox.innerHTML='<div class="mini muted">Keine Endprodukte in der Verkaufsliste.</div>';
+      }else{
+        var tbl=document.createElement('div');
+        tbl.style.display='grid'; tbl.style.gridTemplateColumns='1.2fr .6fr .8fr .9fr .8fr .9fr'; tbl.style.gap='8px';
+        tbl.innerHTML='<div><strong>Endprodukt</strong></div><div><strong>Menge</strong></div><div><strong>Dein Preis</strong></div><div><strong>Vorschlag (≤ 500k/h)</strong></div><div><strong>eff. Preis</strong></div><div><strong>Umsatz</strong></div>';
+        calc.endProducts.forEach(function(ep){
+          var priceDisp = (ep.price>0)? cf.format(ep.price) : '<span class="muted">–</span>';
+          var suggDisp  = (ep.suggested!=null)? cf.format(ep.suggested) : '<span class="muted">–</span>';
+          var row1=document.createElement('div'); row1.textContent=ep.name; tbl.appendChild(row1);
+          var row2=document.createElement('div'); row2.textContent=fmt(ep.units); tbl.appendChild(row2);
+          var row3=document.createElement('div'); row3.innerHTML=priceDisp; tbl.appendChild(row3);
+          var row4=document.createElement('div'); row4.innerHTML=suggDisp; tbl.appendChild(row4);
+          var row5=document.createElement('div'); row5.textContent=cf.format(ep.effective); tbl.appendChild(row5);
+          var row6=document.createElement('div'); row6.textContent=cf.format(ep.revenue); tbl.appendChild(row6);
+        });
+        var tot1=document.createElement('div'); tot1.innerHTML='<strong>Gesamtumsatz</strong>'; tbl.appendChild(tot1);
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        var t6=document.createElement('div'); t6.innerHTML='<strong>'+cf.format(calc.revenue)+'</strong>'; tbl.appendChild(t6);
+        var g1=document.createElement('div'); g1.innerHTML='<strong>Gesamtgewinn</strong>'; tbl.appendChild(g1);
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        tbl.appendChild(document.createElement('div'));
+        var g6=document.createElement('div'); g6.innerHTML='<strong>'+cf.format(calc.revenue - calc.totalCost)+'</strong>'; tbl.appendChild(g6);
+        pBox.appendChild(tbl);
+
+        var hint=document.createElement('div');
+        hint.className='mini muted';
+        hint.style.marginTop='6px';
+        hint.textContent='Vorschläge berücksichtigen den Zielwert ≤ 500 000 €/h. Untergrenze je Produkt ist der durchschnittliche Break-even pro Einheit.';
+        pBox.appendChild(hint);
+      }
+
+      qs('#sumHourly').textContent = cf.format(calc.hourlyProfit);
+    }
+
+    // ===== Report-Text (Export) =====
+    function buildReportText(route, calc){
+      var lines=[];
+      lines.push('Ergebnis & Struktur');
+      lines.push('Gesamtdauer');
+      lines.push(minutesToH(calc.totalMinutes)+' ('+fmt(calc.totalMinutes)+' min)');
+      lines.push('Gesamtkosten');
+      lines.push(cf.format(calc.totalCost));
+      var yieldTxt = calc.endProducts.length
+        ? calc.endProducts.map(function(ep){ return fmt(ep.units)+' × '+ep.name; }).join(', ')
+        : '–';
+      lines.push('Ausbeute');
+      lines.push(yieldTxt);
+      lines.push('Mining');
+      lines.push(minutesToH(calc.miningTime)+' ('+fmt(calc.miningTime)+' min)');
+      lines.push('Fahrten');
+      lines.push(minutesToH(calc.driveTime)+' ('+fmt(calc.driveTime)+' min)');
+      lines.push('Verarbeitung');
+      lines.push(minutesToH(calc.procTime)+' ('+fmt(calc.procTime)+' min)');
+      lines.push('Kosten (Einkauf)');
+      lines.push(cf.format(calc.purchaseCost));
+      lines.push('Transportkosten');
+      lines.push(cf.format(calc.transportCostTotal));
+      lines.push('Verarbeitungskosten (fix)');
+      lines.push(cf.format(calc.processingCostTotal));
+      lines.push('Gesamtkosten');
+      lines.push(cf.format(calc.totalCost));
+      lines.push('Routenstruktur');
+      calc.log.forEach(function(t){ lines.push(t); });
+
+      if(calc.endProducts.length){
+        lines.push('Preis & Gewinn');
+        lines.push('Endprodukt | Menge | Dein Preis | Vorschlag (≤500k/h) | eff. Preis | Umsatz');
+        calc.endProducts.forEach(function(ep){
+          var priceDisp = (ep.price>0)? cf.format(ep.price) : '–';
+          var suggDisp  = (ep.suggested!=null)? cf.format(ep.suggested) : '–';
+          lines.push([ep.name, fmt(ep.units), priceDisp, suggDisp, cf.format(ep.effective), cf.format(ep.revenue)].join(' | '));
+        });
+        lines.push('Gesamtumsatz: '+cf.format(calc.revenue));
+        lines.push('Gesamtgewinn: '+cf.format(calc.revenue - calc.totalCost));
+        lines.push('Gesamt: Gewinn/Stunde: '+cf.format(calc.hourlyProfit));
+      }
+      return lines.join('\n');
+    }
+
+    function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
+
+    // ===== Routenverwaltung (Builder Dropdown alphabetisch) =====
+    function refreshRouteSelect(selectedId){
+      var sel=qs('#routeSelect'); if(!sel) return;
+      var store=readStore(); var map=store.routes||{};
+      sel.innerHTML='';
+      var opt0=document.createElement('option'); opt0.value=''; opt0.textContent='— Gespeicherte Routen —'; sel.appendChild(opt0);
+
+      var entries = Object.keys(map).map(function(id){
+        var r = map[id] || {};
+        return { id:id, name:(r.name || id) };
+      });
+      entries.sort(function(a,b){ return a.name.localeCompare(b.name, 'de', { sensitivity:'base' }); });
+      entries.forEach(function(e){
+        var o=document.createElement('option');
+        o.value=e.id; o.textContent=e.name;
+        if(e.id===selectedId) o.selected=true;
+        sel.appendChild(o);
+      });
+    }
+
+    // ===== Routenliste =====
+    function buildListData(){
+      var store=readStore(); var list=[];
+      Object.keys(store.routes||{}).forEach(function(id){
+        var r=store.routes[id];
+        var calc=compute(r);
+        list.push({
+          id:id,
+          name:r.name||id,
+          endProducts: (r.sellList||[]).map(function(x){ return {name:x.name, price:x.price||null}; }),
+          hourlyProfit: calc.hourlyProfit,
+          calc: calc,
+          route: r
+        });
+      });
+      list.sort(function(a,b){ return (b.hourlyProfit||0) - (a.hourlyProfit||0); });
+      return list;
+    }
+
+    function renderListView(){
+      var list = buildListData();
+      var container = qs('#routesList'); container.innerHTML='';
+
+      list.forEach(function(item){
+        var labelEP = item.endProducts.length
+          ? item.endProducts.map(function(ep){ return ep.name + (ep.price? ' ('+cf.format(ep.price)+')' : ' (–)'); }).join(', ')
+          : '–';
+
+        var wrap=document.createElement('div');
+        wrap.className='route-item';
+        wrap.draggable=true;
+        wrap.dataset.id=item.id;
+
+        var row=document.createElement('div');
+        row.className='route-row';
+        row.innerHTML = `
+          <div class="drag" title="Ziehen, um die Reihenfolge zu ändern">▤</div>
+          <div><div><strong>${item.name}</strong></div><div class="muted">${labelEP}</div></div>
+          <div><span class="pill">${item.endProducts.length? item.endProducts.length+' Produkte' : '—'}</span></div>
+          <div><strong>${cf.format(item.hourlyProfit)}</strong><div class="mini muted">Gewinn/h</div></div>
+          <div class="mini muted"></div>
+        `;
+        wrap.appendChild(row);
+
+        var det=document.createElement('details');
+        det.className='row-details';
+        var sum=document.createElement('summary');
+        sum.textContent='Details anzeigen';
+        det.appendChild(sum);
+
+        var kpis=document.createElement('div');
+        kpis.className='kpis';
+        kpis.innerHTML = `
+          <div class="k">Dauer: ${fmt(item.calc.totalMinutes)} min</div>
+          <div class="k">Kosten: ${cf.format(item.calc.totalCost)}</div>
+          <div class="k">Umsatz: ${cf.format(item.calc.revenue)}</div>
+          <div class="k">Gewinn/h: ${cf.format(item.calc.hourlyProfit)}</div>
+        `;
+        det.appendChild(kpis);
+
+        var ul=document.createElement('ul');
+        item.calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
+        det.appendChild(ul);
+
+        wrap.appendChild(det);
+        container.appendChild(wrap);
+      });
+
+      enableListDnD(container, function(newOrderIds){
+        var dataById={};
+        (buildListData()).forEach(function(x){ dataById[x.id]=x; });
+
+        var margin = 1;
+        var any=false;
+
+        var ul=qs('#adjustmentsList'); ul.innerHTML='';
+        var note=qs('#adjustmentsNote'); note.textContent='';
+        var panel=qs('#adjustmentsPanel');
+
+        newOrderIds.forEach(function(id, i){
+          var d=dataById[id]; if(!d) return;
+          var desiredBelow = (i<newOrderIds.length-1) ? ((dataById[newOrderIds[i+1]]?.hourlyProfit)||0) + margin : -Infinity;
+          var current = d.hourlyProfit||0;
+          if(current < desiredBelow - 1e-9){
+            any=true;
+            var li=document.createElement('li');
+            li.innerHTML = `<strong>${d.name}</strong>: Preise proportional erhöhen, bis ~ ${cf.format(desiredBelow)} Gewinn/h erreicht sind.`;
+            ul.appendChild(li);
+          }
+        });
+
+        note.textContent = 'Vorschläge sind heuristisch (Multi-Endprodukt). Genaue Ziele kannst du über die Produktpreise im Builder setzen.';
+        panel.style.display = any ? 'block' : 'none';
+      });
+    }
+
+    function enableListDnD(container, onOrderChanged){
+      var dragEl=null;
+      container.addEventListener('dragstart', function(e){
+        var item=e.target.closest('.route-item'); if(!item) return;
+        dragEl=item; item.classList.add('dragging');
+        e.dataTransfer.effectAllowed='move';
+        e.dataTransfer.setData('text/plain','drag');
+      });
+      container.addEventListener('dragend', function(){
+        if(dragEl){ dragEl.classList.remove('dragging'); dragEl=null; }
+        var ids=[].map.call(container.querySelectorAll('.route-item'), function(r){return r.dataset.id;});
+        if(typeof onOrderChanged==='function'){ onOrderChanged(ids); }
+      });
+      container.addEventListener('dragover', function(e){
+        e.preventDefault();
+        var dragging=container.querySelector('.route-item.dragging'); if(!dragging) return;
+        var after = (function(){
+          var els=[].slice.call(container.querySelectorAll('.route-item:not(.dragging)'));
+          return els.reduce(function(closest,child){
+            var box=child.getBoundingClientRect();
+            var offset=e.clientY - box.top - box.height/2;
+            if(offset<0 && offset>closest.offset){ return {offset:offset, element:child}; }
+            else { return closest; }
+          }, {offset:Number.NEGATIVE_INFINITY}).element;
+        })();
+        if(after==null){ container.appendChild(dragging); }
+        else { container.insertBefore(dragging, after); }
+      });
+    }
+
+    // ===== Google Apps Script / Drive Sync =====
+    const DRIVE_AUTO_LOAD = true;
+    const DRIVE_AUTO_SAVE = true;
+
+    function updateDriveStateTag(connected){
+      const el = qs('#driveState');
+      if(!el) return;
+      if(connected){
+        el.textContent = 'Drive: verbunden';
+        el.classList.remove('yellow'); el.classList.add('green');
+        el.title = 'Web-App verbunden';
+      }else{
+        el.textContent = 'Drive: nicht verbunden';
+        el.classList.add('yellow'); el.classList.remove('green');
+        el.title = 'Nicht authentifiziert';
+      }
+    }
+
+    function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
+    function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
+
+    async function gasListRoutes(){
+      const url = GAS_URL + '?action=list&token=' + encodeURIComponent(getToken());
+      const data = await jsonp(url);
+      if(!data.ok) throw new Error(data.error || 'List failed');
+      return data.routes || [];
+    }
+    async function gasGetRoute(id){
+      const url = GAS_URL + '?action=get&id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(getToken());
+      const data = await jsonp(url);
+      if(!data.ok) throw new Error(data.error || 'Get failed');
+      return data.route;
+    }
+    async function gasSaveRoute(route){
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', token: getToken(), route })
+      });
+      await new Promise(r => setTimeout(r, 500));
+      return true;
+    }
+    async function gasDeleteRoute(id){
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', token: getToken(), id })
+      });
+      await new Promise(r => setTimeout(r, 500));
+      return true;
+    }
+
+    async function syncFromDriveIntoPage(){
+      try{
+        const list = await gasListRoutes();
+        if(!Array.isArray(list)) return;
+        const store = readStore();
+        for(const meta of list){
+          const id = (meta.id || '').replace(/\.json$/,'');
+          if(!id) continue;
+          const route = await gasGetRoute(id);
+          if(route && route.id && Array.isArray(route.steps)){
+            if(route.travelTimes && typeof route.travelTimes === 'object'){
+              store.travelTimes = Object.assign({}, store.travelTimes||{}, route.travelTimes||{});
+            }
+            store.routes[route.id] = route;
+          }
+        }
+        writeStore(store);
+        refreshRouteSelect(null);
+        renderSummaryAndMaybeList();
+      }catch(err){
+        console.warn('Drive Sync (load) fehlgeschlagen:', err);
+      }
+    }
+
+    async function tryAuthAndLoad(initial=false){
+      const token = getToken();
+      if(!token){
+        showAuth();
+        return;
+      }
+      try{
+        await gasListRoutes();
+        hideAuth();
+        updateDriveStateTag(true);
+        if(initial && DRIVE_AUTO_LOAD){
+          await syncFromDriveIntoPage();
+        }
+      }catch(err){
+        setToken('');
+        showAuth('Zugriff verweigert – falsches Token.');
+        updateDriveStateTag(false);
+      }
+    }
+
+    function showAuth(msg){
+      const overlay=qs('#authOverlay');
+      const err=qs('#authError');
+      if(msg){ err.textContent=msg; err.style.display='block'; } else { err.style.display='none'; }
+      overlay.style.display='flex';
+      qs('.content').style.visibility='hidden';
+      updateDriveStateTag(false);
+      setTimeout(()=>{ qs('#authToken').focus(); }, 50);
+    }
+    function hideAuth(){
+      const overlay=qs('#authOverlay');
+      overlay.style.display='none';
+      qs('.content').style.visibility='visible';
+    }
+
+    function switchTab(name){
+      var isList = (name==='list');
+      document.getElementById('tabBuilder').classList.toggle('active', !isList);
+      document.getElementById('tabList').classList.toggle('active', isList);
+      document.getElementById('builderView').hidden = isList;
+      document.getElementById('resultView').hidden  = isList;
+      document.getElementById('listView').hidden    = !isList;
+      if(isList){ renderListView(); }
+    }
+    function renderSummaryAndMaybeList(){ recalc(); if(!document.getElementById('listView').hidden){ renderListView(); } }
+
+    // ===== Events =====
+    window.addEventListener('DOMContentLoaded', async function(){
+      // Auth
+      qs('#authForm').addEventListener('submit', async function(ev){
+        ev.preventDefault();
+        const t = qs('#authToken').value.trim();
+        if(!t){ showAuth('Bitte Token eingeben.'); return; }
+        setToken(t);
+        await tryAuthAndLoad(true);
+      });
+
+      // Verkaufsliste
+      document.getElementById('addSell').addEventListener('click', function(){ addSellRow('', null); });
+
+      // Steps hinzufügen
+      document.getElementById('addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); });
+
+      // Basisdaten -> Recalc
+      ['lkwSize','backpackKg','routeName'].forEach(function(id){
+        var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
+      });
+
+      // Fahrzeiten-Manager
+      document.getElementById('manageTravelBtn').addEventListener('click', openTravelManager);
+      document.getElementById('tmAddRow').addEventListener('click', function(){ addTmRow('','',0); });
+      document.getElementById('tmCancel').addEventListener('click', closeTravelManager);
+      document.getElementById('tmSave').addEventListener('click', saveTravelManager);
+
+      // Speichern – lokal + Drive
+      document.getElementById('saveBtn')?.addEventListener('click', async function(){
+        var r=getRoute();
+        if(!r.name || r.name==='Unbenannt'){
+          alert('Bitte einen Routenname eintragen.');
+          return;
+        }
+        if(!r.id) r.id = uid();
+        var store=readStore(); store.routes[r.id]=r; writeStore(store);
+        refreshRouteSelect(r.id);
+        var sel=document.getElementById('routeSelect'); if(sel){ sel.value=r.id; }
+        alert('Route lokal gespeichert.');
+
+        if(getToken()){
+          try{
+            await gasSaveRoute(r);
+            updateDriveStateTag(true);
+            alert('Route zusätzlich in Google Drive gespeichert.');
+          }catch(err){
+            console.warn('Speichern nach Drive fehlgeschlagen:', err.message);
+            updateDriveStateTag(false);
+            showAuth('Zugriff verweigert oder Fehler beim Speichern. Bitte Token prüfen.');
+          }
+        }
+
+        if(!document.getElementById('listView').hidden){ renderListView(); }
+      });
+
+      // Löschen – lokal + Drive
+      document.getElementById('deleteBtn')?.addEventListener('click', async function(){
+        var id=document.getElementById('routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
+        if(!confirm('Route wirklich löschen?')) return;
+        var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null);
+        if(!document.getElementById('listView').hidden){ renderListView(); }
+        if(getToken()){
+          try{
+            await gasDeleteRoute(id);
+            alert('Route auch in Google Drive gelöscht.');
+          }catch(err){
+            console.warn('Drive-Delete fehlgeschlagen:', err.message);
+            showAuth('Zugriff verweigert oder Fehler beim Löschen. Bitte Token prüfen.');
+          }
+        }
+      });
+
+      // Route aus Dropdown laden
+      document.getElementById('routeSelect')?.addEventListener('change', function(e){
+        var id=e.target.value; if(!id) return;
+        var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
+      });
+
+      // Export nur aktuelle Route
+      document.getElementById('exportCurrentBtn')?.addEventListener('click', function(){
+        var r=getRoute();
+        if(!r.name || r.name==='Unbenannt'){ alert('Bitte Routenname setzen.'); return; }
+        var calc=compute(r);
+        var payload={
+          exportedAt: new Date().toISOString(),
+          route: r,
+          travelTimes: readStore().travelTimes || {},
+          report:{
+            name: r.name,
+            kpi:{
+              totalMinutes: calc.totalMinutes,
+              totalCost: calc.totalCost,
+              mining: calc.miningTime,
+              drive: calc.driveTime,
+              processing: calc.procTime,
+              hourlyProfit: calc.hourlyProfit,
+              revenue: calc.revenue,
+              profit: calc.profit
+            },
+            endProducts: calc.endProducts,
+            log: calc.log,
+            breakEvenAvg: calc.BE_avg,
+            targetRevenue: calc.targetRevenue,
+            text: buildReportText(r, calc)
+          }
+        };
+        var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download= slug(r.name || 'route') + '.json'; a.click(); URL.revokeObjectURL(a.href);
+      });
+
+      // Import einzelne Route
+      document.getElementById('importCurrentFile')?.addEventListener('change', function(e){
+        var f=e.target.files && e.target.files[0]; if(!f) return;
+        var rd=new FileReader();
+        rd.onload=async function(){
+          try{
+            var incoming=JSON.parse(rd.result||'{}');
+            var store=readStore();
+
+            if(incoming.travelTimes && typeof incoming.travelTimes==='object'){
+              store.travelTimes = Object.assign({}, store.travelTimes||{}, incoming.travelTimes||{});
+            }
+
+            var route = null;
+            if(incoming.route && incoming.route.steps){ route = incoming.route; }
+            else if(Array.isArray(incoming.routes)){ route = incoming.routes[0]; }
+            else if(incoming.routes && typeof incoming.routes==='object'){ var firstId = Object.keys(incoming.routes)[0]; route = incoming.routes[firstId]; }
+            else if(incoming.steps){ route = incoming; }
+
+            if(!route || !Array.isArray(route.steps)){
+              alert('Keine gültige Route in der Datei gefunden.');
+              return;
+            }
+            route.id = route.id || uid();
+            route.name = route.name || 'Importierte Route';
+
+            store.routes[route.id] = route;
+            writeStore(store);
+
+            refreshRouteSelect(route.id);
+            var sel=document.getElementById('routeSelect'); if(sel){ sel.value=route.id; }
+            setRoute(route); currentRouteId = route.id;
+
+            if(getToken()){
+              try{ await gasSaveRoute(route); }catch(err){ console.warn('Drive-Save nach Import fehlgeschlagen:', err.message); }
+            }
+
+            alert('Route importiert und geladen: '+route.name);
+            if(!document.getElementById('listView').hidden){ renderListView(); }
+          }catch(err){
+            alert('Import fehlgeschlagen: '+err.message);
+          }
+        };
+        rd.readAsText(f); e.target.value='';
+      });
+
+      // LIST VIEW Export/Import ALL
+      document.getElementById('exportAllBtn')?.addEventListener('click', function(){
+        var store=readStore();
+        var reports={};
+        Object.keys(store.routes||{}).forEach(function(id){
+          var r=store.routes[id];
+          var calc=compute(r);
+          reports[id]={
+            name: r.name || id,
+            kpi:{
+              totalMinutes: calc.totalMinutes,
+              totalCost: calc.totalCost,
+              mining: calc.miningTime,
+              drive: calc.driveTime,
+              processing: calc.procTime,
+              hourlyProfit: calc.hourlyProfit,
+              revenue: calc.revenue,
+              profit: calc.profit
+            },
+            endProducts: calc.endProducts,
+            log: calc.log,
+            breakEvenAvg: calc.BE_avg,
+            targetRevenue: calc.targetRevenue
+          };
+        });
+        var exportObj={
+          exportedAt: new Date().toISOString(),
+          routes: store.routes || {},
+          travelTimes: store.travelTimes || {},
+          reports: reports
+        };
+        var blob=new Blob([JSON.stringify(exportObj,null,2)],{type:'application/json'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='alle_routen.json'; a.click(); URL.revokeObjectURL(a.href);
+      });
+
+      document.getElementById('importAllFile')?.addEventListener('change', function(e){
+        var f=e.target.files && e.target.files[0]; if(!f) return;
+        var rd=new FileReader();
+        rd.onload=function(){
+          try{
+            var incoming=JSON.parse(rd.result||'{}');
+            var store=readStore();
+            store.travelTimes = Object.assign({}, store.travelTimes||{}, incoming.travelTimes||{});
+            var src = incoming.routes || incoming.route ? (incoming.routes || {[incoming.route?.id || uid()]: incoming.route}) : incoming;
+            if(Array.isArray(src)){
+              src.forEach(function(r){ var id=r.id||uid(); r.id=id; store.routes[id]=r; });
+            }else{
+              Object.keys(src||{}).forEach(function(id){ var r=src[id]; if(!r.id) r.id=id; store.routes[r.id]=r; });
+            }
+            writeStore(store); refreshRouteSelect(null); alert('Import abgeschlossen.');
+            if(!document.getElementById('listView').hidden){ renderListView(); }
+          }catch(err){ alert('Import fehlgeschlagen: '+err.message); }
+        };
+        rd.readAsText(f); e.target.value='';
+      });
+
+      // Tabs
+      document.getElementById('tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
+      document.getElementById('tabList').addEventListener('click', function(){ switchTab('list'); });
+
+      // Init
+      refreshRouteSelect(null);
+      setSellList([]);
+      if(document.getElementById('steps').children.length===0){ addStep('start'); }
+      recalc();
+
+      await tryAuthAndLoad(true);
     });
-
-	  function updateAnzeige() {
-  const start = startSelect.value;
-  const ziel = endSelect.value;
-
-  if (!ziel) {
-    ausgabe.textContent = "❗ Bitte ein Zielprodukt auswählen.";
-    return;
-  }
-
-  const pfad = findeRezeptPfad(start, ziel);
-  if (!pfad) {
-    ausgabe.textContent = "⚠️ Kein Pfad von Start zu Ziel gefunden.";
-    return;
-  }
-
-  const rohstoffe = {};
-  const verwendetInMap = {};
-
-  let startIndex = 0;
-  if (start) {
-    startIndex = pfad.indexOf(start) + 1;
-  }
-
-  const bereitsVorhanden = new Set();
-  if (start) {
-    bereitsVorhanden.add(start);
-  }
-
-  const geplanteHerstellungen = new Set(pfad.slice(startIndex));
-
-  function sammleMaterialien(item, menge = 1) {
-    const rezept = rezepte[item];
-    if (!rezept) return;
-
-    rezept.itemsRequired.forEach(([roh, m]) => {
-      const total = m * menge;
-
-      if (rezepte[roh]) {
-        if (bereitsVorhanden.has(roh)) return; // ⛔ Bereits vorhanden
-        if (geplanteHerstellungen.has(roh)) return; // ⛔ Geplante Herstellung
-        sammleMaterialien(roh, total);
-
-        if (!verwendetInMap[roh]) verwendetInMap[roh] = new Set();
-        verwendetInMap[roh].add(item);
-      } else {
-        if (!rohstoffe[roh]) rohstoffe[roh] = { menge: 0, verwendetIn: {} };
-        rohstoffe[roh].menge += total;
-        const verwendung = anzeigeNamen[item] || item;
-        rohstoffe[roh].verwendetIn[verwendung] = (rohstoffe[roh].verwendetIn[verwendung] || 0) + total;
-      }
-    });
-  }
-
-  for (let i = startIndex; i < pfad.length; i++) {
-    sammleMaterialien(pfad[i]);
-  }
-
-  let rohstoffText = "📦 Rohstoffliste:\n";
-  let gesamt = 0;
-  for (const key in rohstoffe) {
-    const eintrag = rohstoffe[key];
-    const name = anzeigeNamen[key] || key;
-    const ort = fundorte[key] ? ` (Fundort: ${fundorte[key]})` : "";
-    const preis = rohstoffPreise[key] || 0;
-    const kosten = preis * eintrag.menge;
-    gesamt += kosten;
-
-    rohstoffText += `- ${eintrag.menge}x ${name}${ort} ${preis} €/St = ${kosten} €\n`;
-    for (const verwendung in eintrag.verwendetIn) {
-      rohstoffText += `    ↳ verwendet in: ${verwendung} (${eintrag.verwendetIn[verwendung]})\n`;
-    }
-  }
-
-  const herstellungAggregiert = baueAggregiertenHerstellplan(pfad, startIndex, bereitsVorhanden);
-
-ausgabe.textContent =
-  `🔄 Pfad: ${pfad.map(k => anzeigeNamen[k] || k).join(" → ")}\n\n` +
-  rohstoffText +
-  `\n💰 Gesamtkosten: ${gesamt} €\n` + 
-  herstellungAggregiert;
-
-const bildAnzeige = document.getElementById("bildAnzeige");
-const zielRezept = rezepte[ziel];
-if (zielRezept && zielRezept.picture) {
-  bildAnzeige.src = zielRezept.picture;
-  bildAnzeige.style.display = "block";
-} else {
-  bildAnzeige.style.display = "none";
-}
-		  
-}
-
-
-/* *** FIX: Doppelte Zählung verhindern ***
-   - Nur Items aus dem geplanten Pfad selbst in 'gesamtBedarf' erfassen.
-   - Abhängigkeiten nur dann rekursiv auflösen, wenn sie NICHT selbst geplante Items sind.
-*/
-function baueAggregiertenHerstellplan(pfad, startIndex = 0, bereitsVorhandenSet = new Set()) {
-  const teilPfad = pfad.slice(startIndex);
-  const planned = new Set(teilPfad);               // <- geplante Herstellungen
-  const gesamtBedarf = {};
-  const abhaengigkeiten = {};
-
-  function zaehle(item, menge = 1) {
-    if (!rezepte[item] || bereitsVorhandenSet.has(item)) return;
-
-    // Nur geplante Items als "eigentlichen" Bedarf zählen
-    if (planned.has(item)) {
-      if (!gesamtBedarf[item]) gesamtBedarf[item] = 0;
-      gesamtBedarf[item] += menge;
-    }
-
-    // Abhängigkeiten sammeln
-    for (const [roh, m] of rezepte[item].itemsRequired) {
-      const total = m * menge;
-      if (!rezepte[roh]) continue; // nur craft_* weiter betrachten
-
-      if (!abhaengigkeiten[item]) abhaengigkeiten[item] = {};
-      if (!abhaengigkeiten[item][roh]) abhaengigkeiten[item][roh] = 0;
-      abhaengigkeiten[item][roh] += total;
-
-      // WICHTIG: Nur weiter in die Tiefe gehen, wenn 'roh' NICHT separat geplant ist
-      if (!planned.has(roh) && !bereitsVorhandenSet.has(roh)) {
-        zaehle(roh, total);
-      }
-    }
-  }
-
-  // Starte die Zählung von den geplanten Items aus
-  teilPfad.forEach(i => zaehle(i));
-
-  // Topologische Sortierung über die tatsächlich benötigten Items
-  const topologischSortiert = [];
-  const besucht = new Set();
-
-  function sortiere(item) {
-    if (besucht.has(item)) return;
-    besucht.add(item);
-
-    const deps = abhaengigkeiten[item];
-    if (deps) {
-      for (const unter of Object.keys(deps)) {
-        // nur sortieren, wenn dieses Unter-Item überhaupt im Bedarf steckt
-        if (gesamtBedarf[unter]) sortiere(unter);
-      }
-    }
-    topologischSortiert.push(item);
-  }
-
-  Object.keys(gesamtBedarf).forEach(i => sortiere(i));
-
-  let herstellungText = "\n🔧 Herstellprozesse:\n";
-  for (const item of topologischSortiert) {
-    const menge = gesamtBedarf[item];
-    if (!menge || !rezepte[item]) continue;
-    const name = anzeigeNamen[item] || item;
-    herstellungText += `- ${menge}x ${name}\n`;
-    const unter = rezepte[item].itemsRequired;
-
-    for (const [roh, m] of unter) {
-      const total = m * menge;
-      const rName = anzeigeNamen[roh] || roh;
-      herstellungText += `    ⤷ ${total}x ${rName}\n`;
-    }
-  }
-
-  return herstellungText;
-}
-
-function findeRezeptPfad(start, ziel) {
-  const pfad = [];
-  let current = ziel;
-
-  while (current) {
-    pfad.unshift(current);
-    const rezept = rezepte[current];
-    if (!rezept) return null;
-
-    const vorgaenger = rezept.itemsRequired.find(([item]) =>
-      item.startsWith("craft_") && rezepte[item]
-    );
-
-    if (!vorgaenger) break;
-    current = vorgaenger[0];
-
-    if (start && current === start) {
-      pfad.unshift(current);
-      return pfad;
-    }
-  }
-
-  return start ? null : pfad;
-}
-
-
-
-
-    startSelect.addEventListener("change", updateAnzeige);
-    endSelect.addEventListener("change", updateAnzeige);
+  })();
   </script>
 </body>
 </html>
