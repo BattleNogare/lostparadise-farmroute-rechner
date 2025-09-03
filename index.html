@@ -96,7 +96,7 @@
     .kpi .val{font-size:18px;font-weight:700}
 
     .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:5}
-    .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(520px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
+    .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(720px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
     .modal h3{margin:0 0 8px 0}
     .modal .row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
     .modal .actions{display:flex; gap:8px; justify-content:flex-end}
@@ -129,6 +129,12 @@
     .sell-list .row{display:grid; grid-template-columns:1.4fr .8fr auto; gap:8px; margin:6px 0}
     .sell-list .row input[type="text"]{width:100%}
     .sell-list .row input[type="number"]{width:100%}
+
+    /* Travel Manager table */
+    .tm-table{width:100%; border-collapse:collapse; margin-top:8px}
+    .tm-table th,.tm-table td{border:1px solid var(--border); padding:6px 8px; text-align:left}
+    .tm-table th{background:#0c171f; font-weight:600}
+    .tm-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:10px}
   </style>
 </head>
 <body>
@@ -154,12 +160,10 @@
       <div class="wrap header-grid">
         <img class="logo" alt="Routes Logo"
              src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
-
         <div class="brand">
           <h1>Farmrouten-Preisrechner</h1>
           <span id="driveState" class="tag yellow" title="Drive-Verbindung">Drive: nicht verbunden</span>
         </div>
-
         <div class="toolbar">
           <div class="tabs">
             <button class="tab active" id="tabBuilder">Builder</button>
@@ -179,6 +183,7 @@
     </header>
 
     <main class="wrap grid">
+      <!-- Builder -->
       <section class="card" id="builderView">
         <h2>Route zusammenstellen</h2>
 
@@ -212,19 +217,23 @@
         <div class="hr"></div>
         <div id="steps"></div>
 
-        <div class="actions">
-          <select id="addType">
-            <option value="start">➕ Startpunkt</option>
-            <option value="abbau">➕ Abbau</option>
-            <option value="verarbeitung">➕ Verarbeitung</option>
-            <option value="transportkosten">➕ Transportkosten</option>
-            <option value="verkauf">➕ Verkaufsort</option>
-          </select>
-          <button id="addBtn" type="button">Schritt hinzufügen</button>
+        <div class="actions" style="gap:12px; align-items:center">
+          <div style="display:flex; gap:8px; align-items:center">
+            <select id="addType">
+              <option value="start">➕ Startpunkt</option>
+              <option value="abbau">➕ Abbau</option>
+              <option value="verarbeitung">➕ Verarbeitung</option>
+              <option value="transportkosten">➕ Transportkosten</option>
+              <option value="verkauf">➕ Verkaufsort</option>
+            </select>
+            <button id="addBtn" type="button">Schritt hinzufügen</button>
+          </div>
+          <div class="mini" style="flex:1">Fahrzeiten werden beim Verlassen eines Ortsfelds per Popup abgefragt (wenn sich der Ort ändert).</div>
+          <button id="manageTravelBtn" type="button" class="ghost" title="Fahrzeiten nachträglich bearbeiten">Fahrzeiten bearbeiten</button>
         </div>
-        <div class="mini">Fahrzeiten werden beim Verlassen eines Ortsfelds per Popup abgefragt (wenn sich der Ort ändert).</div>
       </section>
 
+      <!-- Result -->
       <aside class="card" id="resultView">
         <h2>Ergebnis &amp; Struktur</h2>
         <div class="kpi">
@@ -246,6 +255,7 @@
         </details>
       </aside>
 
+      <!-- List -->
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
         <div class="sub">Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde</strong> sortiert. Ziehe am Griff, um <strong>Block (Route + Details)</strong> zu verschieben.</div>
@@ -271,6 +281,7 @@
   <script id="app-data" type="application/json">{"routes":{},"travelTimes":{}}</script>
   <!--DATA-END-->
 
+  <!-- Step Templates -->
   <template id="tpl-start">
     <div class="step" data-type="start" draggable="true">
       <div class="bar">
@@ -379,6 +390,7 @@
     </div>
   </template>
 
+  <!-- Fahrzeit-Modal (einzeln) -->
   <div id="travelModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal">
       <h3>Fahrzeit eintragen</h3>
@@ -394,10 +406,32 @@
     </div>
   </div>
 
+  <!-- Fahrzeiten-Manager (Liste bearbeiten) -->
+  <div id="travelManager" class="modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <h3>Fahrzeiten bearbeiten</h3>
+      <div class="mini" style="margin-bottom:6px">Ändere bestehende Fahrzeiten, füge neue hinzu oder entferne Einträge.</div>
+      <table class="tm-table" id="tmTable">
+        <thead>
+          <tr><th>Von</th><th>Nach</th><th>Minuten</th><th>Aktion</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="tm-actions">
+        <button id="tmAddRow" type="button" class="ghost">+ Zeile</button>
+        <span style="flex:1"></span>
+        <button id="tmCancel" type="button">Schließen</button>
+        <button id="tmSave" class="primary" type="button">Speichern</button>
+      </div>
+    </div>
+  </div>
+
   <script>
   (function(){
+    // ===== GAS Web-App URL =====
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbzFHZwQI9KxXhJvR6aZRR0zyqyijb46gaqWpYhCsxdfow2U5Y5A5D4gBg3jmRyaa_hh/exec';
 
+    // ===== Utils =====
     function qs(s, e){return (e||document).querySelector(s);}
     function qsa(s, e){return Array.prototype.slice.call((e||document).querySelectorAll(s));}
     function uid(){return Math.random().toString(36).slice(2,9);}
@@ -408,9 +442,11 @@
     function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
     function slug(s){ return (s||'route').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 
+    // ===== Store =====
     function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{}}; }catch(e){ return {routes:{},travelTimes:{}}; } }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
+    // ===== JSONP =====
     function jsonp(url){
       return new Promise(function(resolve,reject){
         const cb = 'cb_' + Math.random().toString(36).slice(2);
@@ -425,6 +461,7 @@
       });
     }
 
+    // ===== Verkaufsliste =====
     function addSellRow(pname, price){
       var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
       var list=qs('#sellList'); list.appendChild(row);
@@ -447,6 +484,7 @@
       if((arr||[]).length===0){ addSellRow('', null); }
     }
 
+    // ===== Templates / Steps =====
     var TPLS={
       start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
       abbau: function(){return qs('#tpl-abbau').content.firstElementChild.cloneNode(true);},
@@ -473,6 +511,9 @@
       stepEl.addEventListener('input', function(){ recalc(); });
       var where=qs('[data-key="where"]', stepEl);
       if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
+      // Dragging
+      stepEl.addEventListener('dragstart', function(){ stepEl.classList.add('dragging'); });
+      stepEl.addEventListener('dragend', function(){ stepEl.classList.remove('dragging'); recalc(); });
     }
     function addStep(type){
       var el=TPLS[type]?TPLS[type]():null; if(!el) return null;
@@ -497,6 +538,7 @@
       });
     })();
 
+    // ===== Route Build/Load =====
     var currentRouteId=null;
     function getRoute(){
       var name = (qs('#routeName')?.value || '').trim() || 'Unbenannt';
@@ -556,13 +598,12 @@
     function setRoute(route){
       currentRouteId = route.id || uid();
 
-      // >>> FIX: TravelTimes der Route in den Store mergen <<<
+      // TravelTimes der Route in den Store mergen
       if(route.travelTimes && typeof route.travelTimes === 'object'){
         var st = readStore();
         st.travelTimes = Object.assign({}, st.travelTimes||{}, route.travelTimes||{});
         writeStore(st);
       }
-      // <<< FIX ENDE
 
       qs('#routeName').value = route.name || '';
       qs('#lkwSize').value = route.lkwSize || 2000;
@@ -609,6 +650,7 @@
       recalc();
     }
 
+    // ===== Fahrzeiten (Popup & Manager) =====
     function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
     function openTravelModal(from,to, cb){
       var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
@@ -636,6 +678,62 @@
       }catch(e){}
     }
 
+    // ---- Fahrzeiten-Manager (Liste) ----
+    function openTravelManager(){
+      renderTravelManager();
+      var m=qs('#travelManager');
+      m.style.display='flex'; m.setAttribute('aria-hidden','false');
+    }
+    function closeTravelManager(){
+      var m=qs('#travelManager');
+      m.style.display='none'; m.setAttribute('aria-hidden','true');
+    }
+    function renderTravelManager(){
+      var store=readStore();
+      var tbody=qs('#tmTable tbody');
+      tbody.innerHTML='';
+      var entries = Object.entries(store.travelTimes||{}).map(function([k,v]){
+        var parts = k.split('|');
+        return { from: parts[0]||'', to: parts[1]||'', mins: Number(v)||0 };
+      });
+      // sortiere alphabetisch (from, dann to)
+      entries.sort(function(a,b){
+        var s = a.from.localeCompare(b.from,'de',{sensitivity:'base'});
+        if(s!==0) return s;
+        return a.to.localeCompare(b.to,'de',{sensitivity:'base'});
+      });
+      entries.forEach(function(e){ addTmRow(e.from, e.to, e.mins); });
+      if(entries.length===0){ addTmRow('','',0); }
+    }
+    function addTmRow(from,to,mins){
+      var tr=document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="tm-from" placeholder="Von" value="${from?from.replace(/"/g,'&quot;'):''}"></td>
+        <td><input class="tm-to" placeholder="Nach" value="${to?to.replace(/"/g,'&quot;'):''}"></td>
+        <td><input class="tm-mins" type="number" min="0" step="1" value="${Number(mins)||0}"></td>
+        <td><button type="button" class="danger tm-del">Löschen</button></td>
+      `;
+      qs('#tmTable tbody').appendChild(tr);
+      qs('.tm-del',tr).addEventListener('click', function(){ tr.remove(); });
+    }
+    function saveTravelManager(){
+      var rows=qsa('#tmTable tbody tr');
+      var obj={};
+      rows.forEach(function(r){
+        var f = (qs('.tm-from',r).value||'').trim();
+        var t = (qs('.tm-to',r).value||'').trim();
+        var m = Math.max(0, num(qs('.tm-mins',r).value));
+        if(!f || !t) return; // nur vollständige Einträge
+        obj[travelKey(f,t)] = m;
+      });
+      var store=readStore();
+      store.travelTimes = obj;
+      writeStore(store);
+      recalc();
+      closeTravelManager();
+    }
+
+    // ===== Automatik-Hilfen =====
     function kgPerBatchAllInputs(inputs, weights){
       var sum=0;
       inputs.forEach(function(i){
@@ -659,6 +757,7 @@
       });
     }
 
+    // ===== Berechnung =====
     function compute(route){
       var baseKg = route.lkwSize>0? route.lkwSize : 2000;
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
@@ -755,7 +854,7 @@
                 inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
               });
 
-              procTime += durMin;
+              procTime += durMin; // pro Run
               runs++; batchesTotal+=batchesThisRun;
               if(batchesThisRun<=0) break;
             }
@@ -849,6 +948,7 @@
       };
     }
 
+    // ===== UI: Zusammenfassung =====
     function renderSummary(calc){
       qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
       qs('#kpiCost').textContent = cf.format(calc.totalCost);
@@ -919,6 +1019,7 @@
       qs('#sumHourly').textContent = cf.format(calc.hourlyProfit);
     }
 
+    // ===== Report-Text (Export) =====
     function buildReportText(route, calc){
       var lines=[];
       lines.push('Ergebnis & Struktur');
@@ -965,16 +1066,27 @@
 
     function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
 
+    // ===== Routenverwaltung (Builder Dropdown alphabetisch) =====
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
       sel.innerHTML='';
       var opt0=document.createElement('option'); opt0.value=''; opt0.textContent='— Gespeicherte Routen —'; sel.appendChild(opt0);
-      Object.keys(map).forEach(function(id){
-        var r=map[id]; var o=document.createElement('option'); o.value=id; o.textContent=r.name||id; if(id===selectedId) o.selected=true; sel.appendChild(o);
+
+      var entries = Object.keys(map).map(function(id){
+        var r = map[id] || {};
+        return { id:id, name:(r.name || id) };
+      });
+      entries.sort(function(a,b){ return a.name.localeCompare(b.name, 'de', { sensitivity:'base' }); });
+      entries.forEach(function(e){
+        var o=document.createElement('option');
+        o.value=e.id; o.textContent=e.name;
+        if(e.id===selectedId) o.selected=true;
+        sel.appendChild(o);
       });
     }
 
+    // ===== Routenliste =====
     function buildListData(){
       var store=readStore(); var list=[];
       Object.keys(store.routes||{}).forEach(function(id){
@@ -1100,6 +1212,7 @@
       });
     }
 
+    // ===== Google Apps Script / Drive Sync =====
     const DRIVE_AUTO_LOAD = true;
     const DRIVE_AUTO_SAVE = true;
 
@@ -1163,11 +1276,9 @@
           if(!id) continue;
           const route = await gasGetRoute(id);
           if(route && route.id && Array.isArray(route.steps)){
-            // >>> FIX: TravelTimes beim Laden aus Drive mergen <<<
             if(route.travelTimes && typeof route.travelTimes === 'object'){
               store.travelTimes = Object.assign({}, store.travelTimes||{}, route.travelTimes||{});
             }
-            // <<< FIX ENDE
             store.routes[route.id] = route;
           }
         }
@@ -1225,7 +1336,9 @@
     }
     function renderSummaryAndMaybeList(){ recalc(); if(!document.getElementById('listView').hidden){ renderListView(); } }
 
+    // ===== Events =====
     window.addEventListener('DOMContentLoaded', async function(){
+      // Auth
       qs('#authForm').addEventListener('submit', async function(ev){
         ev.preventDefault();
         const t = qs('#authToken').value.trim();
@@ -1234,14 +1347,24 @@
         await tryAuthAndLoad(true);
       });
 
+      // Verkaufsliste
       document.getElementById('addSell').addEventListener('click', function(){ addSellRow('', null); });
 
+      // Steps hinzufügen
       document.getElementById('addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); });
 
+      // Basisdaten -> Recalc
       ['lkwSize','backpackKg','routeName'].forEach(function(id){
         var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
+      // Fahrzeiten-Manager
+      document.getElementById('manageTravelBtn').addEventListener('click', openTravelManager);
+      document.getElementById('tmAddRow').addEventListener('click', function(){ addTmRow('','',0); });
+      document.getElementById('tmCancel').addEventListener('click', closeTravelManager);
+      document.getElementById('tmSave').addEventListener('click', saveTravelManager);
+
+      // Speichern – lokal + Drive
       document.getElementById('saveBtn')?.addEventListener('click', async function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){
@@ -1254,7 +1377,7 @@
         var sel=document.getElementById('routeSelect'); if(sel){ sel.value=r.id; }
         alert('Route lokal gespeichert.');
 
-        if(DRIVE_AUTO_SAVE && getToken()){
+        if(getToken()){
           try{
             await gasSaveRoute(r);
             updateDriveStateTag(true);
@@ -1269,6 +1392,7 @@
         if(!document.getElementById('listView').hidden){ renderListView(); }
       });
 
+      // Löschen – lokal + Drive
       document.getElementById('deleteBtn')?.addEventListener('click', async function(){
         var id=document.getElementById('routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
         if(!confirm('Route wirklich löschen?')) return;
@@ -1285,11 +1409,13 @@
         }
       });
 
+      // Route aus Dropdown laden
       document.getElementById('routeSelect')?.addEventListener('change', function(e){
         var id=e.target.value; if(!id) return;
         var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
       });
 
+      // Export nur aktuelle Route
       document.getElementById('exportCurrentBtn')?.addEventListener('click', function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){ alert('Bitte Routenname setzen.'); return; }
@@ -1321,6 +1447,7 @@
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download= slug(r.name || 'route') + '.json'; a.click(); URL.revokeObjectURL(a.href);
       });
 
+      // Import einzelne Route
       document.getElementById('importCurrentFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
@@ -1353,7 +1480,7 @@
             var sel=document.getElementById('routeSelect'); if(sel){ sel.value=route.id; }
             setRoute(route); currentRouteId = route.id;
 
-            if(DRIVE_AUTO_SAVE && getToken()){
+            if(getToken()){
               try{ await gasSaveRoute(route); }catch(err){ console.warn('Drive-Save nach Import fehlgeschlagen:', err.message); }
             }
 
@@ -1366,6 +1493,7 @@
         rd.readAsText(f); e.target.value='';
       });
 
+      // LIST VIEW Export/Import ALL
       document.getElementById('exportAllBtn')?.addEventListener('click', function(){
         var store=readStore();
         var reports={};
@@ -1421,9 +1549,11 @@
         rd.readAsText(f); e.target.value='';
       });
 
+      // Tabs
       document.getElementById('tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
       document.getElementById('tabList').addEventListener('click', function(){ switchTab('list'); });
 
+      // Init
       refreshRouteSelect(null);
       setSellList([]);
       if(document.getElementById('steps').children.length===0){ addStep('start'); }
