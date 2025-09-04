@@ -258,10 +258,17 @@
       <!-- List -->
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
-        <div class="sub">Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde</strong> sortiert. Ziehe am Griff, um <strong>Block (Route + Details)</strong> zu verschieben.</div>
+        <div class="sub">
+          Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
+          Der <strong>Steuersatz</strong> wird nur auf Routen ohne „illegal“ im Namen angewendet.
+        </div>
         <div class="hr"></div>
 
         <div class="list-toolbar">
+          <label>Steuersatz (%)<br>
+            <input id="taxRate" type="number" min="0" step="0.1" value="0" title="Wird auf alle nicht-illegalen Routen angewendet">
+          </label>
+          <span style="flex:1"></span>
           <button id="exportAllBtn">Alle exportieren</button>
           <label for="importAllFile" class="ghost" style="padding:10px 12px; cursor:pointer">Importieren<input id="importAllFile" type="file" accept="application/json" style="display:none"></label>
         </div>
@@ -278,7 +285,7 @@
   </div>
 
   <!--DATA-START-->
-  <script id="app-data" type="application/json">{"routes":{},"travelTimes":{}}</script>
+  <script id="app-data" type="application/json">{"routes":{},"travelTimes":{},"misc":{"taxRate":0}}</script>
   <!--DATA-END-->
 
   <!-- Step Templates -->
@@ -443,7 +450,8 @@
     function slug(s){ return (s||'route').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 
     // ===== Store =====
-    function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{}}; }catch(e){ return {routes:{},travelTimes:{}}; } }
+    function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{},misc:{}}; }catch(e){ return {routes:{},travelTimes:{},misc:{}}; }
+    }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
     // ===== JSONP =====
@@ -696,7 +704,6 @@
         var parts = k.split('|');
         return { from: parts[0]||'', to: parts[1]||'', mins: Number(v)||0 };
       });
-      // sortiere alphabetisch (from, dann to)
       entries.sort(function(a,b){
         var s = a.from.localeCompare(b.from,'de',{sensitivity:'base'});
         if(s!==0) return s;
@@ -723,7 +730,7 @@
         var f = (qs('.tm-from',r).value||'').trim();
         var t = (qs('.tm-to',r).value||'').trim();
         var m = Math.max(0, num(qs('.tm-mins',r).value));
-        if(!f || !t) return; // nur vollständige Einträge
+        if(!f || !t) return;
         obj[travelKey(f,t)] = m;
       });
       var store=readStore();
@@ -1066,6 +1073,21 @@
 
     function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
 
+    // ===== Steuer (ListView) =====
+    function getTaxRate(){
+      var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
+      var el = qs('#taxRate'); if(el){ var n=num(el.value); if(!isNaN(n)) v=n; }
+      return Math.max(0, v);
+    }
+    function setTaxRateUIFromStore(){
+      var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
+      var el = qs('#taxRate'); if(el){ el.value = v; }
+    }
+    function saveTaxRateToStore(){
+      var v = Math.max(0, num(qs('#taxRate').value));
+      var store=readStore(); store.misc = store.misc || {}; store.misc.taxRate = v; writeStore(store);
+    }
+
     // ===== Routenverwaltung (Builder Dropdown alphabetisch) =====
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
@@ -1088,24 +1110,33 @@
 
     // ===== Routenliste =====
     function buildListData(){
-      var store=readStore(); var list=[];
+      var store=readStore(); var tax = getTaxRate();
+      var list=[];
       Object.keys(store.routes||{}).forEach(function(id){
         var r=store.routes[id];
         var calc=compute(r);
+        var name = r.name || id;
+        var isIllegal = /illegal/i.test(name);
+        var hourlyNet = isIllegal ? (calc.hourlyProfit||0) : (calc.hourlyProfit||0) * (1 - tax/100);
         list.push({
           id:id,
-          name:r.name||id,
+          name:name,
+          isIllegal:isIllegal,
           endProducts: (r.sellList||[]).map(function(x){ return {name:x.name, price:x.price||null}; }),
-          hourlyProfit: calc.hourlyProfit,
+          hourlyProfitGross: calc.hourlyProfit||0,
+          hourlyProfitNet: hourlyNet,
           calc: calc,
           route: r
         });
       });
-      list.sort(function(a,b){ return (b.hourlyProfit||0) - (a.hourlyProfit||0); });
+      // sortiere nach Netto Gewinn/h
+      list.sort(function(a,b){ return (b.hourlyProfitNet||0) - (a.hourlyProfitNet||0); });
       return list;
     }
 
     function renderListView(){
+      setTaxRateUIFromStore();
+
       var list = buildListData();
       var container = qs('#routesList'); container.innerHTML='';
 
@@ -1121,12 +1152,13 @@
 
         var row=document.createElement('div');
         row.className='route-row';
+        var tagIllegal = item.isIllegal ? '<span class="pill warn">illegal</span>' : '';
         row.innerHTML = `
           <div class="drag" title="Ziehen, um die Reihenfolge zu ändern">▤</div>
-          <div><div><strong>${item.name}</strong></div><div class="muted">${labelEP}</div></div>
+          <div><div><strong>${item.name}</strong> ${tagIllegal}</div><div class="muted">${labelEP}</div></div>
           <div><span class="pill">${item.endProducts.length? item.endProducts.length+' Produkte' : '—'}</span></div>
-          <div><strong>${cf.format(item.hourlyProfit)}</strong><div class="mini muted">Gewinn/h</div></div>
-          <div class="mini muted"></div>
+          <div><strong>${cf.format(item.hourlyProfitNet)}</strong><div class="mini muted">Gewinn/h (netto)</div></div>
+          <div class="mini muted" title="Brutto vor Steuer">${cf.format(item.hourlyProfitGross)}</div>
         `;
         wrap.appendChild(row);
 
@@ -1142,7 +1174,8 @@
           <div class="k">Dauer: ${fmt(item.calc.totalMinutes)} min</div>
           <div class="k">Kosten: ${cf.format(item.calc.totalCost)}</div>
           <div class="k">Umsatz: ${cf.format(item.calc.revenue)}</div>
-          <div class="k">Gewinn/h: ${cf.format(item.calc.hourlyProfit)}</div>
+          <div class="k">Gewinn/h (brutto): ${cf.format(item.hourlyProfitGross)}</div>
+          <div class="k">Gewinn/h (netto): ${cf.format(item.hourlyProfitNet)}</div>
         `;
         det.appendChild(kpis);
 
@@ -1158,7 +1191,7 @@
         var dataById={};
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
 
-        var margin = 1;
+        var margin = 1; // € pro Stunde Abstand
         var any=false;
 
         var ul=qs('#adjustmentsList'); ul.innerHTML='';
@@ -1167,17 +1200,17 @@
 
         newOrderIds.forEach(function(id, i){
           var d=dataById[id]; if(!d) return;
-          var desiredBelow = (i<newOrderIds.length-1) ? ((dataById[newOrderIds[i+1]]?.hourlyProfit)||0) + margin : -Infinity;
-          var current = d.hourlyProfit||0;
+          var desiredBelow = (i<newOrderIds.length-1) ? ((dataById[newOrderIds[i+1]]?.hourlyProfitNet)||0) + margin : -Infinity;
+          var current = d.hourlyProfitNet||0;
           if(current < desiredBelow - 1e-9){
             any=true;
             var li=document.createElement('li');
-            li.innerHTML = `<strong>${d.name}</strong>: Preise proportional erhöhen, bis ~ ${cf.format(desiredBelow)} Gewinn/h erreicht sind.`;
+            li.innerHTML = `<strong>${d.name}</strong>: Preise proportional erhöhen, bis ~ ${cf.format(desiredBelow)} Gewinn/h (netto) erreicht sind.`;
             ul.appendChild(li);
           }
         });
 
-        note.textContent = 'Vorschläge sind heuristisch (Multi-Endprodukt). Genaue Ziele kannst du über die Produktpreise im Builder setzen.';
+        note.textContent = 'Vorschläge sind heuristisch (Multi-Endprodukt). Ziele werden auf Netto-Basis (mit Steuersatz) betrachtet.';
         panel.style.display = any ? 'block' : 'none';
       });
     }
@@ -1210,6 +1243,16 @@
         if(after==null){ container.appendChild(dragging); }
         else { container.insertBefore(dragging, after); }
       });
+
+      // Steuerfeld: Änderungen sofort anwenden & speichern
+      var taxEl = qs('#taxRate');
+      if(taxEl && !taxEl._bound){
+        taxEl._bound = true;
+        taxEl.addEventListener('input', function(){
+          saveTaxRateToStore();
+          renderListView();
+        });
+      }
     }
 
     // ===== Google Apps Script / Drive Sync =====
