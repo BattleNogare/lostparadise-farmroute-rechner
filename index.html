@@ -86,6 +86,13 @@
     .three{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
     .actions{display:flex; gap:8px; flex-wrap:wrap}
 
+    .between{
+      margin:-2px 0 8px 0; padding:8px 10px; border-left:3px solid #0a301f; background:#0c171f; border-radius:10px;
+      display:flex; gap:12px; align-items:center; flex-wrap:wrap
+    }
+    .between .pill{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f; font-size:12px}
+    .between .muted{color:#9bb2c9}
+
     .summary{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:13px}
     .summary .row{display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px solid var(--border)}
     .summary .row:last-child{border-bottom:none}
@@ -194,7 +201,7 @@
         </div>
 
         <div class="sub">
-          Verarbeitungszeit gilt pro <strong>Run</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet.
+          Verarbeitungszeit gilt pro <strong>Vorgang</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet.
           Verarbeitungskosten gelten <strong>einmalig für diesen Verarbeitungsschritt</strong>.  
           Endprodukte & Preise pflegst du unten in der <strong>Verkaufsliste</strong> (mehrere möglich).
         </div>
@@ -222,6 +229,7 @@
             <select id="addType">
               <option value="start">➕ Startpunkt</option>
               <option value="abbau">➕ Abbau</option>
+              <option value="lager">➕ Zwischenlager</option>
               <option value="verarbeitung">➕ Verarbeitung</option>
               <option value="transportkosten">➕ Transportkosten</option>
               <option value="verkauf">➕ Verkaufsort</option>
@@ -312,9 +320,40 @@
         <input data-key="unitWeight" placeholder="Gewicht pro Einheit (kg)" type="number" step="0.01">
         <input data-key="where" placeholder="Abbauort">
       </div>
-      <div class="step-body">
-        <input data-key="timeLkw" placeholder="Zeit für LKW-Größe (Minuten)" type="number" step="1">
+      <div class="step-body two">
+        <input data-key="qtyUnits" placeholder="Menge abgebaut (Einheiten)" type="number" step="1">
+        <input data-key="timeMinutes" placeholder="Zeit dafür (Minuten)" type="number" step="1">
       </div>
+      <div class="mini">Direkt eintragen, wie viele <strong>Einheiten</strong> du in welcher <strong>Zeit</strong> abgebaut hast – unabhängig von LKW-Größe.</div>
+    </div>
+  </template>
+
+  <template id="tpl-lager">
+    <div class="step" data-type="lager" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Zwischenlager</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body">
+        <input data-key="where" placeholder="Ort des Zwischenlagers">
+        <textarea data-key="note" placeholder="Notiz (optional)" rows="2" style="resize:vertical"></textarea>
+      </div>
+      <div class="mini" style="margin:4px 0">Bewegungen:</div>
+      <div class="lager-list" data-key="moves"></div>
+      <div class="actions"><button class="addLager" type="button">+ Bewegung</button></div>
+      <div class="mini">Aktion: <strong>ablegen</strong> (vom LKW ins Lager) oder <strong>abholen</strong> (aus dem Lager auf den LKW).</div>
+    </div>
+  </template>
+
+  <template id="tpl-lager-row">
+    <div class="lager-row" style="display:grid;grid-template-columns:1.1fr 1.2fr .7fr auto;gap:6px">
+      <select data-k="action" title="Aktion">
+        <option value="ablegen">ablegen</option>
+        <option value="abholen">abholen</option>
+      </select>
+      <input data-k="name" placeholder="Item-Name">
+      <input data-k="qty" placeholder="Menge (Einheiten)" type="number" step="1" min="0">
+      <button class="delLager" type="button">✕</button>
     </div>
   </template>
 
@@ -326,7 +365,7 @@
       </div>
       <div class="step-body two">
         <input data-key="where" placeholder="Wo wird verarbeitet?">
-        <input data-key="duration" placeholder="Dauer pro Run (Sekunden)" type="number" step="1">
+        <input data-key="duration" placeholder="Dauer pro Vorgang (Sekunden)" type="number" step="1">
       </div>
 
       <div class="mini" style="margin:4px 0">Verarbeitungskosten (einmalig für diesen Schritt, &euro;):</div>
@@ -350,10 +389,12 @@
         <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Transportkosten</span></div>
         <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
       </div>
-      <div class="step-body">
-        <input data-key="transportCost" placeholder="Transportkosten (&euro;), z. B. 1200" type="number" step="0.01">
+      <div class="step-body three">
+        <input data-key="fromWhere" placeholder="Start (nur für Anzeige)">
+        <input data-key="toWhere" placeholder="Ziel (nur für Anzeige)">
+        <input data-key="transportCost" placeholder="Betrag (&euro;), z. B. 1200" type="number" step="0.01">
       </div>
-      <div class="mini">Dieser Betrag wird zu den Gesamtkosten addiert.</div>
+      <div class="mini">Hinweis: Start/Ziel dienen nur der Dokumentation. Es wird <strong>keine</strong> Fahrzeit berechnet.</div>
     </div>
   </template>
 
@@ -496,6 +537,7 @@
     var TPLS={
       start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
       abbau: function(){return qs('#tpl-abbau').content.firstElementChild.cloneNode(true);},
+      lager: function(){return qs('#tpl-lager').content.firstElementChild.cloneNode(true);},
       verarbeitung: function(){ var el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); addOutputRow(el); return el; },
       transportkosten: function(){return qs('#tpl-transportkosten').content.firstElementChild.cloneNode(true);},
       verkauf: function(){return qs('#tpl-verkauf').content.firstElementChild.cloneNode(true);}
@@ -512,10 +554,22 @@
       qs('.delOutput',row).addEventListener('click', function(){ row.remove(); recalc(); });
       row.addEventListener('input', recalc);
     }
+
+    function addLagerRow(stepEl, action, name, qty){
+      var row=qs('#tpl-lager-row').content.firstElementChild.cloneNode(true);
+      qs('[data-key="moves"]', stepEl).appendChild(row);
+      if(action) qs('[data-k="action"]',row).value=action;
+      if(name!=null) qs('[data-k="name"]',row).value=name;
+      if(qty!=null) qs('[data-k="qty"]',row).value=qty;
+      qs('.delLager',row).addEventListener('click', function(){ row.remove(); recalc(); });
+      row.addEventListener('input', recalc);
+    }
+
     function attachStepControls(stepEl){
       qs('.remove',stepEl)?.addEventListener('click', function(){ stepEl.remove(); recalc(); });
       qs('.addInput',stepEl)?.addEventListener('click', function(){ addInputRow(stepEl); });
       qs('.addOutput',stepEl)?.addEventListener('click', function(){ addOutputRow(stepEl); });
+      qs('.addLager',stepEl)?.addEventListener('click', function(){ addLagerRow(stepEl, 'ablegen', '', '') });
       stepEl.addEventListener('input', function(){ recalc(); });
       var where=qs('[data-key="where"]', stepEl);
       if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
@@ -560,7 +614,21 @@
             what: qs('[data-key="what"]',step).value.trim(),
             unitWeight: num(qs('[data-key="unitWeight"]',step).value),
             where: qs('[data-key="where"]',step).value.trim(),
-            timeLkw: num(qs('[data-key="timeLkw"]',step).value)
+            qtyUnits: Math.max(0, num(qs('[data-key="qtyUnits"]',step).value)),
+            timeMinutes: Math.max(0, num(qs('[data-key="timeMinutes"]',step).value))
+          });
+        } else if(type==='lager'){
+          var moves=qsa('[data-key="moves"] .lager-row',step).map(function(r){
+            return {
+              action: qs('[data-k="action"]',r).value,
+              name: (qs('[data-k="name"]',r).value||'').trim(),
+              qty: Math.max(0, num(qs('[data-k="qty"]',r).value))
+            };
+          }).filter(function(m){return m.name && m.qty>0;});
+          steps.push({type:type,
+            where: qs('[data-key="where"]',step).value.trim(),
+            note: qs('[data-key="note"]',step).value.trim(),
+            moves: moves
           });
         } else if(type==='verarbeitung'){
           var inputs=qsa('[data-key="inputs"] .input-row',step).map(function(row){
@@ -587,7 +655,12 @@
             outputs: outputs
           });
         } else if(type==='transportkosten'){
-          steps.push({type:type, transportCost: num(qs('[data-key="transportCost"]',step).value)});
+          steps.push({
+            type:type,
+            fromWhere: qs('[data-key="fromWhere"]',step).value.trim(),
+            toWhere: qs('[data-key="toWhere"]',step).value.trim(),
+            transportCost: num(qs('[data-key="transportCost"]',step).value)
+          });
         } else if(type==='verkauf'){
           steps.push({type:type, where: qs('[data-key="where"]',step).value.trim()});
         }
@@ -626,7 +699,14 @@
           qs('[data-key="what"]',el).value=s.what||'';
           qs('[data-key="unitWeight"]',el).value=s.unitWeight||'';
           qs('[data-key="where"]',el).value=s.where||'';
-          qs('[data-key="timeLkw"]',el).value=s.timeLkw||'';
+          qs('[data-key="qtyUnits"]',el).value=s.qtyUnits||'';
+          qs('[data-key="timeMinutes"]',el).value=s.timeMinutes||'';
+        } else if(s.type==='lager'){
+          qs('[data-key="where"]',el).value=s.where||'';
+          qs('[data-key="note"]',el).value=s.note||'';
+          var list=qs('[data-key="moves"]',el); list.innerHTML='';
+          (s.moves||[]).forEach(function(m){ addLagerRow(el, m.action, m.name, m.qty); });
+          if((s.moves||[]).length===0){ addLagerRow(el,'ablegen','', ''); }
         } else if(s.type==='verarbeitung'){
           qs('[data-key="where"]',el).value = s.where || '';
           qs('[data-key="duration"]',el).value = s.duration || '';
@@ -650,6 +730,8 @@
             qs('[data-k="unitWeight"]',row).value=out.unitWeight||'';
           });
         } else if(s.type==='transportkosten'){
+          qs('[data-key="fromWhere"]',el).value=s.fromWhere||'';
+          qs('[data-key="toWhere"]',el).value=s.toWhere||'';
           qs('[data-key="transportCost"]',el).value=s.transportCost||'';
         } else if(s.type==='verkauf'){
           qs('[data-key="where"]',el).value=s.where||'';
@@ -766,21 +848,39 @@
 
     // ===== Berechnung =====
     function compute(route){
-      var baseKg = route.lkwSize>0? route.lkwSize : 2000;
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
 
-      var inventory = {};
-      var weights = {};
+      var lkw = {};           // aktueller LKW-Bestand (Einheiten pro Item)
+      var storage = {};       // { place: { item: units } }
+      var weights = {};       // kg/Einheit pro Item (für Verarbeitung & Output-Ableitung)
       var miningTime=0, driveTime=0, procTime=0;
       var purchaseCost=0, transportCostTotal=0, processingCostTotal=0;
       var log=[];
+      var snapshots=[];
 
       var store=readStore();
       var lastPlace=null;
 
-      (route.steps||[]).forEach(function(s, idx){
-        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verkauf'||s.type==='verarbeitung') ? (s.where||'') : '';
+      function addTo(map, key, delta){
+        map[key]= (map[key]||0) + delta;
+        if(map[key]<=0) delete map[key];
+      }
+      function pushSnapshot(place, nextPlace){
+        var nextTravel = null;
+        if(place && nextPlace && place!==nextPlace){
+          var key= (place||'?')+'|'+(nextPlace||'?');
+          var m=store.travelTimes[key];
+          nextTravel = (m!=null)? Number(m) : null;
+        }
+        snapshots.push({ place: place||'', nextPlace: nextPlace||'', nextTravel: nextTravel, lkw: Object.assign({}, lkw) });
+      }
 
+      var steps = route.steps||[];
+      for(var idx=0; idx<steps.length; idx++){
+        var s = steps[idx];
+        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verkauf'||s.type==='verarbeitung'||s.type==='lager') ? (s.where||'') : '';
+
+        // Fahrt VOR dem Schritt (von lastPlace zu thisPlace), wenn beide Orte existieren & verschieden sind
         if(thisPlace && lastPlace && lastPlace!==thisPlace){
           var key= (lastPlace||'?')+'|'+(thisPlace||'?');
           var m=store.travelTimes[key];
@@ -797,18 +897,57 @@
         }
         else if(s.type==='abbau'){
           var perUnit=Math.max(0, num(s.unitWeight));
-          var units = perUnit>0 ? Math.floor(baseKg / perUnit) : 0;
+          var units = Math.max(0, Math.floor(num(s.qtyUnits)));
           var what = s.what || ('Rohstoff_'+(idx+1));
-          inventory[what]=(inventory[what]||0)+units;
+          addTo(lkw, what, units);
           if(perUnit>0) weights[what]=perUnit;
-          var t = Math.max(0, num(s.timeLkw));
+          var t = Math.max(0, num(s.timeMinutes));
           miningTime += t;
           log.push('Abbau '+what+' @ '+(s.where||'?')+': '+fmt(units)+' Einheiten (à '+(perUnit||1)+' kg). Zeit +'+fmt(t)+' min.');
+        }
+        else if(s.type==='lager'){
+          var place = s.where||'?';
+          storage[place] = storage[place] || {};
+          var moves = s.moves||[];
+          if(moves.length===0){
+            log.push('Zwischenlager @ '+place+(s.note?(' – '+s.note):''));
+          }else{
+            moves.forEach(function(mv){
+              var qty = Math.max(0, Math.floor(num(mv.qty)));
+              var item = mv.name;
+              if(!item || qty<=0) return;
+              if(mv.action==='abholen'){
+                var avail = (storage[place][item]||0);
+                var take = Math.min(avail, qty);
+                if(take>0){
+                  addTo(storage[place], item, -take);
+                  addTo(lkw, item, take);
+                  log.push('Zwischenlager @ '+place+': abholen '+fmt(take)+'× '+item);
+                }else{
+                  log.push('Zwischenlager @ '+place+': abholen '+fmt(qty)+'× '+item+' – im Lager nicht verfügbar');
+                }
+              }else{ // ablegen
+                var availL = (lkw[item]||0);
+                var put = Math.min(availL, qty);
+                if(put>0){
+                  addTo(lkw, item, -put);
+                  addTo(storage[place], item, put);
+                  log.push('Zwischenlager @ '+place+': ablegen '+fmt(put)+'× '+item);
+                }else{
+                  log.push('Zwischenlager @ '+place+': ablegen '+fmt(qty)+'× '+item+' – im LKW nicht verfügbar');
+                }
+              }
+            });
+            if(s.note){ log.push('Notiz: '+s.note); }
+          }
         }
         else if(s.type==='transportkosten'){
           var c=Math.max(0,num(s.transportCost));
           transportCostTotal+=c;
-          log.push('Transportkosten: +'+cf.format(c));
+          var from = s.fromWhere || '–';
+          var to   = s.toWhere || '–';
+          log.push('Transportkosten ('+from+' → '+to+'): +'+cf.format(c));
+          // KEINE Fahrzeit anrechnen und kein Ort setzen
         }
         else if(s.type==='verarbeitung'){
           var inputs=s.inputs||[];
@@ -826,12 +965,13 @@
 
             var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
 
-            var runs=0, batchesTotal=0;
+            var vgaenge=0, batchesTotal=0;
             while(true){
+              // Batches, die mit LKW-Inventar möglich sind
               var batchesByInventory = Infinity;
               if(nonPurchased.length>0){
                 batchesByInventory = nonPurchased.reduce(function(min,i){
-                  var avail=inventory[i.name]||0;
+                  var avail=lkw[i.name]||0;
                   var need=Math.max(1, num(i.qty));
                   var can=Math.floor(avail/need);
                   return Math.min(min, can);
@@ -839,31 +979,35 @@
               } else { batchesByInventory = 999999; }
               if(batchesByInventory<=0) break;
 
+              // Batches, die in einen Vorgang passen (Rucksackgewicht)
               var kgBatch = totalInputKgPerBatch;
               var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
               if(kgBatch>0 && batchesByBackpack<=0) break;
 
-              var batchesThisRun = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
+              var batchesThisOp = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
 
+              // Inventar verbrauchen (nicht gekaufte Inputs)
               nonPurchased.forEach(function(i){
                 var need=Math.max(0, num(i.qty));
-                inventory[i.name]=(inventory[i.name]||0) - need*batchesThisRun;
+                addTo(lkw, i.name, -(need*batchesThisOp));
               });
+              // Gekaufte Inputs: nur Kosten
               purchased.forEach(function(i){
                 var need=Math.max(0, num(i.qty));
                 var price=Math.max(0, num(i.price));
-                purchaseCost += need*batchesThisRun*price;
+                purchaseCost += need*batchesThisOp*price;
               });
 
+              // Outputs hinzufügen
               var qPerBatchArr = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
               outputs.forEach(function(o,ix){
                 var qPerBatch = Math.max(0, num(o.qty)) || qPerBatchArr[ix] || 0;
-                inventory[o.name]=(inventory[o.name]||0) + qPerBatch*batchesThisRun;
+                addTo(lkw, o.name, qPerBatch*batchesThisOp);
               });
 
-              procTime += durMin; // pro Run
-              runs++; batchesTotal+=batchesThisRun;
-              if(batchesThisRun<=0) break;
+              procTime += durMin; // pro Vorgang
+              vgaenge++; batchesTotal+=batchesThisOp;
+              if(batchesThisOp<=0) break;
             }
 
             var stepCost = Math.max(0, num(s.processCost));
@@ -884,21 +1028,31 @@
               return fmt(q)+'× '+o.name;
             }).join(' + ');
             var durSecTxt = Math.round(durMin*60);
-            log.push('Verarbeitung @ '+(s.where||'?')+': '+runs+' Runs, '+fmt(batchesTotal)+' Batches/Run: '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Run: '+fmt(durSecTxt)+' s');
+            log.push('Verarbeitung @ '+(s.where||'?')+': '+vgaenge+' Vorgänge, '+fmt(batchesTotal)+' Batches/Vorgang: '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Vorgang: '+fmt(durSecTxt)+' s');
           }
         }
         else if(s.type==='verkauf'){
           log.push('Verkaufsort: '+(s.where||'?'));
         }
 
+        // Snapshot NACH dem Schritt (zeigt LKW und Fahrt zur nächsten Station)
+        var nextPlace = '';
+        for(var j=idx+1;j<steps.length;j++){
+          var n=steps[j];
+          var np = (n.type==='start'||n.type==='abbau'||n.type==='verkauf'||n.type==='verarbeitung'||n.type==='lager') ? (n.where||'') : '';
+          if(np){ nextPlace=np; break; }
+        }
+        pushSnapshot(thisPlace, nextPlace);
+
         if(thisPlace){ lastPlace=thisPlace; }
-      });
+      }
 
       var totalMinutes = miningTime + driveTime + procTime;
 
+      // Endprodukte bestimmen aus LKW-Bestand
       var sellList = (route.sellList||[]).filter(function(x){return x && x.name;});
       var endProducts = sellList.map(function(x){
-        var units = Math.max(0, Math.floor((inventory[x.name]||0)));
+        var units = Math.max(0, Math.floor((lkw[x.name]||0)));
         return {name:x.name, units:units, price: (x.price>0? x.price : null)};
       });
 
@@ -951,8 +1105,31 @@
         miningTime, driveTime, procTime, totalMinutes,
         purchaseCost, transportCostTotal, processingCostTotal, totalCost,
         endProducts: endProductsRich, revenue, profit, hourlyProfit,
-        BE_avg, targetRevenue, log
+        BE_avg, targetRevenue, log,
+        snapshots
       };
+    }
+
+    // ===== UI: Zwischenzeilen (Fahrt & LKW im Builder) =====
+    function renderBetween(calc){
+      // alle vorhandenen entfernen
+      qsa('#steps .between').forEach(function(b){ b.remove(); });
+
+      var stepEls = qsa('#steps .step');
+      calc.snapshots.forEach(function(snap, idx){
+        var el = stepEls[idx];
+        if(!el) return;
+        // zwischen aktuellem Schritt (nach diesem) und nächstem Ort
+        var b=document.createElement('div');
+        b.className='between';
+        var travelTxt = (snap.nextPlace && snap.place && snap.nextPlace!==snap.place)
+          ? (snap.nextTravel!=null ? ('Fahrt '+snap.place+' → '+snap.nextPlace+': '+fmt(snap.nextTravel)+' min') : ('Fahrt '+snap.place+' → '+snap.nextPlace+': keine Zeit hinterlegt'))
+          : '—';
+        var keys = Object.keys(snap.lkw).sort((a,b)=>a.localeCompare(b,'de',{sensitivity:'base'}));
+        var lkwTxt = keys.length ? keys.map(k=>k+': '+fmt(Math.floor(snap.lkw[k]))).join(', ') : 'leer';
+        b.innerHTML = `<span class="pill">${travelTxt}</span><span class="muted">LKW: ${lkwTxt}</span>`;
+        el.insertAdjacentElement('afterend', b);
+      });
     }
 
     // ===== UI: Zusammenfassung =====
@@ -1071,7 +1248,12 @@
       return lines.join('\n');
     }
 
-    function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); }
+    function recalc(){
+      var route=getRoute();
+      var calc=compute(route);
+      renderSummary(calc);
+      renderBetween(calc);
+    }
 
     // ===== Steuer (ListView) =====
     function getTaxRate(){
@@ -1129,7 +1311,6 @@
           route: r
         });
       });
-      // sortiere nach Netto Gewinn/h
       list.sort(function(a,b){ return (b.hourlyProfitNet||0) - (a.hourlyProfitNet||0); });
       return list;
     }
@@ -1257,7 +1438,6 @@
 
     // ===== Google Apps Script / Drive Sync =====
     const DRIVE_AUTO_LOAD = true;
-    const DRIVE_AUTO_SAVE = true;
 
     function updateDriveStateTag(connected){
       const el = qs('#driveState');
