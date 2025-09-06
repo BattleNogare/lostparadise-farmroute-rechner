@@ -202,7 +202,7 @@
 
         <div class="sub">
           Verarbeitungszeit gilt pro <strong>Vorgang</strong> (Eingabe in <strong>Sekunden</strong>). Outputs ohne Mengenangabe werden automatisch berechnet.
-          Verarbeitungskosten gelten <strong>einmalig für diesen Verarbeitungsschritt</strong>.  
+          Verarbeitungskosten gelten <strong>einmalig für diesen Verarbeitungsschritt</strong>.<br>
           Endprodukte & Preise pflegst du unten in der <strong>Verkaufsliste</strong> (mehrere möglich).
         </div>
 
@@ -232,7 +232,7 @@
               <option value="lager">➕ Zwischenlager</option>
               <option value="verarbeitung">➕ Verarbeitung</option>
               <option value="transportkosten">➕ Transportkosten</option>
-              <option value="verkauf">➕ Verkaufsort</option>
+              <option value="einverkauf">➕ Einkauf/Verkauf</option>
             </select>
             <button id="addBtn" type="button">Schritt hinzufügen</button>
           </div>
@@ -383,6 +383,26 @@
     </div>
   </template>
 
+  <!-- Verarbeitung Input-Reihe (ohne Einkauf/Preis) -->
+  <template id="tpl-input-row">
+    <div class="input-row" style="display:grid;grid-template-columns:1.6fr .7fr 1.2fr auto;gap:6px">
+      <input data-k="name" placeholder="Item-Name">
+      <input data-k="qty" placeholder="Menge / Batch" type="number" step="0.01">
+      <input data-k="source" placeholder="Fundort (optional)">
+      <button class="delInput" type="button">✕</button>
+    </div>
+  </template>
+
+  <template id="tpl-output-row">
+    <div class="output-row" style="display:grid;grid-template-columns:2fr .8fr .8fr auto;gap:6px">
+      <input data-k="name" placeholder="Output-Name">
+      <input data-k="qty" placeholder="(optional) Menge / Batch" type="number" step="0.01">
+      <input data-k="unitWeight" placeholder="Gewicht / Einheit (kg)" type="number" step="0.01">
+      <button class="delOutput" type="button">✕</button>
+    </div>
+  </template>
+
+  <!-- Transportkosten -->
   <template id="tpl-transportkosten">
     <div class="step" data-type="transportkosten" draggable="true">
       <div class="bar">
@@ -398,38 +418,37 @@
     </div>
   </template>
 
-  <template id="tpl-verkauf">
-    <div class="step" data-type="verkauf" draggable="true">
+  <!-- Einkauf/Verkauf -->
+  <template id="tpl-einverkauf">
+    <div class="step" data-type="einverkauf" draggable="true">
       <div class="bar">
-        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Verkaufsort</span></div>
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Einkauf/Verkauf</span></div>
         <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
       </div>
       <div class="step-body">
-        <input data-key="where" placeholder="Wo wird verkauft?">
+        <input data-key="where" placeholder="Ort">
       </div>
+      <div class="mini" style="margin:4px 0">Positionen:</div>
+      <div class="trade-list" data-key="moves"></div>
+      <div class="actions"><button class="addTrade" type="button">+ Position</button></div>
+      <div class="mini">Aktion: <strong>kaufen</strong> (Bestand ↑, Kosten ↑) oder <strong>verkaufen</strong> (Bestand ↓, Erlös ↑).</div>
     </div>
   </template>
 
-  <template id="tpl-input-row">
-    <div class="input-row" style="display:grid;grid-template-columns:1.6fr .7fr 1.2fr .8fr 1fr auto;gap:6px">
+  <template id="tpl-trade-row">
+    <div class="trade-row" style="display:grid;grid-template-columns:1fr 1.2fr .7fr .9fr auto;gap:6px">
+      <select data-k="action" title="Aktion">
+        <option value="kaufen">kaufen</option>
+        <option value="verkaufen">verkaufen</option>
+      </select>
       <input data-k="name" placeholder="Item-Name">
-      <input data-k="qty" placeholder="Menge / Batch" type="number" step="0.01">
-      <input data-k="source" placeholder="Fundort (optional)">
-      <label style="display:flex;align-items:center;gap:6px"><input data-k="purchased" type="checkbox"> einkaufen?</label>
-      <input data-k="price" placeholder="Preis / Einheit (&euro;)" type="number" step="0.01" title="Nur relevant, wenn 'einkaufen?' aktiv ist">
-      <button class="delInput" type="button">✕</button>
+      <input data-k="qty" placeholder="Menge (Einheiten)" type="number" step="1" min="0">
+      <input data-k="price" placeholder="Preis/Einheit (€)" type="number" step="0.01" min="0">
+      <button class="delTrade" type="button">✕</button>
     </div>
   </template>
 
-  <template id="tpl-output-row">
-    <div class="output-row" style="display:grid;grid-template-columns:2fr .8fr .8fr auto;gap:6px">
-      <input data-k="name" placeholder="Output-Name">
-      <input data-k="qty" placeholder="(optional) Menge / Batch" type="number" step="0.01">
-      <input data-k="unitWeight" placeholder="Gewicht / Einheit (kg)" type="number" step="0.01">
-      <button class="delOutput" type="button">✕</button>
-    </div>
-  </template>
-
+  <!-- Verkaufsliste (Endpreise) -->
   <template id="tpl-sell-row">
     <div class="row">
       <input data-k="pname" type="text" placeholder="Endprodukt-Name (z. B. Aluminiumbarren)">
@@ -454,11 +473,11 @@
     </div>
   </div>
 
-  <!-- Fahrzeiten-Manager (Liste bearbeiten) -->
+  <!-- Fahrzeiten-Manager (nur Übergänge der aktuellen Route) -->
   <div id="travelManager" class="modal-backdrop" aria-hidden="true">
     <div class="modal">
       <h3>Fahrzeiten bearbeiten</h3>
-      <div class="mini" style="margin-bottom:6px">Ändere bestehende Fahrzeiten, füge neue hinzu oder entferne Einträge.</div>
+      <div class="mini" style="margin-bottom:6px">Es werden nur Strecken angezeigt, die in der <strong>aktuellen Route</strong> vorkommen.</div>
       <table class="tm-table" id="tmTable">
         <thead>
           <tr><th>Von</th><th>Nach</th><th>Minuten</th><th>Aktion</th></tr>
@@ -466,7 +485,6 @@
         <tbody></tbody>
       </table>
       <div class="tm-actions">
-        <button id="tmAddRow" type="button" class="ghost">+ Zeile</button>
         <span style="flex:1"></span>
         <button id="tmCancel" type="button">Schließen</button>
         <button id="tmSave" class="primary" type="button">Speichern</button>
@@ -540,7 +558,7 @@
       lager: function(){return qs('#tpl-lager').content.firstElementChild.cloneNode(true);},
       verarbeitung: function(){ var el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); addOutputRow(el); return el; },
       transportkosten: function(){return qs('#tpl-transportkosten').content.firstElementChild.cloneNode(true);},
-      verkauf: function(){return qs('#tpl-verkauf').content.firstElementChild.cloneNode(true);}
+      einverkauf: function(){ var el=qs('#tpl-einverkauf').content.firstElementChild.cloneNode(true); addTradeRow(el); return el; }
     };
     function addInputRow(stepEl){
       var row=qs('#tpl-input-row').content.firstElementChild.cloneNode(true);
@@ -552,6 +570,16 @@
       var row=qs('#tpl-output-row').content.firstElementChild.cloneNode(true);
       qs('[data-key="outputs"]', stepEl).appendChild(row);
       qs('.delOutput',row).addEventListener('click', function(){ row.remove(); recalc(); });
+      row.addEventListener('input', recalc);
+    }
+    function addTradeRow(stepEl, action, name, qty, price){
+      var row=qs('#tpl-trade-row').content.firstElementChild.cloneNode(true);
+      qs('[data-key="moves"]', stepEl).appendChild(row);
+      if(action) qs('[data-k="action"]',row).value=action;
+      if(name!=null) qs('[data-k="name"]',row).value=name;
+      if(qty!=null) qs('[data-k="qty"]',row).value=qty;
+      if(price!=null) qs('[data-k="price"]',row).value=price;
+      qs('.delTrade',row).addEventListener('click', function(){ row.remove(); recalc(); });
       row.addEventListener('input', recalc);
     }
 
@@ -570,6 +598,7 @@
       qs('.addInput',stepEl)?.addEventListener('click', function(){ addInputRow(stepEl); });
       qs('.addOutput',stepEl)?.addEventListener('click', function(){ addOutputRow(stepEl); });
       qs('.addLager',stepEl)?.addEventListener('click', function(){ addLagerRow(stepEl, 'ablegen', '', '') });
+      qs('.addTrade',stepEl)?.addEventListener('click', function(){ addTradeRow(stepEl, 'kaufen', '', '', '') });
       stepEl.addEventListener('input', function(){ recalc(); });
       var where=qs('[data-key="where"]', stepEl);
       if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
@@ -635,9 +664,7 @@
             return {
               name: qs('[data-k="name"]',row).value.trim(),
               qty: num(qs('[data-k="qty"]',row).value),
-              source: qs('[data-k="source"]',row).value.trim(),
-              purchased: qs('[data-k="purchased"]',row).checked,
-              price: num(qs('[data-k="price"]',row).value)
+              source: qs('[data-k="source"]',row).value.trim()
             };
           }).filter(function(i){return i.name && i.qty>0;});
           var outputs=qsa('[data-key="outputs"] .output-row',step).map(function(row){
@@ -661,8 +688,19 @@
             toWhere: qs('[data-key="toWhere"]',step).value.trim(),
             transportCost: num(qs('[data-key="transportCost"]',step).value)
           });
-        } else if(type==='verkauf'){
-          steps.push({type:type, where: qs('[data-key="where"]',step).value.trim()});
+        } else if(type==='einverkauf'){
+          var moves=qsa('[data-key="moves"] .trade-row',step).map(function(r){
+            return {
+              action: qs('[data-k="action"]',r).value,
+              name: (qs('[data-k="name"]',r).value||'').trim(),
+              qty: Math.max(0, num(qs('[data-k="qty"]',r).value)),
+              price: Math.max(0, num(qs('[data-k="price"]',r).value))
+            };
+          }).filter(function(m){return m.name && m.qty>0;});
+          steps.push({type:type,
+            where: qs('[data-key="where"]',step).value.trim(),
+            moves: moves
+          });
         }
       });
       var store=readStore();
@@ -679,7 +717,6 @@
     function setRoute(route){
       currentRouteId = route.id || uid();
 
-      // TravelTimes der Route in den Store mergen
       if(route.travelTimes && typeof route.travelTimes === 'object'){
         var st = readStore();
         st.travelTimes = Object.assign({}, st.travelTimes||{}, route.travelTimes||{});
@@ -718,8 +755,6 @@
             qs('[data-k="name"]',row).value=inp.name||'';
             qs('[data-k="qty"]',row).value=inp.qty||'';
             qs('[data-k="source"]',row).value=inp.source||'';
-            qs('[data-k="purchased"]',row).checked=!!inp.purchased;
-            qs('[data-k="price"]',row).value=inp.price || '';
           });
           var listO=qs('[data-key="outputs"]',el); listO.innerHTML='';
           (s.outputs||[]).forEach(function(out){
@@ -733,8 +768,11 @@
           qs('[data-key="fromWhere"]',el).value=s.fromWhere||'';
           qs('[data-key="toWhere"]',el).value=s.toWhere||'';
           qs('[data-key="transportCost"]',el).value=s.transportCost||'';
-        } else if(s.type==='verkauf'){
+        } else if(s.type==='einverkauf'){
           qs('[data-key="where"]',el).value=s.where||'';
+          var listT=qs('[data-key="moves"]',el); listT.innerHTML='';
+          (s.moves||[]).forEach(function(m){ addTradeRow(el, m.action, m.name, m.qty, m.price); });
+          if((s.moves||[]).length===0){ addTradeRow(el,'kaufen','', '', ''); }
         }
       });
       recalc();
@@ -768,7 +806,29 @@
       }catch(e){}
     }
 
-    // ---- Fahrzeiten-Manager (Liste) ----
+    // ---- Übergänge der aktuellen Route sammeln
+    function getCurrentRouteTransitions(){
+      var r = getRoute();
+      var trans = [];
+      var lastPlace = null;
+      (r.steps||[]).forEach(function(s){
+        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verarbeitung'||s.type==='lager'||s.type==='einverkauf') ? (s.where||'') : '';
+        if(thisPlace && lastPlace && thisPlace!==lastPlace){
+          trans.push({from:lastPlace, to:thisPlace});
+        }
+        if(thisPlace) lastPlace = thisPlace;
+      });
+      // uniq
+      var keySet = new Set();
+      var uniq = [];
+      trans.forEach(function(t){
+        var k = travelKey(t.from, t.to);
+        if(!keySet.has(k)){ keySet.add(k); uniq.push(t); }
+      });
+      return uniq;
+    }
+
+    // ---- Fahrzeiten-Manager (nur aktuelle Übergänge) ----
     function openTravelManager(){
       renderTravelManager();
       var m=qs('#travelManager');
@@ -776,47 +836,59 @@
     }
     function closeTravelManager(){
       var m=qs('#travelManager');
-      m.style.display='none'; m.setAttribute('aria-hidden','true');
+      m.style.display='none';
+      m.setAttribute('aria-hidden','true');
     }
     function renderTravelManager(){
       var store=readStore();
       var tbody=qs('#tmTable tbody');
       tbody.innerHTML='';
-      var entries = Object.entries(store.travelTimes||{}).map(function([k,v]){
-        var parts = k.split('|');
-        return { from: parts[0]||'', to: parts[1]||'', mins: Number(v)||0 };
-      });
-      entries.sort(function(a,b){
+
+      var trans = getCurrentRouteTransitions();
+      // Sortiert anzeigen
+      trans.sort(function(a,b){
         var s = a.from.localeCompare(b.from,'de',{sensitivity:'base'});
         if(s!==0) return s;
         return a.to.localeCompare(b.to,'de',{sensitivity:'base'});
       });
-      entries.forEach(function(e){ addTmRow(e.from, e.to, e.mins); });
-      if(entries.length===0){ addTmRow('','',0); }
+
+      if(trans.length===0){
+        // Kein Übergang -> leere Infozeile
+        var tr=document.createElement('tr');
+        tr.innerHTML='<td colspan="4" class="mini muted">Keine ortsübergreifenden Schritte in der aktuellen Route.</td>';
+        tbody.appendChild(tr);
+        return;
+      }
+
+      trans.forEach(function(t){
+        var key = travelKey(t.from, t.to);
+        var m = store.travelTimes[key] != null ? Number(store.travelTimes[key]) : '';
+        addTmRow(t.from, t.to, m);
+      });
     }
     function addTmRow(from,to,mins){
       var tr=document.createElement('tr');
       tr.innerHTML = `
-        <td><input class="tm-from" placeholder="Von" value="${from?from.replace(/"/g,'&quot;'):''}"></td>
-        <td><input class="tm-to" placeholder="Nach" value="${to?to.replace(/"/g,'&quot;'):''}"></td>
-        <td><input class="tm-mins" type="number" min="0" step="1" value="${Number(mins)||0}"></td>
-        <td><button type="button" class="danger tm-del">Löschen</button></td>
+        <td><input class="tm-from" placeholder="Von" value="${from?from.replace(/"/g,'&quot;'):''}" readonly></td>
+        <td><input class="tm-to" placeholder="Nach" value="${to?to.replace(/"/g,'&quot;'):''}" readonly></td>
+        <td><input class="tm-mins" type="number" min="0" step="1" value="${mins!==''?Number(mins):''}"></td>
+        <td><button type="button" class="danger tm-del" disabled title="In diesem Modus nicht löschbar">Löschen</button></td>
       `;
       qs('#tmTable tbody').appendChild(tr);
-      qs('.tm-del',tr).addEventListener('click', function(){ tr.remove(); });
     }
     function saveTravelManager(){
       var rows=qsa('#tmTable tbody tr');
-      var obj={};
+      var store=readStore();
+      var tt = store.travelTimes || {};
       rows.forEach(function(r){
         var f = (qs('.tm-from',r).value||'').trim();
         var t = (qs('.tm-to',r).value||'').trim();
-        var m = Math.max(0, num(qs('.tm-mins',r).value));
+        var m = qs('.tm-mins',r).value;
         if(!f || !t) return;
-        obj[travelKey(f,t)] = m;
+        var key = travelKey(f,t);
+        if(m === ''){ delete tt[key]; } else { tt[key] = Math.max(0, num(m)); }
       });
-      var store=readStore();
-      store.travelTimes = obj;
+      store.travelTimes = tt;
       writeStore(store);
       recalc();
       closeTravelManager();
@@ -855,6 +927,7 @@
       var weights = {};       // kg/Einheit pro Item (für Verarbeitung & Output-Ableitung)
       var miningTime=0, driveTime=0, procTime=0;
       var purchaseCost=0, transportCostTotal=0, processingCostTotal=0;
+      var tradeRevenue=0;     // Erlöse aus „Einkauf/Verkauf“-Schritten (verkaufen)
       var log=[];
       var snapshots=[];
 
@@ -878,9 +951,9 @@
       var steps = route.steps||[];
       for(var idx=0; idx<steps.length; idx++){
         var s = steps[idx];
-        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verkauf'||s.type==='verarbeitung'||s.type==='lager') ? (s.where||'') : '';
+        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verarbeitung'||s.type==='lager'||s.type==='einverkauf') ? (s.where||'') : '';
 
-        // Fahrt VOR dem Schritt (von lastPlace zu thisPlace), wenn beide Orte existieren & verschieden sind
+        // Fahrt VOR dem Schritt
         if(thisPlace && lastPlace && lastPlace!==thisPlace){
           var key= (lastPlace||'?')+'|'+(thisPlace||'?');
           var m=store.travelTimes[key];
@@ -947,7 +1020,38 @@
           var from = s.fromWhere || '–';
           var to   = s.toWhere || '–';
           log.push('Transportkosten ('+from+' → '+to+'): +'+cf.format(c));
-          // KEINE Fahrzeit anrechnen und kein Ort setzen
+        }
+        else if(s.type==='einverkauf'){
+          var place = s.where||'?';
+          var moves = s.moves||[];
+          if(moves.length===0){
+            log.push('Einkauf/Verkauf @ '+place+': keine Positionen.');
+          }else{
+            moves.forEach(function(mv){
+              var qty = Math.max(0, Math.floor(num(mv.qty)));
+              var price = Math.max(0, num(mv.price));
+              var item = mv.name;
+              if(!item || qty<=0) return;
+              if(mv.action==='kaufen'){
+                addTo(lkw, item, qty);
+                purchaseCost += qty * price;
+                log.push('Kauf '+fmt(qty)+'× '+item+' @ '+place+' zu '+cf.format(price)+'/Stk → Kosten +'+cf.format(qty*price));
+              } else { // verkaufen
+                var avail = (lkw[item]||0);
+                var sell = Math.min(avail, qty);
+                if(sell>0){
+                  addTo(lkw, item, -sell);
+                  tradeRevenue += sell * price;
+                  log.push('Verkauf '+fmt(sell)+'× '+item+' @ '+place+' zu '+cf.format(price)+'/Stk → Erlös +'+cf.format(sell*price));
+                  if(sell<qty){
+                    log.push('Hinweis: '+fmt(qty-sell)+'× '+item+' nicht verkauft (fehlend im LKW)');
+                  }
+                }else{
+                  log.push('Verkauf '+fmt(qty)+'× '+item+' @ '+place+' – im LKW nicht verfügbar');
+                }
+              }
+            });
+          }
         }
         else if(s.type==='verarbeitung'){
           var inputs=s.inputs||[];
@@ -960,17 +1064,14 @@
             var durSec = Math.max(0, num(s.duration));
             var durMin = durSec/60;
 
-            var nonPurchased=inputs.filter(function(i){return !i.purchased;});
-            var purchased=inputs.filter(function(i){return i.purchased;});
-
             var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
 
             var vgaenge=0, batchesTotal=0;
             while(true){
               // Batches, die mit LKW-Inventar möglich sind
               var batchesByInventory = Infinity;
-              if(nonPurchased.length>0){
-                batchesByInventory = nonPurchased.reduce(function(min,i){
+              if(inputs.length>0){
+                batchesByInventory = inputs.reduce(function(min,i){
                   var avail=lkw[i.name]||0;
                   var need=Math.max(1, num(i.qty));
                   var can=Math.floor(avail/need);
@@ -986,16 +1087,10 @@
 
               var batchesThisOp = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
 
-              // Inventar verbrauchen (nicht gekaufte Inputs)
-              nonPurchased.forEach(function(i){
+              // Inventar verbrauchen (alle Inputs aus LKW)
+              inputs.forEach(function(i){
                 var need=Math.max(0, num(i.qty));
                 addTo(lkw, i.name, -(need*batchesThisOp));
-              });
-              // Gekaufte Inputs: nur Kosten
-              purchased.forEach(function(i){
-                var need=Math.max(0, num(i.qty));
-                var price=Math.max(0, num(i.price));
-                purchaseCost += need*batchesThisOp*price;
               });
 
               // Outputs hinzufügen
@@ -1019,7 +1114,6 @@
             var inputsTxt = inputs.map(function(i){
               var t=fmt(num(i.qty))+'× '+i.name;
               if(i.source) t+=' ['+i.source+']';
-              if(i.purchased) t+=' (gekauft '+cf.format(num(i.price))+')';
               return t;
             }).join(' + ');
             var auto = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
@@ -1031,15 +1125,12 @@
             log.push('Verarbeitung @ '+(s.where||'?')+': '+vgaenge+' Vorgänge, '+fmt(batchesTotal)+' Batches/Vorgang: '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Vorgang: '+fmt(durSecTxt)+' s');
           }
         }
-        else if(s.type==='verkauf'){
-          log.push('Verkaufsort: '+(s.where||'?'));
-        }
 
-        // Snapshot NACH dem Schritt (zeigt LKW und Fahrt zur nächsten Station)
+        // Snapshot
         var nextPlace = '';
         for(var j=idx+1;j<steps.length;j++){
           var n=steps[j];
-          var np = (n.type==='start'||n.type==='abbau'||n.type==='verkauf'||n.type==='verarbeitung'||n.type==='lager') ? (n.where||'') : '';
+          var np = (n.type==='start'||n.type==='abbau'||n.type==='verarbeitung'||n.type==='lager'||n.type==='einverkauf') ? (n.where||'') : '';
           if(np){ nextPlace=np; break; }
         }
         pushSnapshot(thisPlace, nextPlace);
@@ -1068,15 +1159,16 @@
       var suggested = {};
       if(totalUnits>0){
         if(varUnits>0){
-          var perUnitVar = (targetRevenue - fixedRevenue) / Math.max(1, varUnits);
+          var perUnitVar = (targetRevenue - (fixedRevenue + tradeRevenue)) / Math.max(1, varUnits);
           var perUnitVarCapped = Math.max(0, Math.max(BE_avg, perUnitVar));
           endProducts.forEach(function(ep){
             if(!(ep.price>0)){ suggested[ep.name] = perUnitVarCapped; }
             else { suggested[ep.name] = ep.price; }
           });
         }else{
-          if(fixedRevenue>0 && fixedRevenue>targetRevenue){
-            var f = targetRevenue / fixedRevenue;
+          var fixedAll = fixedRevenue + tradeRevenue;
+          if(fixedAll>0 && fixedAll>targetRevenue){
+            var f = targetRevenue / fixedAll;
             endProducts.forEach(function(ep){
               var sp = (ep.price>0? ep.price : 0)*f;
               suggested[ep.name] = Math.max(BE_avg, sp);
@@ -1087,10 +1179,11 @@
         }
       }
 
-      var revenue = endProducts.reduce(function(sum, ep){
+      var revenueEnd = endProducts.reduce(function(sum, ep){
         var eff = (ep.price>0) ? ep.price : (suggested[ep.name]||0);
         return sum + eff * ep.units;
       }, 0);
+      var revenue = revenueEnd + tradeRevenue;
       var profit = revenue - totalCost;
       var hourlyProfit = hours>0 ? (profit / hours) : 0;
 
@@ -1112,14 +1205,12 @@
 
     // ===== UI: Zwischenzeilen (Fahrt & LKW im Builder) =====
     function renderBetween(calc){
-      // alle vorhandenen entfernen
       qsa('#steps .between').forEach(function(b){ b.remove(); });
 
       var stepEls = qsa('#steps .step');
       calc.snapshots.forEach(function(snap, idx){
         var el = stepEls[idx];
         if(!el) return;
-        // zwischen aktuellem Schritt (nach diesem) und nächstem Ort
         var b=document.createElement('div');
         b.className='between';
         var travelTxt = (snap.nextPlace && snap.place && snap.nextPlace!==snap.place)
@@ -1425,7 +1516,6 @@
         else { container.insertBefore(dragging, after); }
       });
 
-      // Steuerfeld: Änderungen sofort anwenden & speichern
       var taxEl = qs('#taxRate');
       if(taxEl && !taxEl._bound){
         taxEl._bound = true;
@@ -1583,7 +1673,6 @@
 
       // Fahrzeiten-Manager
       document.getElementById('manageTravelBtn').addEventListener('click', openTravelManager);
-      document.getElementById('tmAddRow').addEventListener('click', function(){ addTmRow('','',0); });
       document.getElementById('tmCancel').addEventListener('click', closeTravelManager);
       document.getElementById('tmSave').addEventListener('click', saveTravelManager);
 
