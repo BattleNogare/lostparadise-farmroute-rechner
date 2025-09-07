@@ -76,8 +76,9 @@
     .mini{font-size:12px; color:#9bb2c9}
 
     #steps{min-height:20px}
+
     .step{border:1px dashed var(--border); border-radius:14px; padding:12px; margin:10px 0; position:relative; display:grid; gap:8px; background:#0f141b}
-    .step .bar{display:flex; align-items:center; gap:8px; justify-content:space-between}
+    .step .bar{display:flex; align-items:center; gap:8px; justify-content:space-between; position:sticky; top:-1px; background:#0f141b; padding-top:2px; z-index:1}
     .handle{cursor:grab; user-select:none; padding:6px 8px; border-radius:8px; background:#0e171f; border:1px solid var(--border); font-size:12px}
     .handle:active{cursor:grabbing}
     .step.dragging{opacity:.6; outline:2px dashed var(--accent)}
@@ -85,6 +86,10 @@
     .two{display:grid; grid-template-columns:1fr 1fr; gap:8px}
     .three{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
     .actions{display:flex; gap:8px; flex-wrap:wrap}
+
+    .input-list, .output-list, .trade-list, .lager-list{
+      display:grid; gap:6px; max-height:40vh; overflow:auto; padding-right:4px;
+    }
 
     .between{
       margin:-2px 0 8px 0; padding:8px 10px; border-left:3px solid #0a301f; background:#0c171f; border-radius:10px;
@@ -103,13 +108,20 @@
     .kpi .val{font-size:18px;font-weight:700}
 
     .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:5}
-    .modal{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; width:min(720px,95vw); box-shadow:0 20px 50px rgba(0,0,0,.5)}
+    .modal{
+      background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
+      width:min(820px,95vw); max-height:90vh; overflow:auto; box-shadow:0 20px 50px rgba(0,0,0,.5)
+    }
     .modal h3{margin:0 0 8px 0}
     .modal .row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px}
     .modal .actions{display:flex; gap:8px; justify-content:flex-end}
 
+    .scroll-area{
+      max-height:60vh; overflow:auto; border:1px solid var(--border); border-radius:10px;
+    }
+
     #authOverlay{position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:10}
-    #authCard{background:var(--panel); border:1px solid var(--border); border-radius:16px; width:min(420px,95vw); padding:18px}
+    #authCard{background:var(--panel); border:1px solid var(--border); border-radius:16px; width:min(420px,95vw); padding:18px; max-height:90vh; overflow:auto}
     #authCard h2{margin:0 0 8px; font-size:18px}
     #authError{color:#ffd1d1; background:#3a0d0d; border:1px solid #5a1a1a; padding:8px 10px; border-radius:10px; display:none; margin-bottom:8px}
     #authForm{display:grid; gap:10px}
@@ -137,10 +149,9 @@
     .sell-list .row input[type="text"]{width:100%}
     .sell-list .row input[type="number"]{width:100%}
 
-    /* Travel Manager table */
-    .tm-table{width:100%; border-collapse:collapse; margin-top:8px}
-    .tm-table th,.tm-table td{border:1px solid var(--border); padding:6px 8px; text-align:left}
-    .tm-table th{background:#0c171f; font-weight:600}
+    .tm-table{width:100%; border-collapse:separate; border-spacing:0}
+    .tm-table th,.tm-table td{border-bottom:1px solid var(--border); padding:8px 10px; text-align:left; background:#0f141b}
+    .tm-table thead th{position:sticky; top:0; z-index:1; background:#0c171f}
     .tm-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:10px}
   </style>
 </head>
@@ -218,7 +229,7 @@
 
         <div class="hr"></div>
         <h3 style="margin:0 0 6px 0;font-size:15px">Verkaufsliste (Endprodukte & Preise)</h3>
-        <div id="sellList" class="sell-list"></div>
+        <div id="sellList" class="sell-list" style="max-height:40vh; overflow:auto; padding-right:4px"></div>
         <div class="actions"><button id="addSell" type="button">+ Produkt hinzufügen</button></div>
 
         <div class="hr"></div>
@@ -233,6 +244,7 @@
               <option value="verarbeitung">➕ Verarbeitung</option>
               <option value="transportkosten">➕ Transportkosten</option>
               <option value="einverkauf">➕ Einkauf/Verkauf</option>
+              <option value="end">➕ Endpunkt</option>
             </select>
             <button id="addBtn" type="button">Schritt hinzufügen</button>
           </div>
@@ -251,12 +263,12 @@
         </div>
         <div class="hr"></div>
 
-        <div class="summary" id="summary"></div>
+        <div class="summary" id="summary" style="max-height:60vh; overflow:auto; padding-right:4px"></div>
 
         <div class="hr"></div>
         <details open>
           <summary>Preis &amp; Gewinn</summary>
-          <div id="priceTable" style="margin-top:8px"></div>
+          <div id="priceTable" style="margin-top:8px; max-height:50vh; overflow:auto; padding-right:4px"></div>
           <div class="row" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-top:1px solid var(--border);margin-top:8px">
             <span><strong>Gesamt: Gewinn/Stunde</strong></span> <strong id="sumHourly">–</strong>
           </div>
@@ -281,7 +293,7 @@
           <label for="importAllFile" class="ghost" style="padding:10px 12px; cursor:pointer">Importieren<input id="importAllFile" type="file" accept="application/json" style="display:none"></label>
         </div>
 
-        <div id="routesList"></div>
+        <div id="routesList" style="max-height:65vh; overflow:auto; padding-right:4px"></div>
 
         <div id="adjustmentsPanel" class="adjustments" style="display:none">
           <strong>Anpassungen nötig, um diese Reihenfolge zu erreichen:</strong>
@@ -305,6 +317,18 @@
       </div>
       <div class="step-body">
         <input data-key="where" placeholder="Start-Ort">
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-end">
+    <div class="step" data-type="end" draggable="true">
+      <div class="bar">
+        <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Endpunkt</span></div>
+        <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
+      </div>
+      <div class="step-body">
+        <input data-key="where" placeholder="Ort des Endpunkts">
       </div>
     </div>
   </template>
@@ -383,7 +407,6 @@
     </div>
   </template>
 
-  <!-- Verarbeitung Input-Reihe (ohne Einkauf/Preis) -->
   <template id="tpl-input-row">
     <div class="input-row" style="display:grid;grid-template-columns:1.6fr .7fr 1.2fr auto;gap:6px">
       <input data-k="name" placeholder="Item-Name">
@@ -402,7 +425,6 @@
     </div>
   </template>
 
-  <!-- Transportkosten -->
   <template id="tpl-transportkosten">
     <div class="step" data-type="transportkosten" draggable="true">
       <div class="bar">
@@ -418,7 +440,6 @@
     </div>
   </template>
 
-  <!-- Einkauf/Verkauf -->
   <template id="tpl-einverkauf">
     <div class="step" data-type="einverkauf" draggable="true">
       <div class="bar">
@@ -448,7 +469,6 @@
     </div>
   </template>
 
-  <!-- Verkaufsliste (Endpreise) -->
   <template id="tpl-sell-row">
     <div class="row">
       <input data-k="pname" type="text" placeholder="Endprodukt-Name (z. B. Aluminiumbarren)">
@@ -457,7 +477,6 @@
     </div>
   </template>
 
-  <!-- Fahrzeit-Modal (einzeln) -->
   <div id="travelModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal">
       <h3>Fahrzeit eintragen</h3>
@@ -473,17 +492,20 @@
     </div>
   </div>
 
-  <!-- Fahrzeiten-Manager (nur Übergänge der aktuellen Route) -->
   <div id="travelManager" class="modal-backdrop" aria-hidden="true">
     <div class="modal">
       <h3>Fahrzeiten bearbeiten</h3>
       <div class="mini" style="margin-bottom:6px">Es werden nur Strecken angezeigt, die in der <strong>aktuellen Route</strong> vorkommen.</div>
-      <table class="tm-table" id="tmTable">
-        <thead>
-          <tr><th>Von</th><th>Nach</th><th>Minuten</th><th>Aktion</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+
+      <div class="scroll-area">
+        <table class="tm-table" id="tmTable">
+          <thead>
+            <tr><th>Von</th><th>Nach</th><th>Minuten</th><th>Aktion</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
       <div class="tm-actions">
         <span style="flex:1"></span>
         <button id="tmCancel" type="button">Schließen</button>
@@ -494,10 +516,8 @@
 
   <script>
   (function(){
-    // ===== GAS Web-App URL =====
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbzFHZwQI9KxXhJvR6aZRR0zyqyijb46gaqWpYhCsxdfow2U5Y5A5D4gBg3jmRyaa_hh/exec';
 
-    // ===== Utils =====
     function qs(s, e){return (e||document).querySelector(s);}
     function qsa(s, e){return Array.prototype.slice.call((e||document).querySelectorAll(s));}
     function uid(){return Math.random().toString(36).slice(2,9);}
@@ -508,12 +528,10 @@
     function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
     function slug(s){ return (s||'route').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 
-    // ===== Store =====
     function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{},misc:{}}; }catch(e){ return {routes:{},travelTimes:{},misc:{}}; }
     }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
-    // ===== JSONP =====
     function jsonp(url){
       return new Promise(function(resolve,reject){
         const cb = 'cb_' + Math.random().toString(36).slice(2);
@@ -528,7 +546,6 @@
       });
     }
 
-    // ===== Verkaufsliste =====
     function addSellRow(pname, price){
       var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
       var list=qs('#sellList'); list.appendChild(row);
@@ -551,9 +568,9 @@
       if((arr||[]).length===0){ addSellRow('', null); }
     }
 
-    // ===== Templates / Steps =====
     var TPLS={
       start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
+      end: function(){return qs('#tpl-end').content.firstElementChild.cloneNode(true);},
       abbau: function(){return qs('#tpl-abbau').content.firstElementChild.cloneNode(true);},
       lager: function(){return qs('#tpl-lager').content.firstElementChild.cloneNode(true);},
       verarbeitung: function(){ var el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); addOutputRow(el); return el; },
@@ -582,7 +599,6 @@
       qs('.delTrade',row).addEventListener('click', function(){ row.remove(); recalc(); });
       row.addEventListener('input', recalc);
     }
-
     function addLagerRow(stepEl, action, name, qty){
       var row=qs('#tpl-lager-row').content.firstElementChild.cloneNode(true);
       qs('[data-key="moves"]', stepEl).appendChild(row);
@@ -602,7 +618,6 @@
       stepEl.addEventListener('input', function(){ recalc(); });
       var where=qs('[data-key="where"]', stepEl);
       if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
-      // Dragging
       stepEl.addEventListener('dragstart', function(){ stepEl.classList.add('dragging'); });
       stepEl.addEventListener('dragend', function(){ stepEl.classList.remove('dragging'); recalc(); });
     }
@@ -629,14 +644,13 @@
       });
     })();
 
-    // ===== Route Build/Load =====
     var currentRouteId=null;
     function getRoute(){
       var name = (qs('#routeName')?.value || '').trim() || 'Unbenannt';
       var steps=[];
       qsa('#steps .step').forEach(function(step){
         var type=step.dataset.type;
-        if(type==='start'){
+        if(type==='start' || type==='end'){
           steps.push({type:type, where: qs('[data-key="where"]',step).value.trim()});
         } else if(type==='abbau'){
           steps.push({type:type,
@@ -730,7 +744,7 @@
       var box=qs('#steps'); box.innerHTML='';
       (route.steps||[]).forEach(function(s){
         var el=addStep(s.type); if(!el) return;
-        if(s.type==='start'){
+        if(s.type==='start' || s.type==='end'){
           qs('[data-key="where"]',el).value=s.where||'';
         } else if(s.type==='abbau'){
           qs('[data-key="what"]',el).value=s.what||'';
@@ -778,7 +792,6 @@
       recalc();
     }
 
-    // ===== Fahrzeiten (Popup & Manager) =====
     function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
     function openTravelModal(from,to, cb){
       var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
@@ -806,19 +819,17 @@
       }catch(e){}
     }
 
-    // ---- Übergänge der aktuellen Route sammeln
     function getCurrentRouteTransitions(){
       var r = getRoute();
       var trans = [];
       var lastPlace = null;
       (r.steps||[]).forEach(function(s){
-        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verarbeitung'||s.type==='lager'||s.type==='einverkauf') ? (s.where||'') : '';
+        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verarbeitung'||s.type==='lager'||s.type==='einverkauf'||s.type==='end') ? (s.where||'') : '';
         if(thisPlace && lastPlace && thisPlace!==lastPlace){
           trans.push({from:lastPlace, to:thisPlace});
         }
         if(thisPlace) lastPlace = thisPlace;
       });
-      // uniq
       var keySet = new Set();
       var uniq = [];
       trans.forEach(function(t){
@@ -828,7 +839,6 @@
       return uniq;
     }
 
-    // ---- Fahrzeiten-Manager (nur aktuelle Übergänge) ----
     function openTravelManager(){
       renderTravelManager();
       var m=qs('#travelManager');
@@ -845,7 +855,6 @@
       tbody.innerHTML='';
 
       var trans = getCurrentRouteTransitions();
-      // Sortiert anzeigen
       trans.sort(function(a,b){
         var s = a.from.localeCompare(b.from,'de',{sensitivity:'base'});
         if(s!==0) return s;
@@ -853,7 +862,6 @@
       });
 
       if(trans.length===0){
-        // Kein Übergang -> leere Infozeile
         var tr=document.createElement('tr');
         tr.innerHTML='<td colspan="4" class="mini muted">Keine ortsübergreifenden Schritte in der aktuellen Route.</td>';
         tbody.appendChild(tr);
@@ -885,7 +893,7 @@
         var t = (qs('.tm-to',r).value||'').trim();
         var m = qs('.tm-mins',r).value;
         if(!f || !t) return;
-        var key = travelKey(f,t);
+        var key = (f||'?')+'|'+(t||'?');
         if(m === ''){ delete tt[key]; } else { tt[key] = Math.max(0, num(m)); }
       });
       store.travelTimes = tt;
@@ -894,7 +902,6 @@
       closeTravelManager();
     }
 
-    // ===== Automatik-Hilfen =====
     function kgPerBatchAllInputs(inputs, weights){
       var sum=0;
       inputs.forEach(function(i){
@@ -918,16 +925,15 @@
       });
     }
 
-    // ===== Berechnung =====
     function compute(route){
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
 
-      var lkw = {};           // aktueller LKW-Bestand (Einheiten pro Item)
-      var storage = {};       // { place: { item: units } }
-      var weights = {};       // kg/Einheit pro Item (für Verarbeitung & Output-Ableitung)
+      var lkw = {};
+      var storage = {};
+      var weights = {};
       var miningTime=0, driveTime=0, procTime=0;
       var purchaseCost=0, transportCostTotal=0, processingCostTotal=0;
-      var tradeRevenue=0;     // Erlöse aus „Einkauf/Verkauf“-Schritten (verkaufen)
+      var tradeRevenue=0;
       var log=[];
       var snapshots=[];
 
@@ -951,9 +957,8 @@
       var steps = route.steps||[];
       for(var idx=0; idx<steps.length; idx++){
         var s = steps[idx];
-        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verarbeitung'||s.type==='lager'||s.type==='einverkauf') ? (s.where||'') : '';
+        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verarbeitung'||s.type==='lager'||s.type==='einverkauf'||s.type==='end') ? (s.where||'') : '';
 
-        // Fahrt VOR dem Schritt
         if(thisPlace && lastPlace && lastPlace!==thisPlace){
           var key= (lastPlace||'?')+'|'+(thisPlace||'?');
           var m=store.travelTimes[key];
@@ -967,6 +972,9 @@
 
         if(s.type==='start'){
           log.push('Start @ '+(s.where||'?'));
+        }
+        else if(s.type==='end'){
+          log.push('Ende @ '+(s.where||'?'));
         }
         else if(s.type==='abbau'){
           var perUnit=Math.max(0, num(s.unitWeight));
@@ -999,7 +1007,7 @@
                 }else{
                   log.push('Zwischenlager @ '+place+': abholen '+fmt(qty)+'× '+item+' – im Lager nicht verfügbar');
                 }
-              }else{ // ablegen
+              }else{
                 var availL = (lkw[item]||0);
                 var put = Math.min(availL, qty);
                 if(put>0){
@@ -1036,7 +1044,7 @@
                 addTo(lkw, item, qty);
                 purchaseCost += qty * price;
                 log.push('Kauf '+fmt(qty)+'× '+item+' @ '+place+' zu '+cf.format(price)+'/Stk → Kosten +'+cf.format(qty*price));
-              } else { // verkaufen
+              } else {
                 var avail = (lkw[item]||0);
                 var sell = Math.min(avail, qty);
                 if(sell>0){
@@ -1068,7 +1076,6 @@
 
             var vgaenge=0, batchesTotal=0;
             while(true){
-              // Batches, die mit LKW-Inventar möglich sind
               var batchesByInventory = Infinity;
               if(inputs.length>0){
                 batchesByInventory = inputs.reduce(function(min,i){
@@ -1080,27 +1087,24 @@
               } else { batchesByInventory = 999999; }
               if(batchesByInventory<=0) break;
 
-              // Batches, die in einen Vorgang passen (Rucksackgewicht)
               var kgBatch = totalInputKgPerBatch;
               var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
               if(kgBatch>0 && batchesByBackpack<=0) break;
 
               var batchesThisOp = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
 
-              // Inventar verbrauchen (alle Inputs aus LKW)
               inputs.forEach(function(i){
                 var need=Math.max(0, num(i.qty));
                 addTo(lkw, i.name, -(need*batchesThisOp));
               });
 
-              // Outputs hinzufügen
               var qPerBatchArr = deriveOutputQuantities(outputs, weights, totalInputKgPerBatch);
               outputs.forEach(function(o,ix){
                 var qPerBatch = Math.max(0, num(o.qty)) || qPerBatchArr[ix] || 0;
                 addTo(lkw, o.name, qPerBatch*batchesThisOp);
               });
 
-              procTime += durMin; // pro Vorgang
+              procTime += durMin;
               vgaenge++; batchesTotal+=batchesThisOp;
               if(batchesThisOp<=0) break;
             }
@@ -1126,11 +1130,10 @@
           }
         }
 
-        // Snapshot
         var nextPlace = '';
         for(var j=idx+1;j<steps.length;j++){
           var n=steps[j];
-          var np = (n.type==='start'||n.type==='abbau'||n.type==='verarbeitung'||n.type==='lager'||n.type==='einverkauf') ? (n.where||'') : '';
+          var np = (n.type==='start'||n.type==='abbau'||n.type==='verarbeitung'||n.type==='lager'||n.type==='einverkauf'||n.type==='end') ? (n.where||'') : '';
           if(np){ nextPlace=np; break; }
         }
         pushSnapshot(thisPlace, nextPlace);
@@ -1140,7 +1143,6 @@
 
       var totalMinutes = miningTime + driveTime + procTime;
 
-      // Endprodukte bestimmen aus LKW-Bestand
       var sellList = (route.sellList||[]).filter(function(x){return x && x.name;});
       var endProducts = sellList.map(function(x){
         var units = Math.max(0, Math.floor((lkw[x.name]||0)));
@@ -1203,7 +1205,6 @@
       };
     }
 
-    // ===== UI: Zwischenzeilen (Fahrt & LKW im Builder) =====
     function renderBetween(calc){
       qsa('#steps .between').forEach(function(b){ b.remove(); });
 
@@ -1223,7 +1224,6 @@
       });
     }
 
-    // ===== UI: Zusammenfassung =====
     function renderSummary(calc){
       qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
       qs('#kpiCost').textContent = cf.format(calc.totalCost);
@@ -1294,7 +1294,6 @@
       qs('#sumHourly').textContent = cf.format(calc.hourlyProfit);
     }
 
-    // ===== Report-Text (Export) =====
     function buildReportText(route, calc){
       var lines=[];
       lines.push('Ergebnis & Struktur');
@@ -1346,7 +1345,6 @@
       renderBetween(calc);
     }
 
-    // ===== Steuer (ListView) =====
     function getTaxRate(){
       var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
       var el = qs('#taxRate'); if(el){ var n=num(el.value); if(!isNaN(n)) v=n; }
@@ -1361,7 +1359,6 @@
       var store=readStore(); store.misc = store.misc || {}; store.misc.taxRate = v; writeStore(store);
     }
 
-    // ===== Routenverwaltung (Builder Dropdown alphabetisch) =====
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
@@ -1381,7 +1378,6 @@
       });
     }
 
-    // ===== Routenliste =====
     function buildListData(){
       var store=readStore(); var tax = getTaxRate();
       var list=[];
@@ -1463,7 +1459,7 @@
         var dataById={};
         (buildListData()).forEach(function(x){ dataById[x.id]=x; });
 
-        var margin = 1; // € pro Stunde Abstand
+        var margin = 1;
         var any=false;
 
         var ul=qs('#adjustmentsList'); ul.innerHTML='';
@@ -1526,7 +1522,6 @@
       }
     }
 
-    // ===== Google Apps Script / Drive Sync =====
     const DRIVE_AUTO_LOAD = true;
 
     function updateDriveStateTag(connected){
@@ -1649,9 +1644,7 @@
     }
     function renderSummaryAndMaybeList(){ recalc(); if(!document.getElementById('listView').hidden){ renderListView(); } }
 
-    // ===== Events =====
     window.addEventListener('DOMContentLoaded', async function(){
-      // Auth
       qs('#authForm').addEventListener('submit', async function(ev){
         ev.preventDefault();
         const t = qs('#authToken').value.trim();
@@ -1660,23 +1653,18 @@
         await tryAuthAndLoad(true);
       });
 
-      // Verkaufsliste
       document.getElementById('addSell').addEventListener('click', function(){ addSellRow('', null); });
 
-      // Steps hinzufügen
       document.getElementById('addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); });
 
-      // Basisdaten -> Recalc
       ['lkwSize','backpackKg','routeName'].forEach(function(id){
         var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
-      // Fahrzeiten-Manager
       document.getElementById('manageTravelBtn').addEventListener('click', openTravelManager);
       document.getElementById('tmCancel').addEventListener('click', closeTravelManager);
       document.getElementById('tmSave').addEventListener('click', saveTravelManager);
 
-      // Speichern – lokal + Drive
       document.getElementById('saveBtn')?.addEventListener('click', async function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){
@@ -1704,7 +1692,6 @@
         if(!document.getElementById('listView').hidden){ renderListView(); }
       });
 
-      // Löschen – lokal + Drive
       document.getElementById('deleteBtn')?.addEventListener('click', async function(){
         var id=document.getElementById('routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
         if(!confirm('Route wirklich löschen?')) return;
@@ -1721,13 +1708,11 @@
         }
       });
 
-      // Route aus Dropdown laden
       document.getElementById('routeSelect')?.addEventListener('change', function(e){
         var id=e.target.value; if(!id) return;
         var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
       });
 
-      // Export nur aktuelle Route
       document.getElementById('exportCurrentBtn')?.addEventListener('click', function(){
         var r=getRoute();
         if(!r.name || r.name==='Unbenannt'){ alert('Bitte Routenname setzen.'); return; }
@@ -1759,7 +1744,6 @@
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download= slug(r.name || 'route') + '.json'; a.click(); URL.revokeObjectURL(a.href);
       });
 
-      // Import einzelne Route
       document.getElementById('importCurrentFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
@@ -1805,7 +1789,6 @@
         rd.readAsText(f); e.target.value='';
       });
 
-      // LIST VIEW Export/Import ALL
       document.getElementById('exportAllBtn')?.addEventListener('click', function(){
         var store=readStore();
         var reports={};
@@ -1861,11 +1844,9 @@
         rd.readAsText(f); e.target.value='';
       });
 
-      // Tabs
       document.getElementById('tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
       document.getElementById('tabList').addEventListener('click', function(){ switchTab('list'); });
 
-      // Init
       refreshRouteSelect(null);
       setSellList([]);
       if(document.getElementById('steps').children.length===0){ addStep('start'); }
