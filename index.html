@@ -18,7 +18,7 @@
     html,body{height:100%}
     body{
       margin:0; background:var(--bg); color:var(--text);
-      font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
+      font:15px/1.5 system-ui,-apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial;
       position:relative;
     }
     body::before{
@@ -153,6 +153,16 @@
     .tm-table th,.tm-table td{border-bottom:1px solid var(--border); padding:8px 10px; text-align:left; background:#0f141b}
     .tm-table thead th{position:sticky; top:0; z-index:1; background:#0c171f}
     .tm-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:10px}
+
+    /* Anzeige des Lager-Bestands im Step */
+    .lager-stock{
+      border:1px dashed var(--border);
+      border-radius:10px;
+      padding:8px;
+      background:#0c171f;
+      font-size:12px;
+      color:#cde6d6;
+    }
   </style>
 </head>
 <body>
@@ -263,7 +273,8 @@
         </div>
         <div class="hr"></div>
 
-        <div class="summary" id="summary" style="max-height:60vh; overflow:auto; padding-right:4px"></div>
+        <!-- Keine feste Höhe/kein Scroll mehr, wächst mit -->
+        <div class="summary" id="summary" style="padding-right:4px"></div>
 
         <div class="hr"></div>
         <details open>
@@ -360,8 +371,11 @@
       </div>
       <div class="step-body">
         <input data-key="where" placeholder="Ort des Zwischenlagers">
-        <textarea data-key="note" placeholder="Notiz (optional)" rows="2" style="resize:vertical"></textarea>
       </div>
+
+      <!-- Live-Bestand dieses Lagers (nach diesem Schritt) -->
+      <div class="lager-stock" data-key="stockView">Bestand: –</div>
+
       <div class="mini" style="margin:4px 0">Bewegungen:</div>
       <div class="lager-list" data-key="moves"></div>
       <div class="actions"><button class="addLager" type="button">+ Bewegung</button></div>
@@ -528,8 +542,7 @@
     function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
     function slug(s){ return (s||'route').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 
-    function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{},misc:{}}; }catch(e){ return {routes:{},travelTimes:{},misc:{}}; }
-    }
+    function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{},misc:{}}; }catch(e){ return {routes:{},travelTimes:{},misc:{}}; } }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
     function jsonp(url){
@@ -670,7 +683,6 @@
           }).filter(function(m){return m.name && m.qty>0;});
           steps.push({type:type,
             where: qs('[data-key="where"]',step).value.trim(),
-            note: qs('[data-key="note"]',step).value.trim(),
             moves: moves
           });
         } else if(type==='verarbeitung'){
@@ -754,7 +766,6 @@
           qs('[data-key="timeMinutes"]',el).value=s.timeMinutes||'';
         } else if(s.type==='lager'){
           qs('[data-key="where"]',el).value=s.where||'';
-          qs('[data-key="note"]',el).value=s.note||'';
           var list=qs('[data-key="moves"]',el); list.innerHTML='';
           (s.moves||[]).forEach(function(m){ addLagerRow(el, m.action, m.name, m.qty); });
           if((s.moves||[]).length===0){ addLagerRow(el,'ablegen','', ''); }
@@ -925,6 +936,15 @@
       });
     }
 
+    function deepClone(obj){
+      if(!obj || typeof obj!=='object') return obj;
+      var out = Array.isArray(obj) ? [] : {};
+      Object.keys(obj).forEach(function(k){
+        out[k] = deepClone(obj[k]);
+      });
+      return out;
+    }
+
     function compute(route){
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
 
@@ -951,7 +971,7 @@
           var m=store.travelTimes[key];
           nextTravel = (m!=null)? Number(m) : null;
         }
-        snapshots.push({ place: place||'', nextPlace: nextPlace||'', nextTravel: nextTravel, lkw: Object.assign({}, lkw) });
+        snapshots.push({ place: place||'', nextPlace: nextPlace||'', nextTravel: nextTravel, lkw: Object.assign({}, lkw), storage: deepClone(storage) });
       }
 
       var steps = route.steps||[];
@@ -991,7 +1011,7 @@
           storage[place] = storage[place] || {};
           var moves = s.moves||[];
           if(moves.length===0){
-            log.push('Zwischenlager @ '+place+(s.note?(' – '+s.note):''));
+            log.push('Zwischenlager @ '+place+': keine Bewegungen.');
           }else{
             moves.forEach(function(mv){
               var qty = Math.max(0, Math.floor(num(mv.qty)));
@@ -1019,7 +1039,6 @@
                 }
               }
             });
-            if(s.note){ log.push('Notiz: '+s.note); }
           }
         }
         else if(s.type==='transportkosten'){
@@ -1161,14 +1180,14 @@
       var suggested = {};
       if(totalUnits>0){
         if(varUnits>0){
-          var perUnitVar = (targetRevenue - (fixedRevenue + tradeRevenue)) / Math.max(1, varUnits);
+          var perUnitVar = (targetRevenue - (fixedRevenue)) / Math.max(1, varUnits);
           var perUnitVarCapped = Math.max(0, Math.max(BE_avg, perUnitVar));
           endProducts.forEach(function(ep){
             if(!(ep.price>0)){ suggested[ep.name] = perUnitVarCapped; }
             else { suggested[ep.name] = ep.price; }
           });
         }else{
-          var fixedAll = fixedRevenue + tradeRevenue;
+          var fixedAll = fixedRevenue;
           if(fixedAll>0 && fixedAll>targetRevenue){
             var f = targetRevenue / fixedAll;
             endProducts.forEach(function(ep){
@@ -1185,7 +1204,7 @@
         var eff = (ep.price>0) ? ep.price : (suggested[ep.name]||0);
         return sum + eff * ep.units;
       }, 0);
-      var revenue = revenueEnd + tradeRevenue;
+      var revenue = revenueEnd;
       var profit = revenue - totalCost;
       var hourlyProfit = hours>0 ? (profit / hours) : 0;
 
@@ -1222,6 +1241,30 @@
         b.innerHTML = `<span class="pill">${travelTxt}</span><span class="muted">LKW: ${lkwTxt}</span>`;
         el.insertAdjacentElement('afterend', b);
       });
+    }
+
+    function renderLagerStocks(calc){
+      // zeigt im Lager-Step den Bestand dieses Ortes NACH dem jeweiligen Schritt
+      var stepEls = qsa('#steps .step');
+      for(var i=0;i<stepEls.length;i++){
+        var el = stepEls[i];
+        if(el.dataset.type!=='lager') continue;
+        var place = (qs('[data-key="where"]', el)?.value || '').trim();
+        var view = qs('[data-key="stockView"]', el);
+        if(!view){ continue; }
+        var snap = calc.snapshots[i]; // Snapshot nach diesem Schritt
+        if(!snap || !place){
+          view.textContent = 'Bestand: –';
+          continue;
+        }
+        var storeAtPlace = (snap.storage && snap.storage[place]) ? snap.storage[place] : {};
+        var keys = Object.keys(storeAtPlace).sort(function(a,b){ return a.localeCompare(b,'de',{sensitivity:'base'}); });
+        if(keys.length===0){
+          view.textContent = 'Bestand: (leer)';
+        }else{
+          view.textContent = 'Bestand: ' + keys.map(function(k){ return k+': '+fmt(Math.floor(storeAtPlace[k])); }).join(', ');
+        }
+      }
     }
 
     function renderSummary(calc){
@@ -1343,6 +1386,7 @@
       var calc=compute(route);
       renderSummary(calc);
       renderBetween(calc);
+      renderLagerStocks(calc);
     }
 
     function getTaxRate(){
