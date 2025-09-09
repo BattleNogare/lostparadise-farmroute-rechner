@@ -304,7 +304,8 @@
           <label for="importAllFile" class="ghost" style="padding:10px 12px; cursor:pointer">Importieren<input id="importAllFile" type="file" accept="application/json" style="display:none"></label>
         </div>
 
-        <div id="routesList" style="max-height:65vh; overflow:auto; padding-right:4px"></div>
+        <!-- Änderung: KEINE eigene Scrollbox/Max-Höhe mehr -->
+        <div id="routesList"></div>
 
         <div id="adjustmentsPanel" class="adjustments" style="display:none">
           <strong>Anpassungen nötig, um diese Reihenfolge zu erreichen:</strong>
@@ -1244,7 +1245,6 @@
     }
 
     function renderLagerStocks(calc){
-      // zeigt im Lager-Step den Bestand dieses Ortes NACH dem jeweiligen Schritt
       var stepEls = qsa('#steps .step');
       for(var i=0;i<stepEls.length;i++){
         var el = stepEls[i];
@@ -1252,7 +1252,7 @@
         var place = (qs('[data-key="where"]', el)?.value || '').trim();
         var view = qs('[data-key="stockView"]', el);
         if(!view){ continue; }
-        var snap = calc.snapshots[i]; // Snapshot nach diesem Schritt
+        var snap = calc.snapshots[i];
         if(!snap || !place){
           view.textContent = 'Bestand: –';
           continue;
@@ -1681,9 +1681,9 @@
       var isList = (name==='list');
       document.getElementById('tabBuilder').classList.toggle('active', !isList);
       document.getElementById('tabList').classList.toggle('active', isList);
-      document.getElementById('builderView').hidden = isList;
-      document.getElementById('resultView').hidden  = isList;
-      document.getElementById('listView').hidden    = !isList;
+      document.getElementById('builderView').hidden = !isList ? false : true;
+      document.getElementById('resultView').hidden  = !isList ? false : true;
+      document.getElementById('listView').hidden    = isList ? false : true;
       if(isList){ renderListView(); }
     }
     function renderSummaryAndMaybeList(){ recalc(); if(!document.getElementById('listView').hidden){ renderListView(); } }
@@ -1716,7 +1716,7 @@
           return;
         }
         if(!r.id) r.id = uid();
-        var store=readStore(); store.routes[r.id]=r; writeStore(store);
+        var store=readStore(); store.routes[r.id]=r; writeStore(store); 
         refreshRouteSelect(r.id);
         var sel=document.getElementById('routeSelect'); if(sel){ sel.value=r.id; }
         alert('Route lokal gespeichert.');
