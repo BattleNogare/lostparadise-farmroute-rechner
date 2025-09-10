@@ -71,7 +71,7 @@
     .grid{display:grid; grid-template-columns:1.2fr .8fr; gap:16px; margin-top:16px}
     .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
     .card h2{margin:0 0 6px; font-size:16px}
-    .sub{color:var(--soft); font-size:13px}
+    .sub{color:#9bb2c9; font-size:13px}
     .hr{height:1px; background:linear-gradient(90deg,transparent, var(--border), transparent); margin:12px 0}
     .mini{font-size:12px; color:#9bb2c9}
 
@@ -154,7 +154,6 @@
     .tm-table thead th{position:sticky; top:0; z-index:1; background:#0c171f}
     .tm-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:10px}
 
-    /* Anzeige des Lager-Bestands im Step */
     .lager-stock{
       border:1px dashed var(--border);
       border-radius:10px;
@@ -228,12 +227,15 @@
         </div>
 
         <div class="hr"></div>
-        <div class="two">
+        <div class="three">
           <label>LKW-Größe (kg)<br/>
             <input id="lkwSize" type="number" min="1" step="1" value="2000">
           </label>
           <label>Rucksack-Größe (kg)<br/>
             <input id="backpackKg" type="number" min="1" step="1" value="150">
+          </label>
+          <label>Verarbeitungsstufe (%)<br/>
+            <input id="procLevel" type="number" min="0" max="100" step="1" value="0" title="Reduziert die Dauer pro Verarbeitungsvorgang um diesen Prozentwert (global)">
           </label>
         </div>
 
@@ -273,7 +275,6 @@
         </div>
         <div class="hr"></div>
 
-        <!-- Keine feste Höhe/kein Scroll mehr, wächst mit -->
         <div class="summary" id="summary" style="padding-right:4px"></div>
 
         <div class="hr"></div>
@@ -304,7 +305,6 @@
           <label for="importAllFile" class="ghost" style="padding:10px 12px; cursor:pointer">Importieren<input id="importAllFile" type="file" accept="application/json" style="display:none"></label>
         </div>
 
-        <!-- Änderung: KEINE eigene Scrollbox/Max-Höhe mehr -->
         <div id="routesList"></div>
 
         <div id="adjustmentsPanel" class="adjustments" style="display:none">
@@ -374,7 +374,6 @@
         <input data-key="where" placeholder="Ort des Zwischenlagers">
       </div>
 
-      <!-- Live-Bestand dieses Lagers (nach diesem Schritt) -->
       <div class="lager-stock" data-key="stockView">Bestand: –</div>
 
       <div class="mini" style="margin:4px 0">Bewegungen:</div>
@@ -736,6 +735,7 @@
         name: name,
         lkwSize: Math.max(1, num(qs('#lkwSize').value)||2000),
         backpackKg: Math.max(1, num(qs('#backpackKg').value)||150),
+        processLevel: Math.max(0, Math.min(100, num(qs('#procLevel').value)||0)), /* NEU */
         sellList: getSellList(),
         steps: steps,
         travelTimes: store.travelTimes || {}
@@ -753,6 +753,7 @@
       qs('#routeName').value = route.name || '';
       qs('#lkwSize').value = route.lkwSize || 2000;
       qs('#backpackKg').value = route.backpackKg || 150;
+      qs('#procLevel').value = (route.processLevel!=null)? route.processLevel : 0; /* NEU */
       setSellList(route.sellList||[]);
       var box=qs('#steps'); box.innerHTML='';
       (route.steps||[]).forEach(function(s){
@@ -948,6 +949,7 @@
 
     function compute(route){
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
+      var procLevel = Math.max(0, Math.min(100, route.processLevel || 0)); /* NEU: globale Verarbeitungsstufe in % */
 
       var lkw = {};
       var storage = {};
@@ -1090,7 +1092,8 @@
             outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
             var durSec = Math.max(0, num(s.duration));
-            var durMin = durSec/60;
+            var durSecEff = Math.max(0, durSec * (1 - procLevel/100)); /* NEU: Stufe anwenden */
+            var durMin = durSecEff/60;
 
             var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
 
@@ -1145,8 +1148,9 @@
               var q = Math.max(0, num(o.qty)) || auto[ix] || 0;
               return fmt(q)+'× '+o.name;
             }).join(' + ');
-            var durSecTxt = Math.round(durMin*60);
-            log.push('Verarbeitung @ '+(s.where||'?')+': '+vgaenge+' Vorgänge, '+fmt(batchesTotal)+' Batches/Vorgang: '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Vorgang: '+fmt(durSecTxt)+' s');
+            var durSecTxt = Math.round(durSecEff);
+            var ps = procLevel>0 ? (' (Stufe '+fmt(procLevel)+'%)') : '';
+            log.push('Verarbeitung @ '+(s.where||'?')+': '+vgaenge+' Vorgänge, '+fmt(batchesTotal)+' Batches/Vorgang: '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Vorgang: '+fmt(durSecTxt)+' s'+ps);
           }
         }
 
@@ -1701,7 +1705,7 @@
 
       document.getElementById('addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); });
 
-      ['lkwSize','backpackKg','routeName'].forEach(function(id){
+      ['lkwSize','backpackKg','routeName','procLevel'].forEach(function(id){
         var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
