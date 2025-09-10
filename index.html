@@ -128,7 +128,7 @@
     #authForm input{width:100%}
 
     #listView{grid-column:1/-1}
-    .list-toolbar{display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap}
+    .list-toolbar{display:flex; gap:12px; margin-bottom:8px; align-items:center; flex-wrap:wrap}
 
     .route-item{margin:8px 0; border-radius:12px; background:#0f141b; border:1px dashed var(--border)}
     .route-item.dragging{opacity:.6; outline:2px dashed var(--accent)}
@@ -234,9 +234,7 @@
           <label>Rucksack-Größe (kg)<br/>
             <input id="backpackKg" type="number" min="1" step="1" value="150">
           </label>
-          <label>Verarbeitungsstufe (%)<br/>
-            <input id="procLevel" type="number" min="0" max="100" step="1" value="0" title="Reduziert die Dauer pro Verarbeitungsvorgang um diesen Prozentwert (global)">
-          </label>
+          <div></div>
         </div>
 
         <div class="hr"></div>
@@ -292,13 +290,17 @@
         <h2>Routenliste</h2>
         <div class="sub">
           Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
-          Der <strong>Steuersatz</strong> wird nur auf Routen ohne „illegal“ im Namen angewendet.
+          Der <strong>Steuersatz</strong> wird nur auf Routen ohne „illegal“ im Namen angewendet.  
+          Die <strong>Verarbeitungsstufe (%)</strong> reduziert die Dauer pro Verarbeitungsvorgang global für alle Routen.
         </div>
         <div class="hr"></div>
 
         <div class="list-toolbar">
           <label>Steuersatz (%)<br>
             <input id="taxRate" type="number" min="0" step="0.1" value="0" title="Wird auf alle nicht-illegalen Routen angewendet">
+          </label>
+          <label>Verarbeitungsstufe (%)<br>
+            <input id="procRate" type="number" min="0" max="100" step="1" value="0" title="Global: reduziert Dauer pro Vorgang in Verarbeitungsschritten">
           </label>
           <span style="flex:1"></span>
           <button id="exportAllBtn">Alle exportieren</button>
@@ -317,7 +319,7 @@
   </div>
 
   <!--DATA-START-->
-  <script id="app-data" type="application/json">{"routes":{},"travelTimes":{},"misc":{"taxRate":0}}</script>
+  <script id="app-data" type="application/json">{"routes":{},"travelTimes":{},"misc":{"taxRate":0,"processLevel":0}}</script>
   <!--DATA-END-->
 
   <!-- Step Templates -->
@@ -735,7 +737,6 @@
         name: name,
         lkwSize: Math.max(1, num(qs('#lkwSize').value)||2000),
         backpackKg: Math.max(1, num(qs('#backpackKg').value)||150),
-        processLevel: Math.max(0, Math.min(100, num(qs('#procLevel').value)||0)), /* NEU */
         sellList: getSellList(),
         steps: steps,
         travelTimes: store.travelTimes || {}
@@ -753,7 +754,6 @@
       qs('#routeName').value = route.name || '';
       qs('#lkwSize').value = route.lkwSize || 2000;
       qs('#backpackKg').value = route.backpackKg || 150;
-      qs('#procLevel').value = (route.processLevel!=null)? route.processLevel : 0; /* NEU */
       setSellList(route.sellList||[]);
       var box=qs('#steps'); box.innerHTML='';
       (route.steps||[]).forEach(function(s){
@@ -915,6 +915,36 @@
       closeTravelManager();
     }
 
+    /* ==== Globale Einstellungen (Steuer + Verarbeitungsstufe) ==== */
+    function getTaxRate(){
+      var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
+      var el = qs('#taxRate'); if(el){ var n=num(el.value); if(!isNaN(n)) v=n; }
+      return Math.max(0, v);
+    }
+    function setTaxRateUIFromStore(){
+      var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
+      var el = qs('#taxRate'); if(el){ el.value = v; }
+    }
+    function saveTaxRateToStore(){
+      var v = Math.max(0, num(qs('#taxRate').value));
+      var store=readStore(); store.misc = store.misc || {}; store.misc.taxRate = v; writeStore(store);
+    }
+
+    function getProcessLevel(){
+      var store=readStore(); var v = (store.misc && typeof store.misc.processLevel==='number') ? store.misc.processLevel : 0;
+      var el = qs('#procRate'); if(el){ var n=num(el.value); if(!isNaN(n)) v=n; }
+      return Math.max(0, Math.min(100, v));
+    }
+    function setProcessLevelUIFromStore(){
+      var store=readStore(); var v = (store.misc && typeof store.misc.processLevel==='number') ? store.misc.processLevel : 0;
+      var el = qs('#procRate'); if(el){ el.value = v; }
+    }
+    function saveProcessLevelToStore(){
+      var v = Math.max(0, Math.min(100, num(qs('#procRate').value)));
+      var store=readStore(); store.misc = store.misc || {}; store.misc.processLevel = v; writeStore(store);
+    }
+    /* ============================================================= */
+
     function kgPerBatchAllInputs(inputs, weights){
       var sum=0;
       inputs.forEach(function(i){
@@ -949,7 +979,7 @@
 
     function compute(route){
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
-      var procLevel = Math.max(0, Math.min(100, route.processLevel || 0)); /* NEU: globale Verarbeitungsstufe in % */
+      var procLevel = getProcessLevel(); /* GLOBAL: Verarbeitungsstufe in % */
 
       var lkw = {};
       var storage = {};
@@ -1092,7 +1122,7 @@
             outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
             var durSec = Math.max(0, num(s.duration));
-            var durSecEff = Math.max(0, durSec * (1 - procLevel/100)); /* NEU: Stufe anwenden */
+            var durSecEff = Math.max(0, durSec * (1 - procLevel/100)); /* GLOBAL-Stufe anwenden */
             var durMin = durSecEff/60;
 
             var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
@@ -1393,20 +1423,6 @@
       renderLagerStocks(calc);
     }
 
-    function getTaxRate(){
-      var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
-      var el = qs('#taxRate'); if(el){ var n=num(el.value); if(!isNaN(n)) v=n; }
-      return Math.max(0, v);
-    }
-    function setTaxRateUIFromStore(){
-      var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
-      var el = qs('#taxRate'); if(el){ el.value = v; }
-    }
-    function saveTaxRateToStore(){
-      var v = Math.max(0, num(qs('#taxRate').value));
-      var store=readStore(); store.misc = store.misc || {}; store.misc.taxRate = v; writeStore(store);
-    }
-
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
@@ -1452,6 +1468,7 @@
 
     function renderListView(){
       setTaxRateUIFromStore();
+      setProcessLevelUIFromStore();
 
       var list = buildListData();
       var container = qs('#routesList'); container.innerHTML='';
@@ -1529,6 +1546,25 @@
         note.textContent = 'Vorschläge sind heuristisch (Multi-Endprodukt). Ziele werden auf Netto-Basis (mit Steuersatz) betrachtet.';
         panel.style.display = any ? 'block' : 'none';
       });
+
+      var taxEl = qs('#taxRate');
+      if(taxEl && !taxEl._bound){
+        taxEl._bound = true;
+        taxEl.addEventListener('input', function(){
+          saveTaxRateToStore();
+          renderListView();
+          recalc(); // wirkt global
+        });
+      }
+      var procEl = qs('#procRate');
+      if(procEl && !procEl._bound){
+        procEl._bound = true;
+        procEl.addEventListener('input', function(){
+          saveProcessLevelToStore();
+          renderListView();
+          recalc(); // wirkt global
+        });
+      }
     }
 
     function enableListDnD(container, onOrderChanged){
@@ -1559,15 +1595,6 @@
         if(after==null){ container.appendChild(dragging); }
         else { container.insertBefore(dragging, after); }
       });
-
-      var taxEl = qs('#taxRate');
-      if(taxEl && !taxEl._bound){
-        taxEl._bound = true;
-        taxEl.addEventListener('input', function(){
-          saveTaxRateToStore();
-          renderListView();
-        });
-      }
     }
 
     const DRIVE_AUTO_LOAD = true;
@@ -1705,7 +1732,7 @@
 
       document.getElementById('addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); });
 
-      ['lkwSize','backpackKg','routeName','procLevel'].forEach(function(id){
+      ['lkwSize','backpackKg','routeName'].forEach(function(id){
         var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
