@@ -174,7 +174,7 @@
       <form id="authForm">
         <label>Token<br><input id="authToken" type="password" placeholder="●●●●●●●●" autocomplete="current-password" required></label>
         <div class="actions" style="justify-content:space-between">
-          <span class="tag yellow" title="Google Apps Script">Drive-Backend aktiv</span>
+          <span class="tag yellow" title="Google Apps Script">Sheet-Backend aktiv</span>
           <button id="authSubmit" type="submit" class="primary">Entsperren</button>
         </div>
       </form>
@@ -189,7 +189,7 @@
              src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
         <div class="brand">
           <h1>Farmrouten-Preisrechner</h1>
-          <span id="driveState" class="tag yellow" title="Drive-Verbindung">Drive: nicht verbunden</span>
+          <span id="driveState" class="tag yellow" title="Sheet-Verbindung">Sheet: nicht verbunden</span>
         </div>
         <div class="toolbar">
           <div class="tabs">
@@ -289,7 +289,7 @@
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
         <div class="sub">
-          Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
+          Alle gespeicherten Routen (Sheet wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
           Der <strong>Steuersatz</strong> wird nur auf Routen ohne „illegal“ im Namen angewendet.  
           Die <strong>Verarbeitungsstufe (%)</strong> reduziert die Dauer pro Verarbeitungsvorgang global für alle Routen.
         </div>
@@ -532,8 +532,12 @@
 
   <script>
   (function(){
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzFHZwQI9KxXhJvR6aZRR0zyqyijb46gaqWpYhCsxdfow2U5Y5A5D4gBg3jmRyaa_hh/exec';
+    /* ===========================================================
+       CONFIG: Apps Script Web-App URL (unbedingt ersetzen!)
+    ============================================================ */
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxfopqKT8QfhMqeH5Bw-xzgrwPlUy-79YGippypdMQo5HcoUT-j7rTTJ7n5Bl-g2RQ/exec';
 
+    /* ======== Hilfsfunktionen & Format ======== */
     function qs(s, e){return (e||document).querySelector(s);}
     function qsa(s, e){return Array.prototype.slice.call((e||document).querySelectorAll(s));}
     function uid(){return Math.random().toString(36).slice(2,9);}
@@ -547,6 +551,7 @@
     function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{},misc:{}}; }catch(e){ return {routes:{},travelTimes:{},misc:{}}; } }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
+    // JSONP Loader (für GET)
     function jsonp(url){
       return new Promise(function(resolve,reject){
         const cb = 'cb_' + Math.random().toString(36).slice(2);
@@ -561,6 +566,7 @@
       });
     }
 
+    /* ======== UI: SellList ======== */
     function addSellRow(pname, price){
       var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
       var list=qs('#sellList'); list.appendChild(row);
@@ -583,6 +589,7 @@
       if((arr||[]).length===0){ addSellRow('', null); }
     }
 
+    /* ======== Step-Templates/Controls ======== */
     var TPLS={
       start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
       end: function(){return qs('#tpl-end').content.firstElementChild.cloneNode(true);},
@@ -623,7 +630,6 @@
       qs('.delLager',row).addEventListener('click', function(){ row.remove(); recalc(); });
       row.addEventListener('input', recalc);
     }
-
     function attachStepControls(stepEl){
       qs('.remove',stepEl)?.addEventListener('click', function(){ stepEl.remove(); recalc(); });
       qs('.addInput',stepEl)?.addEventListener('click', function(){ addInputRow(stepEl); });
@@ -660,6 +666,8 @@
     })();
 
     var currentRouteId=null;
+
+    /* ======== Route (lesen/schreiben im UI) ======== */
     function getRoute(){
       var name = (qs('#routeName')?.value || '').trim() || 'Unbenannt';
       var steps=[];
@@ -805,6 +813,7 @@
       recalc();
     }
 
+    /* ======== Travel-Zeiten ======== */
     function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
     function openTravelModal(from,to, cb){
       var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
@@ -831,7 +840,6 @@
         openTravelModal(prevPlace, currPlace, function(mins){ if(mins==null) return; store.travelTimes[key]=mins; writeStore(store); recalc(); });
       }catch(e){}
     }
-
     function getCurrentRouteTransitions(){
       var r = getRoute();
       var trans = [];
@@ -851,7 +859,6 @@
       });
       return uniq;
     }
-
     function openTravelManager(){
       renderTravelManager();
       var m=qs('#travelManager');
@@ -915,7 +922,7 @@
       closeTravelManager();
     }
 
-    /* ==== Globale Einstellungen (Steuer + Verarbeitungsstufe) ==== */
+    /* ======== Globale Einstellungen (Steuer + Verarbeitungsstufe) ======== */
     function getTaxRate(){
       var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
       var el = qs('#taxRate'); if(el){ var n=num(el.value); if(!isNaN(n)) v=n; }
@@ -943,8 +950,8 @@
       var v = Math.max(0, Math.min(100, num(qs('#procRate').value)));
       var store=readStore(); store.misc = store.misc || {}; store.misc.processLevel = v; writeStore(store);
     }
-    /* ============================================================= */
 
+    /* ======== Berechnung ======== */
     function kgPerBatchAllInputs(inputs, weights){
       var sum=0;
       inputs.forEach(function(i){
@@ -967,7 +974,6 @@
         return Math.max(0, Math.floor(shareKg / ow));
       });
     }
-
     function deepClone(obj){
       if(!obj || typeof obj!=='object') return obj;
       var out = Array.isArray(obj) ? [] : {};
@@ -1122,7 +1128,7 @@
             outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
             var durSec = Math.max(0, num(s.duration));
-            var durSecEff = Math.max(0, durSec * (1 - procLevel/100)); /* GLOBAL-Stufe anwenden */
+            var durSecEff = Math.max(0, durSec * (1 - getProcessLevel()/100));
             var durMin = durSecEff/60;
 
             var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
@@ -1141,7 +1147,7 @@
               if(batchesByInventory<=0) break;
 
               var kgBatch = totalInputKgPerBatch;
-              var batchesByBackpack = kgBatch>0 ? Math.floor(backpackKg / kgBatch) : batchesByInventory;
+              var batchesByBackpack = kgBatch>0 ? Math.floor(route.backpackKg / kgBatch) : batchesByInventory;
               if(kgBatch>0 && batchesByBackpack<=0) break;
 
               var batchesThisOp = Math.max(1, Math.min(batchesByInventory, batchesByBackpack || batchesByInventory));
@@ -1179,7 +1185,7 @@
               return fmt(q)+'× '+o.name;
             }).join(' + ');
             var durSecTxt = Math.round(durSecEff);
-            var ps = procLevel>0 ? (' (Stufe '+fmt(procLevel)+'%)') : '';
+            var ps = getProcessLevel()>0 ? (' (Stufe '+fmt(getProcessLevel())+'%)') : '';
             log.push('Verarbeitung @ '+(s.where||'?')+': '+vgaenge+' Vorgänge, '+fmt(batchesTotal)+' Batches/Vorgang: '+inputsTxt+' → '+dbgOut+' je Batch. Dauer/Vorgang: '+fmt(durSecTxt)+' s'+ps);
           }
         }
@@ -1259,6 +1265,7 @@
       };
     }
 
+    /* ======== Rendering ======== */
     function renderBetween(calc){
       qsa('#steps .between').forEach(function(b){ b.remove(); });
 
@@ -1277,7 +1284,6 @@
         el.insertAdjacentElement('afterend', b);
       });
     }
-
     function renderLagerStocks(calc){
       var stepEls = qsa('#steps .step');
       for(var i=0;i<stepEls.length;i++){
@@ -1300,7 +1306,6 @@
         }
       }
     }
-
     function renderSummary(calc){
       qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
       qs('#kpiCost').textContent = cf.format(calc.totalCost);
@@ -1415,14 +1420,10 @@
       return lines.join('\n');
     }
 
-    function recalc(){
-      var route=getRoute();
-      var calc=compute(route);
-      renderSummary(calc);
-      renderBetween(calc);
-      renderLagerStocks(calc);
-    }
+    function renderSummaryAndMaybeList(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); renderBetween(calc); renderLagerStocks(calc); if(!document.getElementById('listView').hidden){ renderListView(); } }
+    function recalc(){ var route=getRoute(); var calc=compute(route); renderSummary(calc); renderBetween(calc); renderLagerStocks(calc); }
 
+    /* ======== Routenliste (Ranking) ======== */
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
@@ -1441,7 +1442,6 @@
         sel.appendChild(o);
       });
     }
-
     function buildListData(){
       var store=readStore(); var tax = getTaxRate();
       var list=[];
@@ -1465,7 +1465,6 @@
       list.sort(function(a,b){ return (b.hourlyProfitNet||0) - (a.hourlyProfitNet||0); });
       return list;
     }
-
     function renderListView(){
       setTaxRateUIFromStore();
       setProcessLevelUIFromStore();
@@ -1566,7 +1565,6 @@
         });
       }
     }
-
     function enableListDnD(container, onOrderChanged){
       var dragEl=null;
       container.addEventListener('dragstart', function(e){
@@ -1597,25 +1595,28 @@
       });
     }
 
-    const DRIVE_AUTO_LOAD = true;
+    /* ======== Backend: Google Sheets via Apps Script ======== */
 
+    // State-Tag (UI)
     function updateDriveStateTag(connected){
       const el = qs('#driveState');
       if(!el) return;
       if(connected){
-        el.textContent = 'Drive: verbunden';
+        el.textContent = 'Sheet: verbunden';
         el.classList.remove('yellow'); el.classList.add('green');
-        el.title = 'Web-App verbunden';
+        el.title = 'Web-App / Sheet verbunden';
       }else{
-        el.textContent = 'Drive: nicht verbunden';
+        el.textContent = 'Sheet: nicht verbunden';
         el.classList.add('yellow'); el.classList.remove('green');
         el.title = 'Nicht authentifiziert';
       }
     }
 
+    // Token im SessionStorage
     function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
     function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
 
+    // API-Wrapper: list/get per JSONP, save/delete per POST
     async function gasListRoutes(){
       const url = GAS_URL + '?action=list&token=' + encodeURIComponent(getToken());
       const data = await jsonp(url);
@@ -1626,14 +1627,20 @@
       const url = GAS_URL + '?action=get&id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(getToken());
       const data = await jsonp(url);
       if(!data.ok) throw new Error(data.error || 'Get failed');
-      return data.route;
+      // data enthält: { ok:true, route, travelTimes, misc }
+      return data;
     }
     async function gasSaveRoute(route){
+      const store = readStore();
+      const misc = {
+        taxRate: String(getTaxRate()),
+        processLevel: String(getProcessLevel())
+      };
       await fetch(GAS_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save', token: getToken(), route })
+        body: JSON.stringify({ action: 'save', token: getToken(), route, travelTimes: store.travelTimes||{}, misc })
       });
       await new Promise(r => setTimeout(r, 500));
       return true;
@@ -1649,27 +1656,36 @@
       return true;
     }
 
-    async function syncFromDriveIntoPage(){
+    // Vollständiger Sync: aus Sheet in lokalen Page-Store
+    async function syncFromSheetIntoPage(){
       try{
         const list = await gasListRoutes();
-        if(!Array.isArray(list)) return;
         const store = readStore();
         for(const meta of list){
           const id = (meta.id || '').replace(/\.json$/,'');
           if(!id) continue;
-          const route = await gasGetRoute(id);
-          if(route && route.id && Array.isArray(route.steps)){
-            if(route.travelTimes && typeof route.travelTimes === 'object'){
-              store.travelTimes = Object.assign({}, store.travelTimes||{}, route.travelTimes||{});
+          const data = await gasGetRoute(id);
+          if(data && data.route){
+            store.routes[data.route.id] = data.route;
+            if(data.travelTimes && typeof data.travelTimes === 'object'){
+              store.travelTimes = Object.assign({}, store.travelTimes||{}, data.travelTimes||{});
             }
-            store.routes[route.id] = route;
+            if(data.misc){
+              const tax = Number(data.misc.taxRate||0);
+              const proc = Number(data.misc.processLevel||0);
+              store.misc = store.misc || {};
+              store.misc.taxRate = tax;
+              store.misc.processLevel = proc;
+            }
           }
         }
         writeStore(store);
+        setTaxRateUIFromStore();
+        setProcessLevelUIFromStore();
         refreshRouteSelect(null);
         renderSummaryAndMaybeList();
       }catch(err){
-        console.warn('Drive Sync (load) fehlgeschlagen:', err);
+        console.warn('Sheet Sync (load) fehlgeschlagen:', err);
       }
     }
 
@@ -1680,11 +1696,11 @@
         return;
       }
       try{
-        await gasListRoutes();
+        await gasListRoutes(); // einfacher Check
         hideAuth();
         updateDriveStateTag(true);
-        if(initial && DRIVE_AUTO_LOAD){
-          await syncFromDriveIntoPage();
+        if(initial){
+          await syncFromSheetIntoPage();
         }
       }catch(err){
         setToken('');
@@ -1693,6 +1709,7 @@
       }
     }
 
+    /* ======== Auth-Overlay ======== */
     function showAuth(msg){
       const overlay=qs('#authOverlay');
       const err=qs('#authError');
@@ -1708,17 +1725,7 @@
       qs('.content').style.visibility='visible';
     }
 
-    function switchTab(name){
-      var isList = (name==='list');
-      document.getElementById('tabBuilder').classList.toggle('active', !isList);
-      document.getElementById('tabList').classList.toggle('active', isList);
-      document.getElementById('builderView').hidden = !isList ? false : true;
-      document.getElementById('resultView').hidden  = !isList ? false : true;
-      document.getElementById('listView').hidden    = isList ? false : true;
-      if(isList){ renderListView(); }
-    }
-    function renderSummaryAndMaybeList(){ recalc(); if(!document.getElementById('listView').hidden){ renderListView(); } }
-
+    /* ======== DOM Ready ======== */
     window.addEventListener('DOMContentLoaded', async function(){
       qs('#authForm').addEventListener('submit', async function(ev){
         ev.preventDefault();
@@ -1729,7 +1736,6 @@
       });
 
       document.getElementById('addSell').addEventListener('click', function(){ addSellRow('', null); });
-
       document.getElementById('addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); });
 
       ['lkwSize','backpackKg','routeName'].forEach(function(id){
@@ -1747,7 +1753,7 @@
           return;
         }
         if(!r.id) r.id = uid();
-        var store=readStore(); store.routes[r.id]=r; writeStore(store); 
+        var store=readStore(); store.routes[r.id]=r; writeStore(store);
         refreshRouteSelect(r.id);
         var sel=document.getElementById('routeSelect'); if(sel){ sel.value=r.id; }
         alert('Route lokal gespeichert.');
@@ -1756,9 +1762,9 @@
           try{
             await gasSaveRoute(r);
             updateDriveStateTag(true);
-            alert('Route zusätzlich in Google Drive gespeichert.');
+            alert('Route in Google Sheet gespeichert.');
           }catch(err){
-            console.warn('Speichern nach Drive fehlgeschlagen:', err.message);
+            console.warn('Speichern ins Sheet fehlgeschlagen:', err.message);
             updateDriveStateTag(false);
             showAuth('Zugriff verweigert oder Fehler beim Speichern. Bitte Token prüfen.');
           }
@@ -1775,9 +1781,9 @@
         if(getToken()){
           try{
             await gasDeleteRoute(id);
-            alert('Route auch in Google Drive gelöscht.');
+            alert('Route auch im Google Sheet gelöscht.');
           }catch(err){
-            console.warn('Drive-Delete fehlgeschlagen:', err.message);
+            console.warn('Sheet-Delete fehlgeschlagen:', err.message);
             showAuth('Zugriff verweigert oder Fehler beim Löschen. Bitte Token prüfen.');
           }
         }
@@ -1852,7 +1858,7 @@
             setRoute(route); currentRouteId = route.id;
 
             if(getToken()){
-              try{ await gasSaveRoute(route); }catch(err){ console.warn('Drive-Save nach Import fehlgeschlagen:', err.message); }
+              try{ await gasSaveRoute(route); }catch(err){ console.warn('Sheet-Save nach Import fehlgeschlagen:', err.message); }
             }
 
             alert('Route importiert und geladen: '+route.name);
@@ -1919,8 +1925,21 @@
         rd.readAsText(f); e.target.value='';
       });
 
-      document.getElementById('tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
-      document.getElementById('tabList').addEventListener('click', function(){ switchTab('list'); });
+      document.getElementById('tabBuilder').addEventListener('click', function(){ 
+        document.getElementById('tabBuilder').classList.add('active');
+        document.getElementById('tabList').classList.remove('active');
+        document.getElementById('builderView').hidden = false;
+        document.getElementById('resultView').hidden  = false;
+        document.getElementById('listView').hidden    = true;
+      });
+      document.getElementById('tabList').addEventListener('click', function(){ 
+        document.getElementById('tabBuilder').classList.remove('active');
+        document.getElementById('tabList').classList.add('active');
+        document.getElementById('builderView').hidden = true;
+        document.getElementById('resultView').hidden  = true;
+        document.getElementById('listView').hidden    = false;
+        renderListView();
+      });
 
       refreshRouteSelect(null);
       setSellList([]);
