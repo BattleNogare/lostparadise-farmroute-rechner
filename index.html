@@ -131,12 +131,15 @@
     .list-toolbar{display:flex; gap:12px; margin-bottom:8px; align-items:center; flex-wrap:wrap}
 
     .route-item{margin:8px 0; border-radius:12px; background:#0f141b; border:1px dashed var(--border)}
+    .route-item.dragging{opacity:.6; outline:2px dashed var(--accent)}
 
     .route-row{display:grid; grid-template-columns: 32px 1.2fr 1fr .8fr auto; gap:10px; align-items:center; padding:10px;}
+    .route-row .drag{cursor:grab; user-select:none; text-align:center; border:1px solid var(--border); border-radius:8px; padding:6px; background:#0e171f}
     .pill{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e171f; font-size:12px}
     .muted{color:#9bb2c9}
     .warn{color:#2b2300; background:linear-gradient(180deg,#ffe58f,#ffd666); border-color:#e8c14c}
-    .adjustments{display:none}
+    .adjustments{margin-top:12px; border:1px solid var(--border); border-radius:12px; padding:10px; background:#0e171f}
+    .adjustments ul{margin:8px 0 0 18px}
 
     .row-details{margin:0 10px 10px 42px; border-left:2px dashed var(--border); padding:8px 0 0 12px}
     .row-details .kpis{display:flex; gap:12px; flex-wrap:wrap; margin:6px 0}
@@ -171,7 +174,7 @@
       <form id="authForm">
         <label>Token<br><input id="authToken" type="password" placeholder="●●●●●●●●" autocomplete="current-password" required></label>
         <div class="actions" style="justify-content:space-between">
-          <span id="driveState" class="tag yellow" title="Backend-Verbindung">Backend: nicht verbunden</span>
+          <span class="tag yellow" title="Google Apps Script">Drive-Backend aktiv</span>
           <button id="authSubmit" type="submit" class="primary">Entsperren</button>
         </div>
       </form>
@@ -186,7 +189,7 @@
              src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
         <div class="brand">
           <h1>Farmrouten-Preisrechner</h1>
-          <span id="driveState2" class="tag yellow" title="Backend-Verbindung" style="display:none">Backend: nicht verbunden</span>
+          <span id="driveState" class="tag yellow" title="Drive-Verbindung">Drive: nicht verbunden</span>
         </div>
         <div class="toolbar">
           <div class="tabs">
@@ -194,7 +197,7 @@
             <button class="tab" id="tabList">Routenliste</button>
           </div>
           <div class="menu">
-            <select id="routeSelect" title="Gespeicherte Routen"></select>
+            <select id="routeSelect" title="Gespeicherte Routen (in dieser Seite)"></select>
             <button id="saveBtn">Route speichern</button>
             <button id="deleteBtn" class="danger">Löschen</button>
             <button id="exportCurrentBtn" class="ghost">Export aktuelle Route</button>
@@ -286,12 +289,16 @@
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
         <div class="sub">
-          Alle gespeicherten Routen (Sheets wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (brutto)</strong> sortiert.
+          Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
+          Der <strong>Steuersatz</strong> wird nur auf Routen ohne „illegal“ im Namen angewendet.  
           Die <strong>Verarbeitungsstufe (%)</strong> reduziert die Dauer pro Verarbeitungsvorgang global für alle Routen.
         </div>
         <div class="hr"></div>
 
         <div class="list-toolbar">
+          <label>Steuersatz (%)<br>
+            <input id="taxRate" type="number" min="0" step="0.1" value="0" title="Wird auf alle nicht-illegalen Routen angewendet">
+          </label>
           <label>Verarbeitungsstufe (%)<br>
             <input id="procRate" type="number" min="0" max="100" step="1" value="0" title="Global: reduziert Dauer pro Vorgang in Verarbeitungsschritten">
           </label>
@@ -302,20 +309,22 @@
 
         <div id="routesList"></div>
 
-        <div id="adjustmentsPanel" class="adjustments">
-          <strong>Anpassungen (deaktiviert)</strong>
+        <div id="adjustmentsPanel" class="adjustments" style="display:none">
+          <strong>Anpassungen nötig, um diese Reihenfolge zu erreichen:</strong>
+          <ul id="adjustmentsList"></ul>
+          <div class="mini muted" id="adjustmentsNote" style="margin-top:6px"></div>
         </div>
       </section>
     </main>
   </div>
 
   <!--DATA-START-->
-  <script id="app-data" type="application/json">{"routes":{},"travelTimes":{},"misc":{"processLevel":0}}</script>
+  <script id="app-data" type="application/json">{"routes":{},"travelTimes":{},"misc":{"taxRate":0,"processLevel":0}}</script>
   <!--DATA-END-->
 
   <!-- Step Templates -->
   <template id="tpl-start">
-    <div class="step" data-type="start">
+    <div class="step" data-type="start" draggable="true">
       <div class="bar">
         <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Startpunkt</span></div>
         <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
@@ -327,7 +336,7 @@
   </template>
 
   <template id="tpl-end">
-    <div class="step" data-type="end">
+    <div class="step" data-type="end" draggable="true">
       <div class="bar">
         <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Endpunkt</span></div>
         <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
@@ -339,7 +348,7 @@
   </template>
 
   <template id="tpl-abbau">
-    <div class="step" data-type="abbau">
+    <div class="step" data-type="abbau" draggable="true">
       <div class="bar">
         <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Abbau</span></div>
         <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
@@ -358,7 +367,7 @@
   </template>
 
   <template id="tpl-lager">
-    <div class="step" data-type="lager">
+    <div class="step" data-type="lager" draggable="true">
       <div class="bar">
         <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Zwischenlager</span></div>
         <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
@@ -389,7 +398,7 @@
   </template>
 
   <template id="tpl-verarbeitung">
-    <div class="step" data-type="verarbeitung">
+    <div class="step" data-type="verarbeitung" draggable="true">
       <div class="bar">
         <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Verarbeitung</span></div>
         <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
@@ -433,7 +442,7 @@
   </template>
 
   <template id="tpl-transportkosten">
-    <div class="step" data-type="transportkosten">
+    <div class="step" data-type="transportkosten" draggable="true">
       <div class="bar">
         <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Transportkosten</span></div>
         <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
@@ -448,7 +457,7 @@
   </template>
 
   <template id="tpl-einverkauf">
-    <div class="step" data-type="einverkauf">
+    <div class="step" data-type="einverkauf" draggable="true">
       <div class="bar">
         <div><span class="handle" title="Ziehen zum Sortieren">▤</span> <span class="tag">Einkauf/Verkauf</span></div>
         <div class="actions"><button class="remove danger" type="button">Entfernen</button></div>
@@ -493,7 +502,7 @@
       </div>
       <label>Fahrzeit (Minuten)<br><input id="travelMinutes" type="number" min="0" step="1"></label>
       <div class="actions" style="margin-top:10px">
-        <button id="travelCancel" type="button">Schließen</button>
+        <button id="travelCancel" type="button">Abbrechen</button>
         <button id="travelSave" class="primary" type="button">Speichern</button>
       </div>
     </div>
@@ -521,29 +530,23 @@
     </div>
   </div>
 
-  <!-- ======= SCRIPT (Sheets-Backend, Autosave, Polling, ohne DnD) ======= -->
   <script>
-  /* ======= SHEETS BACKEND URL ======= */
-  const GAS_URL = '<<DEINE_WEB_APP_URL_HIER_EINFÜGEN>>';
-
   (function(){
-    /* ======= UTIL ======= */
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzFHZwQI9KxXhJvR6aZRR0zyqyijb46gaqWpYhCsxdfow2U5Y5A5D4gBg3jmRyaa_hh/exec';
+
     function qs(s, e){return (e||document).querySelector(s);}
     function qsa(s, e){return Array.prototype.slice.call((e||document).querySelectorAll(s));}
     function uid(){return Math.random().toString(36).slice(2,9);}
-    const nf=new Intl.NumberFormat('de-DE',{maximumFractionDigits:2});
-    const cf=new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:2});
+    var nf=new Intl.NumberFormat('de-DE',{maximumFractionDigits:2});
+    var cf=new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:2});
     function fmt(n){return nf.format(n);}
     function num(v){ if(v==null) return 0; if(typeof v==='number') return v; var s=String(v).trim().replace(/\./g,'').replace(',', '.'); var n=parseFloat(s); return isNaN(n)?0:n; }
     function minutesToH(m){ var h=Math.floor(m/60), mi=Math.round(m%60); return h<=0 ? (mi+" min") : (h+" h "+mi+" min"); }
     function slug(s){ return (s||'route').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 
-    /* ======= STATE ======= */
     function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{},misc:{}}; }catch(e){ return {routes:{},travelTimes:{},misc:{}}; } }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
-    let currentRouteId=null;
 
-    /* ======= JSONP + FETCH ======= */
     function jsonp(url){
       return new Promise(function(resolve,reject){
         const cb = 'cb_' + Math.random().toString(36).slice(2);
@@ -557,55 +560,18 @@
         document.head.appendChild(s);
       });
     }
-    function gasListRoutes(){ return jsonp(GAS_URL + '?action=list&token=' + encodeURIComponent(getToken())); }
-    function gasGetRoute(id){ return jsonp(GAS_URL + '?action=get&id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(getToken())); }
-    async function gasSaveRoute(route, travelTimes, misc){
-      try{
-        await fetch(GAS_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action:'save', token:getToken(), route, travelTimes, misc })
-        });
-      }catch(err){ console.warn('Save failed:', err); }
-    }
-    async function gasDeleteRoute(id){
-      try{
-        await fetch(GAS_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action:'delete', token:getToken(), id })
-        });
-      }catch(err){ console.warn('Delete failed:', err); }
-    }
 
-    /* ======= LOGIN BADGE ======= */
-    function updateBackendStateTag(connected){
-      const el = qs('#driveState');
-      if(!el) return;
-      el.textContent = connected ? 'Backend: verbunden' : 'Backend: nicht verbunden';
-      el.classList.toggle('green', !!connected);
-      el.classList.toggle('yellow', !connected);
-      el.title = connected ? 'Web-App (Sheets) verbunden' : 'Nicht authentifiziert';
-    }
-
-    /* ======= TOKEN ======= */
-    function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
-    function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
-
-    /* ======= SELL LIST HELPERS ======= */
     function addSellRow(pname, price){
       var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
       var list=qs('#sellList'); list.appendChild(row);
       if(pname) qs('[data-k="pname"]',row).value=pname;
-      if(price!=null && price!=='') qs('[data-k="pprice"]',row).value=price;
-      row.addEventListener('input', onUserChanged);
-      qs('.delSell',row).addEventListener('click', function(){ row.remove(); onUserChanged(); });
+      if(price!=null) qs('[data-k="pprice"]',row).value=price;
+      row.addEventListener('input', recalc);
+      qs('.delSell',row).addEventListener('click', function(){ row.remove(); recalc(); });
     }
     function getSellList(){
       return qsa('#sellList .row').map(function(r){
-        var n=(qs('[data-k="pname"]',r).value||'').trim();
+        var n=qs('[data-k="pname"]',r).value.trim();
         var p=num(qs('[data-k="pprice"]',r).value);
         if(!n) return null;
         return {name:n, price:(p>0?p:null)};
@@ -613,31 +579,30 @@
     }
     function setSellList(arr){
       var list=qs('#sellList'); list.innerHTML='';
-      (arr||[]).forEach(function(x){ addSellRow(x.name, x.price==null? '' : x.price); });
+      (arr||[]).forEach(function(x){ addSellRow(x.name, x.price); });
       if((arr||[]).length===0){ addSellRow('', null); }
     }
 
-    /* ======= STEPS ======= */
-    const TPLS={
-      start: ()=>qs('#tpl-start').content.firstElementChild.cloneNode(true),
-      end: ()=>qs('#tpl-end').content.firstElementChild.cloneNode(true),
-      abbau: ()=>qs('#tpl-abbau').content.firstElementChild.cloneNode(true),
-      lager: ()=>qs('#tpl-lager').content.firstElementChild.cloneNode(true),
-      verarbeitung: ()=>{ var el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); addOutputRow(el); return el; },
-      transportkosten: ()=>qs('#tpl-transportkosten').content.firstElementChild.cloneNode(true),
-      einverkauf: ()=>{ var el=qs('#tpl-einverkauf').content.firstElementChild.cloneNode(true); addTradeRow(el); return el; }
+    var TPLS={
+      start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
+      end: function(){return qs('#tpl-end').content.firstElementChild.cloneNode(true);},
+      abbau: function(){return qs('#tpl-abbau').content.firstElementChild.cloneNode(true);},
+      lager: function(){return qs('#tpl-lager').content.firstElementChild.cloneNode(true);},
+      verarbeitung: function(){ var el=qs('#tpl-verarbeitung').content.firstElementChild.cloneNode(true); addInputRow(el); addOutputRow(el); return el; },
+      transportkosten: function(){return qs('#tpl-transportkosten').content.firstElementChild.cloneNode(true);},
+      einverkauf: function(){ var el=qs('#tpl-einverkauf').content.firstElementChild.cloneNode(true); addTradeRow(el); return el; }
     };
     function addInputRow(stepEl){
       var row=qs('#tpl-input-row').content.firstElementChild.cloneNode(true);
       qs('[data-key="inputs"]', stepEl).appendChild(row);
-      qs('.delInput',row).addEventListener('click', function(){ row.remove(); onUserChanged(); });
-      row.addEventListener('input', onUserChanged);
+      qs('.delInput',row).addEventListener('click', function(){ row.remove(); recalc(); });
+      row.addEventListener('input', recalc);
     }
     function addOutputRow(stepEl){
       var row=qs('#tpl-output-row').content.firstElementChild.cloneNode(true);
       qs('[data-key="outputs"]', stepEl).appendChild(row);
-      qs('.delOutput',row).addEventListener('click', function(){ row.remove(); onUserChanged(); });
-      row.addEventListener('input', onUserChanged);
+      qs('.delOutput',row).addEventListener('click', function(){ row.remove(); recalc(); });
+      row.addEventListener('input', recalc);
     }
     function addTradeRow(stepEl, action, name, qty, price){
       var row=qs('#tpl-trade-row').content.firstElementChild.cloneNode(true);
@@ -646,8 +611,8 @@
       if(name!=null) qs('[data-k="name"]',row).value=name;
       if(qty!=null) qs('[data-k="qty"]',row).value=qty;
       if(price!=null) qs('[data-k="price"]',row).value=price;
-      qs('.delTrade',row).addEventListener('click', function(){ row.remove(); onUserChanged(); });
-      row.addEventListener('input', onUserChanged);
+      qs('.delTrade',row).addEventListener('click', function(){ row.remove(); recalc(); });
+      row.addEventListener('input', recalc);
     }
     function addLagerRow(stepEl, action, name, qty){
       var row=qs('#tpl-lager-row').content.firstElementChild.cloneNode(true);
@@ -655,26 +620,48 @@
       if(action) qs('[data-k="action"]',row).value=action;
       if(name!=null) qs('[data-k="name"]',row).value=name;
       if(qty!=null) qs('[data-k="qty"]',row).value=qty;
-      qs('.delLager',row).addEventListener('click', function(){ row.remove(); onUserChanged(); });
-      row.addEventListener('input', onUserChanged);
+      qs('.delLager',row).addEventListener('click', function(){ row.remove(); recalc(); });
+      row.addEventListener('input', recalc);
     }
+
     function attachStepControls(stepEl){
-      qs('.remove',stepEl)?.addEventListener('click', function(){ stepEl.remove(); onUserChanged(); });
+      qs('.remove',stepEl)?.addEventListener('click', function(){ stepEl.remove(); recalc(); });
       qs('.addInput',stepEl)?.addEventListener('click', function(){ addInputRow(stepEl); });
       qs('.addOutput',stepEl)?.addEventListener('click', function(){ addOutputRow(stepEl); });
       qs('.addLager',stepEl)?.addEventListener('click', function(){ addLagerRow(stepEl, 'ablegen', '', '') });
       qs('.addTrade',stepEl)?.addEventListener('click', function(){ addTradeRow(stepEl, 'kaufen', '', '', '') });
-      stepEl.addEventListener('input', onUserChanged);
+      stepEl.addEventListener('input', function(){ recalc(); });
       var where=qs('[data-key="where"]', stepEl);
       if(where){ where.addEventListener('blur', function(){ handlePlaceBlur(stepEl); }); }
+      stepEl.addEventListener('dragstart', function(){ stepEl.classList.add('dragging'); });
+      stepEl.addEventListener('dragend', function(){ stepEl.classList.remove('dragging'); recalc(); });
     }
     function addStep(type){
       var el=TPLS[type]?TPLS[type]():null; if(!el) return null;
       el.dataset.type=type; attachStepControls(el); qs('#steps').appendChild(el); return el;
     }
+    (function(){
+      var container=qs('#steps');
+      function afterEl(container,y){
+        var els=[].slice.call(container.querySelectorAll('.step:not(.dragging)'));
+        return els.reduce(function(closest,child){
+          var box=child.getBoundingClientRect();
+          var offset=y - box.top - box.height/2;
+          if(offset<0 && offset>closest.offset){ return {offset:offset, element:child}; }
+          else { return closest; }
+        }, {offset:Number.NEGATIVE_INFINITY}).element;
+      }
+      document.addEventListener('dragover', function(e){
+        var dragging=qs('.step.dragging'); if(!dragging) return;
+        e.preventDefault();
+        var a=afterEl(container, e.clientY);
+        if(a==null){ container.appendChild(dragging); } else { container.insertBefore(dragging, a); }
+      });
+    })();
 
-    /* ======= SERIALIZE ======= */
+    var currentRouteId=null;
     function getRoute(){
+      var name = (qs('#routeName')?.value || '').trim() || 'Unbenannt';
       var steps=[];
       qsa('#steps .step').forEach(function(step){
         var type=step.dataset.type;
@@ -702,34 +689,52 @@
           });
         } else if(type==='verarbeitung'){
           var inputs=qsa('[data-key="inputs"] .input-row',step).map(function(row){
-            return { name: qs('[data-k="name"]',row).value.trim(), qty: num(qs('[data-k="qty"]',row).value), source: qs('[data-k="source"]',row).value.trim() };
+            return {
+              name: qs('[data-k="name"]',row).value.trim(),
+              qty: num(qs('[data-k="qty"]',row).value),
+              source: qs('[data-k="source"]',row).value.trim()
+            };
           }).filter(function(i){return i.name && i.qty>0;});
           var outputs=qsa('[data-key="outputs"] .output-row',step).map(function(row){
-            return { name: qs('[data-k="name"]',row).value.trim(), qty: num(qs('[data-k="qty"]',row).value), unitWeight: num(qs('[data-k="unitWeight"]',row).value) };
+            return {
+              name: qs('[data-k="name"]',row).value.trim(),
+              qty: num(qs('[data-k="qty"]',row).value),
+              unitWeight: num(qs('[data-k="unitWeight"]',row).value)
+            };
           }).filter(function(o){return o.name;});
           steps.push({type:type,
             where: qs('[data-key="where"]',step).value.trim(),
             duration: num(qs('[data-key="duration"]',step).value),
             processCost: num(qs('[data-key="processCost"]',step).value),
-            inputs: inputs, outputs: outputs
+            inputs: inputs,
+            outputs: outputs
           });
         } else if(type==='transportkosten'){
-          steps.push({ type:type,
+          steps.push({
+            type:type,
             fromWhere: qs('[data-key="fromWhere"]',step).value.trim(),
             toWhere: qs('[data-key="toWhere"]',step).value.trim(),
             transportCost: num(qs('[data-key="transportCost"]',step).value)
           });
         } else if(type==='einverkauf'){
           var moves=qsa('[data-key="moves"] .trade-row',step).map(function(r){
-            return { action: qs('[data-k="action"]',r).value, name: (qs('[data-k="name"]',r).value||'').trim(), qty: Math.max(0, num(qs('[data-k="qty"]',r).value)), price: Math.max(0, num(qs('[data-k="price"]',r).value)) };
+            return {
+              action: qs('[data-k="action"]',r).value,
+              name: (qs('[data-k="name"]',r).value||'').trim(),
+              qty: Math.max(0, num(qs('[data-k="qty"]',r).value)),
+              price: Math.max(0, num(qs('[data-k="price"]',r).value))
+            };
           }).filter(function(m){return m.name && m.qty>0;});
-          steps.push({type:type, where: qs('[data-key="where"]',step).value.trim(), moves: moves});
+          steps.push({type:type,
+            where: qs('[data-key="where"]',step).value.trim(),
+            moves: moves
+          });
         }
       });
       var store=readStore();
       return {
         id: currentRouteId || uid(),
-        name: (qs('#routeName')?.value || '').trim() || 'Unbenannt',
+        name: name,
         lkwSize: Math.max(1, num(qs('#lkwSize').value)||2000),
         backpackKg: Math.max(1, num(qs('#backpackKg').value)||150),
         sellList: getSellList(),
@@ -737,11 +742,198 @@
         travelTimes: store.travelTimes || {}
       };
     }
+    function setRoute(route){
+      currentRouteId = route.id || uid();
 
-    /* ======= GLOBAL SETTINGS (Misc) ======= */
+      if(route.travelTimes && typeof route.travelTimes === 'object'){
+        var st = readStore();
+        st.travelTimes = Object.assign({}, st.travelTimes||{}, route.travelTimes||{});
+        writeStore(st);
+      }
+
+      qs('#routeName').value = route.name || '';
+      qs('#lkwSize').value = route.lkwSize || 2000;
+      qs('#backpackKg').value = route.backpackKg || 150;
+      setSellList(route.sellList||[]);
+      var box=qs('#steps'); box.innerHTML='';
+      (route.steps||[]).forEach(function(s){
+        var el=addStep(s.type); if(!el) return;
+        if(s.type==='start' || s.type==='end'){
+          qs('[data-key="where"]',el).value=s.where||'';
+        } else if(s.type==='abbau'){
+          qs('[data-key="what"]',el).value=s.what||'';
+          qs('[data-key="unitWeight"]',el).value=s.unitWeight||'';
+          qs('[data-key="where"]',el).value=s.where||'';
+          qs('[data-key="qtyUnits"]',el).value=s.qtyUnits||'';
+          qs('[data-key="timeMinutes"]',el).value=s.timeMinutes||'';
+        } else if(s.type==='lager'){
+          qs('[data-key="where"]',el).value=s.where||'';
+          var list=qs('[data-key="moves"]',el); list.innerHTML='';
+          (s.moves||[]).forEach(function(m){ addLagerRow(el, m.action, m.name, m.qty); });
+          if((s.moves||[]).length===0){ addLagerRow(el,'ablegen','', ''); }
+        } else if(s.type==='verarbeitung'){
+          qs('[data-key="where"]',el).value = s.where || '';
+          qs('[data-key="duration"]',el).value = s.duration || '';
+          qs('[data-key="processCost"]',el).value = s.processCost || '';
+          var listI=qs('[data-key="inputs"]',el); listI.innerHTML='';
+          (s.inputs||[]).forEach(function(inp){
+            addInputRow(el);
+            var row=listI.lastElementChild;
+            qs('[data-k="name"]',row).value=inp.name||'';
+            qs('[data-k="qty"]',row).value=inp.qty||'';
+            qs('[data-k="source"]',row).value=inp.source||'';
+          });
+          var listO=qs('[data-key="outputs"]',el); listO.innerHTML='';
+          (s.outputs||[]).forEach(function(out){
+            addOutputRow(el);
+            var row=listO.lastElementChild;
+            qs('[data-k="name"]',row).value=out.name||'';
+            qs('[data-k="qty"]',row).value=out.qty||'';
+            qs('[data-k="unitWeight"]',row).value=out.unitWeight||'';
+          });
+        } else if(s.type==='transportkosten'){
+          qs('[data-key="fromWhere"]',el).value=s.fromWhere||'';
+          qs('[data-key="toWhere"]',el).value=s.toWhere||'';
+          qs('[data-key="transportCost"]',el).value=s.transportCost||'';
+        } else if(s.type==='einverkauf'){
+          qs('[data-key="where"]',el).value=s.where||'';
+          var listT=qs('[data-key="moves"]',el); listT.innerHTML='';
+          (s.moves||[]).forEach(function(m){ addTradeRow(el, m.action, m.name, m.qty, m.price); });
+          if((s.moves||[]).length===0){ addTradeRow(el,'kaufen','', '', ''); }
+        }
+      });
+      recalc();
+    }
+
+    function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
+    function openTravelModal(from,to, cb){
+      var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
+      m.style.display='flex'; m.setAttribute('aria-hidden','false');
+      function close(){ m.style.display='none'; m.setAttribute('aria-hidden','true'); }
+      qs('#travelSave').onclick=function(){ var mins=Math.max(0, num(qs('#travelMinutes').value)); close(); cb(mins); };
+      qs('#travelCancel').onclick=function(){ close(); cb(null); };
+    }
+    function handlePlaceBlur(stepEl){
+      try{
+        var stepsNodes=qsa('#steps .step');
+        var idx=stepsNodes.findIndex(function(n){return n===stepEl;});
+        if(idx<0) return;
+        var currPlace=qs('[data-key="where"]', stepEl)?.value.trim(); if(!currPlace) return;
+        var prevPlace=null;
+        for(var i=idx-1;i>=0;i--){
+          var node=stepsNodes[i];
+          var w=qs('[data-key="where"]', node);
+          if(w && w.value.trim()){ prevPlace=w.value.trim(); break; }
+        }
+        if(!prevPlace || prevPlace===currPlace) return;
+        var store=readStore(); var key=travelKey(prevPlace, currPlace);
+        if(store.travelTimes[key]!=null) return;
+        openTravelModal(prevPlace, currPlace, function(mins){ if(mins==null) return; store.travelTimes[key]=mins; writeStore(store); recalc(); });
+      }catch(e){}
+    }
+
+    function getCurrentRouteTransitions(){
+      var r = getRoute();
+      var trans = [];
+      var lastPlace = null;
+      (r.steps||[]).forEach(function(s){
+        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verarbeitung'||s.type==='lager'||s.type==='einverkauf'||s.type==='end') ? (s.where||'') : '';
+        if(thisPlace && lastPlace && thisPlace!==lastPlace){
+          trans.push({from:lastPlace, to:thisPlace});
+        }
+        if(thisPlace) lastPlace = thisPlace;
+      });
+      var keySet = new Set();
+      var uniq = [];
+      trans.forEach(function(t){
+        var k = travelKey(t.from, t.to);
+        if(!keySet.has(k)){ keySet.add(k); uniq.push(t); }
+      });
+      return uniq;
+    }
+
+    function openTravelManager(){
+      renderTravelManager();
+      var m=qs('#travelManager');
+      m.style.display='flex'; m.setAttribute('aria-hidden','false');
+    }
+    function closeTravelManager(){
+      var m=qs('#travelManager');
+      m.style.display='none';
+      m.setAttribute('aria-hidden','true');
+    }
+    function renderTravelManager(){
+      var store=readStore();
+      var tbody=qs('#tmTable tbody');
+      tbody.innerHTML='';
+
+      var trans = getCurrentRouteTransitions();
+      trans.sort(function(a,b){
+        var s = a.from.localeCompare(b.from,'de',{sensitivity:'base'});
+        if(s!==0) return s;
+        return a.to.localeCompare(b.to,'de',{sensitivity:'base'});
+      });
+
+      if(trans.length===0){
+        var tr=document.createElement('tr');
+        tr.innerHTML='<td colspan="4" class="mini muted">Keine ortsübergreifenden Schritte in der aktuellen Route.</td>';
+        tbody.appendChild(tr);
+        return;
+      }
+
+      trans.forEach(function(t){
+        var key = travelKey(t.from, t.to);
+        var m = store.travelTimes[key] != null ? Number(store.travelTimes[key]) : '';
+        addTmRow(t.from, t.to, m);
+      });
+    }
+    function addTmRow(from,to,mins){
+      var tr=document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="tm-from" placeholder="Von" value="${from?from.replace(/"/g,'&quot;'):''}" readonly></td>
+        <td><input class="tm-to" placeholder="Nach" value="${to?to.replace(/"/g,'&quot;'):''}" readonly></td>
+        <td><input class="tm-mins" type="number" min="0" step="1" value="${mins!==''?Number(mins):''}"></td>
+        <td><button type="button" class="danger tm-del" disabled title="In diesem Modus nicht löschbar">Löschen</button></td>
+      `;
+      qs('#tmTable tbody').appendChild(tr);
+    }
+    function saveTravelManager(){
+      var rows=qsa('#tmTable tbody tr');
+      var store=readStore();
+      var tt = store.travelTimes || {};
+      rows.forEach(function(r){
+        var f = (qs('.tm-from',r).value||'').trim();
+        var t = (qs('.tm-to',r).value||'').trim();
+        var m = qs('.tm-mins',r).value;
+        if(!f || !t) return;
+        var key = (f||'?')+'|'+(t||'?');
+        if(m === ''){ delete tt[key]; } else { tt[key] = Math.max(0, num(m)); }
+      });
+      store.travelTimes = tt;
+      writeStore(store);
+      recalc();
+      closeTravelManager();
+    }
+
+    /* ==== Globale Einstellungen (Steuer + Verarbeitungsstufe) ==== */
+    function getTaxRate(){
+      var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
+      var el = qs('#taxRate'); if(el){ var n=num(el.value); if(!isNaN(n)) v=n; }
+      return Math.max(0, v);
+    }
+    function setTaxRateUIFromStore(){
+      var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
+      var el = qs('#taxRate'); if(el){ el.value = v; }
+    }
+    function saveTaxRateToStore(){
+      var v = Math.max(0, num(qs('#taxRate').value));
+      var store=readStore(); store.misc = store.misc || {}; store.misc.taxRate = v; writeStore(store);
+    }
+
     function getProcessLevel(){
-      var store=readStore(); var v = (store.misc && typeof store.misc.processLevel==='number') ? store.misc.processLevel : num(qs('#procRate')?.value || 0);
-      return Math.max(0, Math.min(100, v||0));
+      var store=readStore(); var v = (store.misc && typeof store.misc.processLevel==='number') ? store.misc.processLevel : 0;
+      var el = qs('#procRate'); if(el){ var n=num(el.value); if(!isNaN(n)) v=n; }
+      return Math.max(0, Math.min(100, v));
     }
     function setProcessLevelUIFromStore(){
       var store=readStore(); var v = (store.misc && typeof store.misc.processLevel==='number') ? store.misc.processLevel : 0;
@@ -750,10 +942,9 @@
     function saveProcessLevelToStore(){
       var v = Math.max(0, Math.min(100, num(qs('#procRate').value)));
       var store=readStore(); store.misc = store.misc || {}; store.misc.processLevel = v; writeStore(store);
-      onUserChanged();
     }
+    /* ============================================================= */
 
-    /* ======= CORE COMPUTE (aus deiner Originalversion, nur Steuer entfernt) ======= */
     function kgPerBatchAllInputs(inputs, weights){
       var sum=0;
       inputs.forEach(function(i){
@@ -776,6 +967,7 @@
         return Math.max(0, Math.floor(shareKg / ow));
       });
     }
+
     function deepClone(obj){
       if(!obj || typeof obj!=='object') return obj;
       var out = Array.isArray(obj) ? [] : {};
@@ -784,9 +976,10 @@
       });
       return out;
     }
+
     function compute(route){
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
-      var procLevel = getProcessLevel();
+      var procLevel = getProcessLevel(); /* GLOBAL: Verarbeitungsstufe in % */
 
       var lkw = {};
       var storage = {};
@@ -929,7 +1122,7 @@
             outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
             var durSec = Math.max(0, num(s.duration));
-            var durSecEff = Math.max(0, durSec * (1 - procLevel/100));
+            var durSecEff = Math.max(0, durSec * (1 - procLevel/100)); /* GLOBAL-Stufe anwenden */
             var durMin = durSecEff/60;
 
             var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
@@ -1066,9 +1259,9 @@
       };
     }
 
-    /* ======= RENDER ======= */
     function renderBetween(calc){
       qsa('#steps .between').forEach(function(b){ b.remove(); });
+
       var stepEls = qsa('#steps .step');
       calc.snapshots.forEach(function(snap, idx){
         var el = stepEls[idx];
@@ -1084,6 +1277,7 @@
         el.insertAdjacentElement('afterend', b);
       });
     }
+
     function renderLagerStocks(calc){
       var stepEls = qsa('#steps .step');
       for(var i=0;i<stepEls.length;i++){
@@ -1106,9 +1300,11 @@
         }
       }
     }
+
     function renderSummary(calc){
       qs('#kpiTime').textContent = minutesToH(calc.totalMinutes);
       qs('#kpiCost').textContent = cf.format(calc.totalCost);
+
       var yieldTxt = calc.endProducts.length
         ? calc.endProducts.map(function(ep){ return fmt(ep.units)+' × '+ep.name; }).join(', ')
         : '–';
@@ -1227,160 +1423,12 @@
       renderLagerStocks(calc);
     }
 
-    /* ======= AUTO-SAVE ======= */
-    let autosaveTimer=null;
-    let autosaveDisabledUntil=0;
-    function scheduleAutoSave(){
-      if(Date.now() < autosaveDisabledUntil) return;
-      clearTimeout(autosaveTimer);
-      autosaveTimer = setTimeout(tryAutoSave, 1000);
-    }
-    async function tryAutoSave(){
-      if(!getToken()) return;
-      const route = getRoute();
-      const store = readStore();
-      await gasSaveRoute(route, store.travelTimes || {}, store.misc || {});
-      const s = readStore();
-      s.routes = s.routes || {};
-      s.routes[route.id] = route;
-      writeStore(s);
-      currentRouteId = route.id;
-      refreshRouteSelect(route.id, true);
-      console.info('[autosave] route saved', route.id);
-    }
-    function onUserChanged(){
-      renderSummaryAndMaybeList();
-      scheduleAutoSave();
-    }
-
-    /* ======= REMOTE POLLING ======= */
-    let pollTimer=null;
-    function startPolling(){ stopPolling(); pollTimer = setInterval(pullRemoteChanges, 15000); }
-    function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
-
-    async function pullRemoteChanges(){
-      try{
-        const rid = currentRouteId || qs('#routeSelect')?.value || '';
-        if(!rid) return;
-        const data = await gasGetRoute(rid);
-        if(!data || !data.ok || !data.route) return;
-
-        // TravelTimes & Misc
-        const store = readStore();
-        if(data.travelTimes && typeof data.travelTimes==='object'){
-          store.travelTimes = Object.assign({}, data.travelTimes);
-        }
-        if(data.misc && typeof data.misc==='object'){
-          store.misc = Object.assign({}, data.misc);
-        }
-        writeStore(store);
-        setProcessLevelUIFromStore();
-
-        // Preise übernehmen
-        const remote = data.route;
-        let changed = false;
-        const rMap = new Map(remote.sellList.map(x=>[x.name, x.price]));
-        const lRows = qsa('#sellList .row');
-        lRows.forEach(row=>{
-          const name = (qs('[data-k="pname"]',row).value||'').trim();
-          if(!name) return;
-          const remotePrice = rMap.get(name);
-          const el = qs('[data-k="pprice"]',row);
-          if(remotePrice==null || remotePrice===''){ return; }
-          const now = num(el.value);
-          if(Math.abs((now||0) - (remotePrice||0))>1e-9){
-            el.value = remotePrice;
-            changed = true;
-          }
-        });
-
-        function setIfDiff(sel, v){
-          const el = qs(sel); if(!el) return false;
-          const now = el.value, nv = String(v??'');
-          if(now!==nv){ el.value=nv; return true; }
-          return false;
-        }
-        if(setIfDiff('#routeName', remote.name)) changed=true;
-        if(setIfDiff('#lkwSize', remote.lkwSize)) changed=true;
-        if(setIfDiff('#backpackKg', remote.backpackKg)) changed=true;
-
-        if(changed){
-          autosaveDisabledUntil = Date.now()+2000;
-          renderSummaryAndMaybeList();
-          console.info('[poll] remote changes applied');
-        }
-      }catch(err){ console.warn('polling error', err); }
-    }
-
-    /* ======= ROUTENLISTE (ohne Drag & Drop) ======= */
-    function buildListData(){
-      const list=[];
-      const routesMap = (readStore().routes)||{};
-      Object.keys(routesMap).forEach(id=>{
-        const r=routesMap[id];
-        const calc=compute(r);
-        list.push({
-          id, name: r.name || id,
-          endProducts: (r.sellList||[]).map(x=>({name:x.name, price:x.price||null})),
-          hourlyProfitGross: calc.hourlyProfit||0,
-          calc, route: r
-        });
-      });
-      list.sort((a,b)=> (b.hourlyProfitGross||0) - (a.hourlyProfitGross||0));
-      return list;
-    }
-    function renderListView(){
-      setProcessLevelUIFromStore();
-      const list = buildListData();
-      const container = qs('#routesList'); container.innerHTML='';
-
-      list.forEach(function(item){
-        const labelEP = item.endProducts.length
-          ? item.endProducts.map(ep => ep.name + (ep.price? ' ('+cf.format(ep.price)+')':' (–)')).join(', ')
-          : '–';
-        const wrap=document.createElement('div');
-        wrap.className='route-item';
-        wrap.dataset.id=item.id;
-
-        const row=document.createElement('div');
-        row.className='route-row';
-        row.innerHTML = `
-          <div style="opacity:.35;text-align:center">–</div>
-          <div><div><strong>${item.name}</strong></div><div class="muted">${labelEP}</div></div>
-          <div><span class="pill">${item.endProducts.length? item.endProducts.length+' Produkte' : '—'}</span></div>
-          <div><strong>${cf.format(item.hourlyProfitGross)}</strong><div class="mini muted">Gewinn/h</div></div>
-          <div class="mini muted" title="Umsatz">${cf.format(item.calc.revenue)}</div>
-        `;
-        wrap.appendChild(row);
-
-        const det=document.createElement('details');
-        det.className='row-details';
-        const sum=document.createElement('summary');
-        sum.textContent='Details anzeigen';
-        det.appendChild(sum);
-
-        const kpis=document.createElement('div');
-        kpis.className='kpis';
-        kpis.innerHTML = `
-          <div class="k">Dauer: ${fmt(item.calc.totalMinutes)} min</div>
-          <div class="k">Kosten: ${cf.format(item.calc.totalCost)}</div>
-          <div class="k">Umsatz: ${cf.format(item.calc.revenue)}</div>
-          <div class="k">Gewinn/h: ${cf.format(item.hourlyProfitGross)}</div>
-        `;
-        det.appendChild(kpis);
-
-        const ul=document.createElement('ul');
-        item.calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
-        det.appendChild(ul);
-
-        container.appendChild(wrap);
-      });
-    }
-    function refreshRouteSelect(selectedId, silent){
+    function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
       sel.innerHTML='';
       var opt0=document.createElement('option'); opt0.value=''; opt0.textContent='— Gespeicherte Routen —'; sel.appendChild(opt0);
+
       var entries = Object.keys(map).map(function(id){
         var r = map[id] || {};
         return { id:id, name:(r.name || id) };
@@ -1392,196 +1440,266 @@
         if(e.id===selectedId) o.selected=true;
         sel.appendChild(o);
       });
-      if(!silent && selectedId){ sel.value = selectedId; }
     }
 
-    /* ======= TRAVEL TIMES ======= */
-    function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
-    function openTravelModal(from,to, cb){
-      var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
-      m.style.display='flex'; m.setAttribute('aria-hidden','false');
-      function close(){ m.style.display='none'; m.setAttribute('aria-hidden','true'); }
-      qs('#travelSave').onclick=function(){ var mins=Math.max(0, num(qs('#travelMinutes').value)); close(); cb(mins); onUserChanged(); };
-      qs('#travelCancel').onclick=function(){ close(); cb(null); };
-    }
-    function handlePlaceBlur(stepEl){
-      try{
-        var stepsNodes=qsa('#steps .step');
-        var idx=stepsNodes.findIndex(function(n){return n===stepEl;});
-        if(idx<0) return;
-        var currPlace=qs('[data-key="where"]', stepEl)?.value.trim(); if(!currPlace) return;
-        var prevPlace=null;
-        for(var i=idx-1;i>=0;i--){
-          var node=stepsNodes[i];
-          var w=qs('[data-key="where"]', node);
-          if(w && w.value.trim()){ prevPlace=w.value.trim(); break; }
-        }
-        if(!prevPlace || prevPlace===currPlace) return;
-        var store=readStore(); var key=travelKey(prevPlace, currPlace);
-        if(store.travelTimes[key]!=null) return;
-        openTravelModal(prevPlace, currPlace, function(mins){ if(mins==null) return; store.travelTimes[key]=mins; writeStore(store); onUserChanged(); });
-      }catch(e){}
+    function buildListData(){
+      var store=readStore(); var tax = getTaxRate();
+      var list=[];
+      Object.keys(store.routes||{}).forEach(function(id){
+        var r=store.routes[id];
+        var calc=compute(r);
+        var name = r.name || id;
+        var isIllegal = /illegal/i.test(name);
+        var hourlyNet = isIllegal ? (calc.hourlyProfit||0) : (calc.hourlyProfit||0) * (1 - tax/100);
+        list.push({
+          id:id,
+          name:name,
+          isIllegal:isIllegal,
+          endProducts: (r.sellList||[]).map(function(x){ return {name:x.name, price:x.price||null}; }),
+          hourlyProfitGross: calc.hourlyProfit||0,
+          hourlyProfitNet: hourlyNet,
+          calc: calc,
+          route: r
+        });
+      });
+      list.sort(function(a,b){ return (b.hourlyProfitNet||0) - (a.hourlyProfitNet||0); });
+      return list;
     }
 
-    function getCurrentRouteTransitions(){
-      var r = getRoute();
-      var trans = [];
-      var lastPlace = null;
-      (r.steps||[]).forEach(function(s){
-        var thisPlace = (s.type==='start'||s.type==='abbau'||s.type==='verarbeitung'||s.type==='lager'||s.type==='einverkauf'||s.type==='end') ? (s.where||'') : '';
-        if(thisPlace && lastPlace && thisPlace!==lastPlace){
-          trans.push({from:lastPlace, to:thisPlace});
-        }
-        if(thisPlace) lastPlace = thisPlace;
-      });
-      var keySet = new Set(); var uniq = [];
-      trans.forEach(function(t){
-        var k = (t.from||'?')+'|'+(t.to||'?');
-        if(!keySet.has(k)){ keySet.add(k); uniq.push(t); }
-      });
-      return uniq;
-    }
-    function renderTravelManager(){
-      var store=readStore();
-      var tbody=qs('#tmTable tbody'); tbody.innerHTML='';
-      var trans = getCurrentRouteTransitions();
-      trans.sort(function(a,b){
-        var s = a.from.localeCompare(b.from,'de',{sensitivity:'base'});
-        if(s!==0) return s;
-        return a.to.localeCompare(b.to,'de',{sensitivity:'base'});
-      });
-      if(trans.length===0){
-        var tr=document.createElement('tr');
-        tr.innerHTML='<td colspan="4" class="mini muted">Keine ortsübergreifenden Schritte in der aktuellen Route.</td>';
-        tbody.appendChild(tr); return;
-      }
-      trans.forEach(function(t){
-        var key = (t.from||'?')+'|'+(t.to||'?');
-        var m = store.travelTimes[key] != null ? Number(store.travelTimes[key]) : '';
-        var tr=document.createElement('tr');
-        tr.innerHTML = `
-          <td><input class="tm-from" placeholder="Von" value="${t.from?t.from.replace(/"/g,'&quot;'):''}" readonly></td>
-          <td><input class="tm-to" placeholder="Nach" value="${t.to?t.to.replace(/"/g,'&quot;'):''}" readonly></td>
-          <td><input class="tm-mins" type="number" min="0" step="1" value="${m!==''?Number(m):''}"></td>
-          <td><button type="button" class="danger tm-del" disabled>—</button></td>
+    function renderListView(){
+      setTaxRateUIFromStore();
+      setProcessLevelUIFromStore();
+
+      var list = buildListData();
+      var container = qs('#routesList'); container.innerHTML='';
+
+      list.forEach(function(item){
+        var labelEP = item.endProducts.length
+          ? item.endProducts.map(function(ep){ return ep.name + (ep.price? ' ('+cf.format(ep.price)+')' : ' (–)'); }).join(', ')
+          : '–';
+
+        var wrap=document.createElement('div');
+        wrap.className='route-item';
+        wrap.draggable=true;
+        wrap.dataset.id=item.id;
+
+        var row=document.createElement('div');
+        row.className='route-row';
+        var tagIllegal = item.isIllegal ? '<span class="pill warn">illegal</span>' : '';
+        row.innerHTML = `
+          <div class="drag" title="Ziehen, um die Reihenfolge zu ändern">▤</div>
+          <div><div><strong>${item.name}</strong> ${tagIllegal}</div><div class="muted">${labelEP}</div></div>
+          <div><span class="pill">${item.endProducts.length? item.endProducts.length+' Produkte' : '—'}</span></div>
+          <div><strong>${cf.format(item.hourlyProfitNet)}</strong><div class="mini muted">Gewinn/h (netto)</div></div>
+          <div class="mini muted" title="Brutto vor Steuer">${cf.format(item.hourlyProfitGross)}</div>
         `;
-        tbody.appendChild(tr);
-      });
-    }
-    function saveTravelManager(){
-      var rows=qsa('#tmTable tbody tr');
-      var store=readStore();
-      var tt = store.travelTimes || {};
-      rows.forEach(function(r){
-        var f = (qs('.tm-from',r).value||'').trim();
-        var t = (qs('.tm-to',r).value||'').trim();
-        var m = qs('.tm-mins',r).value;
-        if(!f || !t) return;
-        var key = (f||'?')+'|'+(t||'?');
-        if(m === ''){ delete tt[key]; } else { tt[key] = Math.max(0, num(m)); }
-      });
-      store.travelTimes = tt;
-      writeStore(store);
-    }
+        wrap.appendChild(row);
 
-    /* ======= ROUTE SETTER ======= */
-    function setRoute(route){
-      currentRouteId = route.id || uid();
-      if(route.travelTimes && typeof route.travelTimes === 'object'){
-        var st = readStore();
-        st.travelTimes = Object.assign({}, st.travelTimes||{}, route.travelTimes||{});
-        writeStore(st);
+        var det=document.createElement('details');
+        det.className='row-details';
+        var sum=document.createElement('summary');
+        sum.textContent='Details anzeigen';
+        det.appendChild(sum);
+
+        var kpis=document.createElement('div');
+        kpis.className='kpis';
+        kpis.innerHTML = `
+          <div class="k">Dauer: ${fmt(item.calc.totalMinutes)} min</div>
+          <div class="k">Kosten: ${cf.format(item.calc.totalCost)}</div>
+          <div class="k">Umsatz: ${cf.format(item.calc.revenue)}</div>
+          <div class="k">Gewinn/h (brutto): ${cf.format(item.hourlyProfitGross)}</div>
+          <div class="k">Gewinn/h (netto): ${cf.format(item.hourlyProfitNet)}</div>
+        `;
+        det.appendChild(kpis);
+
+        var ul=document.createElement('ul');
+        item.calc.log.forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
+        det.appendChild(ul);
+
+        wrap.appendChild(det);
+        container.appendChild(wrap);
+      });
+
+      enableListDnD(container, function(newOrderIds){
+        var dataById={};
+        (buildListData()).forEach(function(x){ dataById[x.id]=x; });
+
+        var margin = 1;
+        var any=false;
+
+        var ul=qs('#adjustmentsList'); ul.innerHTML='';
+        var note=qs('#adjustmentsNote'); note.textContent='';
+        var panel=qs('#adjustmentsPanel');
+
+        newOrderIds.forEach(function(id, i){
+          var d=dataById[id]; if(!d) return;
+          var desiredBelow = (i<newOrderIds.length-1) ? ((dataById[newOrderIds[i+1]]?.hourlyProfitNet)||0) + margin : -Infinity;
+          var current = d.hourlyProfitNet||0;
+          if(current < desiredBelow - 1e-9){
+            any=true;
+            var li=document.createElement('li');
+            li.innerHTML = `<strong>${d.name}</strong>: Preise proportional erhöhen, bis ~ ${cf.format(desiredBelow)} Gewinn/h (netto) erreicht sind.`;
+            ul.appendChild(li);
+          }
+        });
+
+        note.textContent = 'Vorschläge sind heuristisch (Multi-Endprodukt). Ziele werden auf Netto-Basis (mit Steuersatz) betrachtet.';
+        panel.style.display = any ? 'block' : 'none';
+      });
+
+      var taxEl = qs('#taxRate');
+      if(taxEl && !taxEl._bound){
+        taxEl._bound = true;
+        taxEl.addEventListener('input', function(){
+          saveTaxRateToStore();
+          renderListView();
+          recalc(); // wirkt global
+        });
       }
-      qs('#routeName').value = route.name || '';
-      qs('#lkwSize').value = route.lkwSize || 2000;
-      qs('#backpackKg').value = route.backpackKg || 150;
-      setSellList(route.sellList||[]);
-      var box=qs('#steps'); box.innerHTML='';
-      (route.steps||[]).forEach(function(s){
-        var el=addStep(s.type); if(!el) return;
-        if(s.type==='start' || s.type==='end'){
-          qs('[data-key="where"]',el).value=s.where||'';
-        } else if(s.type==='abbau'){
-          qs('[data-key="what"]',el).value=s.what||'';
-          qs('[data-key="unitWeight"]',el).value=s.unitWeight||'';
-          qs('[data-key="where"]',el).value=s.where||'';
-          qs('[data-key="qtyUnits"]',el).value=s.qtyUnits||'';
-          qs('[data-key="timeMinutes"]',el).value=s.timeMinutes||'';
-        } else if(s.type==='lager'){
-          qs('[data-key="where"]',el).value=s.where||'';
-          var list=qs('[data-key="moves"]',el); list.innerHTML='';
-          (s.moves||[]).forEach(function(m){ addLagerRow(el, m.action, m.name, m.qty); });
-          if((s.moves||[]).length===0){ addLagerRow(el,'ablegen','', ''); }
-        } else if(s.type==='verarbeitung'){
-          qs('[data-key="where"]',el).value = s.where || '';
-          qs('[data-key="duration"]',el).value = s.duration || '';
-          qs('[data-key="processCost"]',el).value = s.processCost || '';
-          var listI=qs('[data-key="inputs"]',el); listI.innerHTML='';
-          (s.inputs||[]).forEach(function(inp){
-            addInputRow(el);
-            var row=listI.lastElementChild;
-            qs('[data-k="name"]',row).value=inp.name||'';
-            qs('[data-k="qty"]',row).value=inp.qty||'';
-            qs('[data-k="source"]',row).value=inp.source||'';
-          });
-          var listO=qs('[data-key="outputs"]',el); listO.innerHTML='';
-          (s.outputs||[]).forEach(function(out){
-            addOutputRow(el);
-            var row=listO.lastElementChild;
-            qs('[data-k="name"]',row).value=out.name||'';
-            qs('[data-k="qty"]',row).value=out.qty||'';
-            qs('[data-k="unitWeight"]',row).value=out.unitWeight||'';
-          });
-        } else if(s.type==='transportkosten'){
-          qs('[data-key="fromWhere"]',el).value=s.fromWhere||'';
-          qs('[data-key="toWhere"]',el).value=s.toWhere||'';
-          qs('[data-key="transportCost"]',el).value=s.transportCost||'';
-        } else if(s.type==='einverkauf'){
-          qs('[data-key="where"]',el).value=s.where||'';
-          var listT=qs('[data-key="moves"]',el); listT.innerHTML='';
-          (s.moves||[]).forEach(function(m){ addTradeRow(el, m.action, m.name, m.qty, m.price); });
-          if((s.moves||[]).length===0){ addTradeRow(el,'kaufen','', '', ''); }
-        }
+      var procEl = qs('#procRate');
+      if(procEl && !procEl._bound){
+        procEl._bound = true;
+        procEl.addEventListener('input', function(){
+          saveProcessLevelToStore();
+          renderListView();
+          recalc(); // wirkt global
+        });
+      }
+    }
+
+    function enableListDnD(container, onOrderChanged){
+      var dragEl=null;
+      container.addEventListener('dragstart', function(e){
+        var item=e.target.closest('.route-item'); if(!item) return;
+        dragEl=item; item.classList.add('dragging');
+        e.dataTransfer.effectAllowed='move';
+        e.dataTransfer.setData('text/plain','drag');
+      });
+      container.addEventListener('dragend', function(){
+        if(dragEl){ dragEl.classList.remove('dragging'); dragEl=null; }
+        var ids=[].map.call(container.querySelectorAll('.route-item'), function(r){return r.dataset.id;});
+        if(typeof onOrderChanged==='function'){ onOrderChanged(ids); }
+      });
+      container.addEventListener('dragover', function(e){
+        e.preventDefault();
+        var dragging=container.querySelector('.route-item.dragging'); if(!dragging) return;
+        var after = (function(){
+          var els=[].slice.call(container.querySelectorAll('.route-item:not(.dragging)'));
+          return els.reduce(function(closest,child){
+            var box=child.getBoundingClientRect();
+            var offset=e.clientY - box.top - box.height/2;
+            if(offset<0 && offset>closest.offset){ return {offset:offset, element:child}; }
+            else { return closest; }
+          }, {offset:Number.NEGATIVE_INFINITY}).element;
+        })();
+        if(after==null){ container.appendChild(dragging); }
+        else { container.insertBefore(dragging, after); }
       });
     }
 
-    /* ======= AUTH + INIT ======= */
-    async function tryAuthAndLoad(initial=false){
-      const token = getToken();
-      if(!token){ showAuth(); return; }
+    const DRIVE_AUTO_LOAD = true;
+
+    function updateDriveStateTag(connected){
+      const el = qs('#driveState');
+      if(!el) return;
+      if(connected){
+        el.textContent = 'Drive: verbunden';
+        el.classList.remove('yellow'); el.classList.add('green');
+        el.title = 'Web-App verbunden';
+      }else{
+        el.textContent = 'Drive: nicht verbunden';
+        el.classList.add('yellow'); el.classList.remove('green');
+        el.title = 'Nicht authentifiziert';
+      }
+    }
+
+    function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
+    function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
+
+    async function gasListRoutes(){
+      const url = GAS_URL + '?action=list&token=' + encodeURIComponent(getToken());
+      const data = await jsonp(url);
+      if(!data.ok) throw new Error(data.error || 'List failed');
+      return data.routes || [];
+    }
+    async function gasGetRoute(id){
+      const url = GAS_URL + '?action=get&id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(getToken());
+      const data = await jsonp(url);
+      if(!data.ok) throw new Error(data.error || 'Get failed');
+      return data.route;
+    }
+    async function gasSaveRoute(route){
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', token: getToken(), route })
+      });
+      await new Promise(r => setTimeout(r, 500));
+      return true;
+    }
+    async function gasDeleteRoute(id){
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', token: getToken(), id })
+      });
+      await new Promise(r => setTimeout(r, 500));
+      return true;
+    }
+
+    async function syncFromDriveIntoPage(){
       try{
         const list = await gasListRoutes();
-        if(!list.ok){ throw new Error('auth failed'); }
-        hideAuth(); updateBackendStateTag(true);
-        const store = readStore(); store.routes = store.routes || {};
-        for(const meta of (list.routes || [])){
-          const id = (meta.id||'').replace(/\.json$/,'');
+        if(!Array.isArray(list)) return;
+        const store = readStore();
+        for(const meta of list){
+          const id = (meta.id || '').replace(/\.json$/,'');
           if(!id) continue;
-          const r = await gasGetRoute(id);
-          if(r && r.ok && r.route){
-            store.routes[id] = r.route;
-            if(r.travelTimes) store.travelTimes = Object.assign({}, store.travelTimes||{}, r.travelTimes);
-            if(r.misc) store.misc = Object.assign({}, store.misc||{}, r.misc);
+          const route = await gasGetRoute(id);
+          if(route && route.id && Array.isArray(route.steps)){
+            if(route.travelTimes && typeof route.travelTimes === 'object'){
+              store.travelTimes = Object.assign({}, store.travelTimes||{}, route.travelTimes||{});
+            }
+            store.routes[route.id] = route;
           }
         }
         writeStore(store);
-        setProcessLevelUIFromStore();
-        refreshRouteSelect(currentRouteId || null, true);
+        refreshRouteSelect(null);
         renderSummaryAndMaybeList();
-        if(initial) startPolling();
+      }catch(err){
+        console.warn('Drive Sync (load) fehlgeschlagen:', err);
+      }
+    }
+
+    async function tryAuthAndLoad(initial=false){
+      const token = getToken();
+      if(!token){
+        showAuth();
+        return;
+      }
+      try{
+        await gasListRoutes();
+        hideAuth();
+        updateDriveStateTag(true);
+        if(initial && DRIVE_AUTO_LOAD){
+          await syncFromDriveIntoPage();
+        }
       }catch(err){
         setToken('');
         showAuth('Zugriff verweigert – falsches Token.');
-        updateBackendStateTag(false);
+        updateDriveStateTag(false);
       }
     }
+
     function showAuth(msg){
       const overlay=qs('#authOverlay');
       const err=qs('#authError');
       if(msg){ err.textContent=msg; err.style.display='block'; } else { err.style.display='none'; }
       overlay.style.display='flex';
       qs('.content').style.visibility='hidden';
-      updateBackendStateTag(false);
+      updateDriveStateTag(false);
       setTimeout(()=>{ qs('#authToken').focus(); }, 50);
     }
     function hideAuth(){
@@ -1590,18 +1708,18 @@
       qs('.content').style.visibility='visible';
     }
 
-    function renderSummaryAndMaybeList(){
-      const route=getRoute();
-      const calc=compute(route);
-      renderSummary(calc);
-      renderBetween(calc);
-      renderLagerStocks(calc);
-      if(!document.getElementById('listView').hidden){ renderListView(); }
+    function switchTab(name){
+      var isList = (name==='list');
+      document.getElementById('tabBuilder').classList.toggle('active', !isList);
+      document.getElementById('tabList').classList.toggle('active', isList);
+      document.getElementById('builderView').hidden = !isList ? false : true;
+      document.getElementById('resultView').hidden  = !isList ? false : true;
+      document.getElementById('listView').hidden    = isList ? false : true;
+      if(isList){ renderListView(); }
     }
+    function renderSummaryAndMaybeList(){ recalc(); if(!document.getElementById('listView').hidden){ renderListView(); } }
 
-    /* ======= DOM EVENTS ======= */
     window.addEventListener('DOMContentLoaded', async function(){
-      // Login
       qs('#authForm').addEventListener('submit', async function(ev){
         ev.preventDefault();
         const t = qs('#authToken').value.trim();
@@ -1610,148 +1728,205 @@
         await tryAuthAndLoad(true);
       });
 
-      // Toolbar / Builder
-      qs('#addSell').addEventListener('click', function(){ addSellRow('', null); onUserChanged(); });
-      qs('#addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); onUserChanged(); });
+      document.getElementById('addSell').addEventListener('click', function(){ addSellRow('', null); });
+
+      document.getElementById('addBtn')?.addEventListener('click', function(){ var t=document.getElementById('addType').value; addStep(t); });
+
       ['lkwSize','backpackKg','routeName'].forEach(function(id){
-        var el=document.getElementById(id); if(el) el.addEventListener('input', onUserChanged);
-      });
-      document.getElementById('manageTravelBtn').addEventListener('click', function(){
-        renderTravelManager();
-        var m=qs('#travelManager'); m.style.display='flex'; m.setAttribute('aria-hidden','false');
-      });
-      document.getElementById('tmCancel').addEventListener('click', function(){
-        var m=qs('#travelManager'); m.style.display='none'; m.setAttribute('aria-hidden','true');
-      });
-      document.getElementById('tmSave').addEventListener('click', function(){
-        saveTravelManager();
-        var m=qs('#travelManager'); m.style.display='none'; m.setAttribute('aria-hidden','true');
-        onUserChanged();
+        var el=document.getElementById(id); if(el) el.addEventListener('input', renderSummaryAndMaybeList);
       });
 
-      // Speichern (manuell – optional)
+      document.getElementById('manageTravelBtn').addEventListener('click', openTravelManager);
+      document.getElementById('tmCancel').addEventListener('click', closeTravelManager);
+      document.getElementById('tmSave').addEventListener('click', saveTravelManager);
+
       document.getElementById('saveBtn')?.addEventListener('click', async function(){
-        await tryAutoSave();
+        var r=getRoute();
+        if(!r.name || r.name==='Unbenannt'){
+          alert('Bitte einen Routenname eintragen.');
+          return;
+        }
+        if(!r.id) r.id = uid();
+        var store=readStore(); store.routes[r.id]=r; writeStore(store); 
+        refreshRouteSelect(r.id);
+        var sel=document.getElementById('routeSelect'); if(sel){ sel.value=r.id; }
+        alert('Route lokal gespeichert.');
+
+        if(getToken()){
+          try{
+            await gasSaveRoute(r);
+            updateDriveStateTag(true);
+            alert('Route zusätzlich in Google Drive gespeichert.');
+          }catch(err){
+            console.warn('Speichern nach Drive fehlgeschlagen:', err.message);
+            updateDriveStateTag(false);
+            showAuth('Zugriff verweigert oder Fehler beim Speichern. Bitte Token prüfen.');
+          }
+        }
+
+        if(!document.getElementById('listView').hidden){ renderListView(); }
       });
 
-      // Löschen (silent)
       document.getElementById('deleteBtn')?.addEventListener('click', async function(){
-        var id=document.getElementById('routeSelect').value; if(!id) return;
-        const store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null, true);
-        if(currentRouteId===id){ currentRouteId=null; }
-        await gasDeleteRoute(id);
-        renderSummaryAndMaybeList();
-        console.info('[delete] route', id);
+        var id=document.getElementById('routeSelect').value; if(!id){ alert('Bitte Route wählen.'); return; }
+        if(!confirm('Route wirklich löschen?')) return;
+        var store=readStore(); delete store.routes[id]; writeStore(store); refreshRouteSelect(null);
+        if(!document.getElementById('listView').hidden){ renderListView(); }
+        if(getToken()){
+          try{
+            await gasDeleteRoute(id);
+            alert('Route auch in Google Drive gelöscht.');
+          }catch(err){
+            console.warn('Drive-Delete fehlgeschlagen:', err.message);
+            showAuth('Zugriff verweigert oder Fehler beim Löschen. Bitte Token prüfen.');
+          }
+        }
       });
 
-      // Route wählen
       document.getElementById('routeSelect')?.addEventListener('change', function(e){
         var id=e.target.value; if(!id) return;
-        var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; renderSummaryAndMaybeList(); }
-      });
-
-      // Export (silent)
-      document.getElementById('exportAllBtn')?.addEventListener('click', function(){
-        var store=readStore();
-        var exportObj={ exportedAt:new Date().toISOString(), routes: store.routes || {}, travelTimes: store.travelTimes || {} };
-        var blob=new Blob([JSON.stringify(exportObj,null,2)],{type:'application/json'});
-        var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='alle_routen.json'; a.click(); URL.revokeObjectURL(a.href);
+        var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
       });
 
       document.getElementById('exportCurrentBtn')?.addEventListener('click', function(){
         var r=getRoute();
+        if(!r.name || r.name==='Unbenannt'){ alert('Bitte Routenname setzen.'); return; }
         var calc=compute(r);
-        var payload={ exportedAt: new Date().toISOString(), route: r, travelTimes: readStore().travelTimes || {}, report:{ name: r.name, text: buildReportText(r, calc) } };
+        var payload={
+          exportedAt: new Date().toISOString(),
+          route: r,
+          travelTimes: readStore().travelTimes || {},
+          report:{
+            name: r.name,
+            kpi:{
+              totalMinutes: calc.totalMinutes,
+              totalCost: calc.totalCost,
+              mining: calc.miningTime,
+              drive: calc.driveTime,
+              processing: calc.procTime,
+              hourlyProfit: calc.hourlyProfit,
+              revenue: calc.revenue,
+              profit: calc.profit
+            },
+            endProducts: calc.endProducts,
+            log: calc.log,
+            breakEvenAvg: calc.BE_avg,
+            targetRevenue: calc.targetRevenue,
+            text: buildReportText(r, calc)
+          }
+        };
         var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download= slug(r.name || 'route') + '.json'; a.click(); URL.revokeObjectURL(a.href);
       });
 
-      // Import (einzel)
-      document.getElementById('importCurrentFile')?.addEventListener('change', async function(e){
+      document.getElementById('importCurrentFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
         rd.onload=async function(){
           try{
             var incoming=JSON.parse(rd.result||'{}');
             var store=readStore();
+
             if(incoming.travelTimes && typeof incoming.travelTimes==='object'){
               store.travelTimes = Object.assign({}, store.travelTimes||{}, incoming.travelTimes||{});
             }
+
             var route = null;
             if(incoming.route && incoming.route.steps){ route = incoming.route; }
             else if(Array.isArray(incoming.routes)){ route = incoming.routes[0]; }
             else if(incoming.routes && typeof incoming.routes==='object'){ var firstId = Object.keys(incoming.routes)[0]; route = incoming.routes[firstId]; }
             else if(incoming.steps){ route = incoming; }
-            if(!route || !Array.isArray(route.steps)){ return; }
+
+            if(!route || !Array.isArray(route.steps)){
+              alert('Keine gültige Route in der Datei gefunden.');
+              return;
+            }
             route.id = route.id || uid();
             route.name = route.name || 'Importierte Route';
 
             store.routes[route.id] = route;
             writeStore(store);
 
-            refreshRouteSelect(route.id, true);
+            refreshRouteSelect(route.id);
+            var sel=document.getElementById('routeSelect'); if(sel){ sel.value=route.id; }
             setRoute(route); currentRouteId = route.id;
-            renderSummaryAndMaybeList();
 
-            await gasSaveRoute(route, store.travelTimes, store.misc||{});
-            console.info('[import+save] route', route.id);
-          }catch(err){ console.warn('Import failed:', err.message); }
+            if(getToken()){
+              try{ await gasSaveRoute(route); }catch(err){ console.warn('Drive-Save nach Import fehlgeschlagen:', err.message); }
+            }
+
+            alert('Route importiert und geladen: '+route.name);
+            if(!document.getElementById('listView').hidden){ renderListView(); }
+          }catch(err){
+            alert('Import fehlgeschlagen: '+err.message);
+          }
         };
         rd.readAsText(f); e.target.value='';
       });
 
-      // Import (bulk)
+      document.getElementById('exportAllBtn')?.addEventListener('click', function(){
+        var store=readStore();
+        var reports={};
+        Object.keys(store.routes||{}).forEach(function(id){
+          var r=store.routes[id];
+          var calc=compute(r);
+          reports[id]={
+            name: r.name || id,
+            kpi:{
+              totalMinutes: calc.totalMinutes,
+              totalCost: calc.totalCost,
+              mining: calc.miningTime,
+              drive: calc.driveTime,
+              processing: calc.procTime,
+              hourlyProfit: calc.hourlyProfit,
+              revenue: calc.revenue,
+              profit: calc.profit
+            },
+            endProducts: calc.endProducts,
+            log: calc.log,
+            breakEvenAvg: calc.BE_avg,
+            targetRevenue: calc.targetRevenue
+          };
+        });
+        var exportObj={
+          exportedAt: new Date().toISOString(),
+          routes: store.routes || {},
+          travelTimes: store.travelTimes || {},
+          reports: reports
+        };
+        var blob=new Blob([JSON.stringify(exportObj,null,2)],{type:'application/json'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='alle_routen.json'; a.click(); URL.revokeObjectURL(a.href);
+      });
+
       document.getElementById('importAllFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
-        rd.onload=async function(){
+        rd.onload=function(){
           try{
             var incoming=JSON.parse(rd.result||'{}');
             var store=readStore();
             store.travelTimes = Object.assign({}, store.travelTimes||{}, incoming.travelTimes||{});
             var src = incoming.routes || incoming.route ? (incoming.routes || {[incoming.route?.id || uid()]: incoming.route}) : incoming;
-            const toSave=[];
             if(Array.isArray(src)){
-              src.forEach(function(r){ var id=r.id||uid(); r.id=id; store.routes[id]=r; toSave.push(r); });
+              src.forEach(function(r){ var id=r.id||uid(); r.id=id; store.routes[id]=r; });
             }else{
-              Object.keys(src||{}).forEach(function(id){ var r=src[id]; if(!r.id) r.id=id; store.routes[r.id]=r; toSave.push(r); });
+              Object.keys(src||{}).forEach(function(id){ var r=src[id]; if(!r.id) r.id=id; store.routes[r.id]=r; });
             }
-            writeStore(store);
-            refreshRouteSelect(null, true);
-            renderSummaryAndMaybeList();
-
-            for(const r of toSave){ await gasSaveRoute(r, store.travelTimes, store.misc||{}); }
-            console.info('[bulk import+save] count:', toSave.length);
-          }catch(err){ console.warn('Bulk import failed:', err.message); }
+            writeStore(store); refreshRouteSelect(null); alert('Import abgeschlossen.');
+            if(!document.getElementById('listView').hidden){ renderListView(); }
+          }catch(err){ alert('Import fehlgeschlagen: '+err.message); }
         };
         rd.readAsText(f); e.target.value='';
       });
 
-      // Tabs
-      document.getElementById('tabBuilder').addEventListener('click', function(){
-        document.getElementById('tabBuilder').classList.add('active');
-        document.getElementById('tabList').classList.remove('active');
-        document.getElementById('builderView').hidden = false;
-        document.getElementById('resultView').hidden  = false;
-        document.getElementById('listView').hidden    = true;
-      });
-      document.getElementById('tabList').addEventListener('click', function(){
-        document.getElementById('tabBuilder').classList.remove('active');
-        document.getElementById('tabList').classList.add('active');
-        document.getElementById('builderView').hidden = true;
-        document.getElementById('resultView').hidden  = true;
-        document.getElementById('listView').hidden    = false;
-        renderListView();
-      });
+      document.getElementById('tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
+      document.getElementById('tabList').addEventListener('click', function(){ switchTab('list'); });
 
-      // Misc controls
-      const procEl = qs('#procRate');
-      if(procEl){ procEl.addEventListener('input', saveProcessLevelToStore); }
-
-      // Init
+      refreshRouteSelect(null);
       setSellList([]);
       if(document.getElementById('steps').children.length===0){ addStep('start'); }
       recalc();
+
       await tryAuthAndLoad(true);
     });
   })();
