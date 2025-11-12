@@ -7,7 +7,7 @@
 
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon"
-        href="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/4755eff9d2f03a8171689a9f9a0b2b635a10e903/Routes-Logo.ico" />
+        href="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/main/Routes-Logo.ico" />
 
   <style>
     :root{
@@ -174,7 +174,7 @@
       <form id="authForm">
         <label>Token<br><input id="authToken" type="password" placeholder="●●●●●●●●" autocomplete="current-password" required></label>
         <div class="actions" style="justify-content:space-between">
-          <span class="tag yellow" title="Google Apps Script">Drive-Backend aktiv</span>
+          <span class="tag yellow" title="Sheets-Backend aktiv">Sheets-Backend aktiv</span>
           <button id="authSubmit" type="submit" class="primary">Entsperren</button>
         </div>
       </form>
@@ -189,7 +189,7 @@
              src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
         <div class="brand">
           <h1>Farmrouten-Preisrechner</h1>
-          <span id="driveState" class="tag yellow" title="Drive-Verbindung">Drive: nicht verbunden</span>
+          <span id="driveState" class="tag yellow" title="Sheets-Verbindung">Sheets: nicht verbunden</span>
         </div>
         <div class="toolbar">
           <div class="tabs">
@@ -289,7 +289,7 @@
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
         <div class="sub">
-          Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
+          Alle gespeicherten Routen (Sheets wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
           Der <strong>Steuersatz</strong> wird nur auf Routen ohne „illegal“ im Namen angewendet.  
           Die <strong>Verarbeitungsstufe (%)</strong> reduziert die Dauer pro Verarbeitungsvorgang global für alle Routen.
         </div>
@@ -532,7 +532,8 @@
 
   <script>
   (function(){
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzFHZwQI9KxXhJvR6aZRR0zyqyijb46gaqWpYhCsxdfow2U5Y5A5D4gBg3jmRyaa_hh/exec';
+    /* ===== Sheets Web-App URL (deine neue) ===== */
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwXqVfkK787fVfLawjUslxaYkvdKNthPGHdatoIjWT6VLgc2cYyVITo1nc4tR2KG3hK/exec';
 
     function qs(s, e){return (e||document).querySelector(s);}
     function qsa(s, e){return Array.prototype.slice.call((e||document).querySelectorAll(s));}
@@ -1597,17 +1598,17 @@
       });
     }
 
-    const DRIVE_AUTO_LOAD = true;
+    const DRIVE_AUTO_LOAD = true; // Name bleibt; Funktionalität = Sheets-Auto-Load
 
     function updateDriveStateTag(connected){
       const el = qs('#driveState');
       if(!el) return;
       if(connected){
-        el.textContent = 'Drive: verbunden';
+        el.textContent = 'Sheets: verbunden';
         el.classList.remove('yellow'); el.classList.add('green');
         el.title = 'Web-App verbunden';
       }else{
-        el.textContent = 'Drive: nicht verbunden';
+        el.textContent = 'Sheets: nicht verbunden';
         el.classList.add('yellow'); el.classList.remove('green');
         el.title = 'Nicht authentifiziert';
       }
@@ -1616,10 +1617,15 @@
     function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
     function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
 
+    /* ====== Sheets-API: list/get/save/delete + savemany ====== */
     async function gasListRoutes(){
       const url = GAS_URL + '?action=list&token=' + encodeURIComponent(getToken());
       const data = await jsonp(url);
       if(!data.ok) throw new Error(data.error || 'List failed');
+      // travelTimes global mergen
+      const store = readStore();
+      store.travelTimes = Object.assign({}, store.travelTimes||{}, data.travelTimes||{});
+      writeStore(store);
       return data.routes || [];
     }
     async function gasGetRoute(id){
@@ -1648,28 +1654,36 @@
       await new Promise(r => setTimeout(r, 500));
       return true;
     }
+    async function gasSaveMany(routes, travelTimes){
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'savemany', token: getToken(), routes, travelTimes })
+      });
+      await new Promise(r => setTimeout(r, 800));
+      return true;
+    }
 
-    async function syncFromDriveIntoPage(){
+    async function syncFromSheetIntoPage(){
       try{
-        const list = await gasListRoutes();
-        if(!Array.isArray(list)) return;
+        const list = await gasListRoutes(); // holt Metas + travelTimes (schon gemerged)
         const store = readStore();
-        for(const meta of list){
-          const id = (meta.id || '').replace(/\.json$/,'');
-          if(!id) continue;
-          const route = await gasGetRoute(id);
-          if(route && route.id && Array.isArray(route.steps)){
-            if(route.travelTimes && typeof route.travelTimes === 'object'){
-              store.travelTimes = Object.assign({}, store.travelTimes||{}, route.travelTimes||{});
+        if(Array.isArray(list)){
+          for(const meta of list){
+            const id = meta.id;
+            if(!id) continue;
+            const route = await gasGetRoute(id);
+            if(route && route.id && Array.isArray(route.steps)){
+              store.routes[route.id] = route;
             }
-            store.routes[route.id] = route;
           }
+          writeStore(store);
+          refreshRouteSelect(null);
+          renderSummaryAndMaybeList();
         }
-        writeStore(store);
-        refreshRouteSelect(null);
-        renderSummaryAndMaybeList();
       }catch(err){
-        console.warn('Drive Sync (load) fehlgeschlagen:', err);
+        console.warn('Sheets Sync (load) fehlgeschlagen:', err);
       }
     }
 
@@ -1684,7 +1698,7 @@
         hideAuth();
         updateDriveStateTag(true);
         if(initial && DRIVE_AUTO_LOAD){
-          await syncFromDriveIntoPage();
+          await syncFromSheetIntoPage();
         }
       }catch(err){
         setToken('');
@@ -1750,15 +1764,15 @@
         var store=readStore(); store.routes[r.id]=r; writeStore(store); 
         refreshRouteSelect(r.id);
         var sel=document.getElementById('routeSelect'); if(sel){ sel.value=r.id; }
-        alert('Route lokal gespeichert.');
+        alert('Route lokal gespeichert.'); /* belassen – nicht Drive-bezogen */
 
         if(getToken()){
           try{
             await gasSaveRoute(r);
             updateDriveStateTag(true);
-            alert('Route zusätzlich in Google Drive gespeichert.');
+            /* Drive-Popup entfernt: keine weitere Meldung */
           }catch(err){
-            console.warn('Speichern nach Drive fehlgeschlagen:', err.message);
+            console.warn('Speichern in Sheets fehlgeschlagen:', err.message);
             updateDriveStateTag(false);
             showAuth('Zugriff verweigert oder Fehler beim Speichern. Bitte Token prüfen.');
           }
@@ -1775,9 +1789,9 @@
         if(getToken()){
           try{
             await gasDeleteRoute(id);
-            alert('Route auch in Google Drive gelöscht.');
+            /* Drive-Popup entfernt: keine Meldung "auch in Drive gelöscht" */
           }catch(err){
-            console.warn('Drive-Delete fehlgeschlagen:', err.message);
+            console.warn('Sheets-Delete fehlgeschlagen:', err.message);
             showAuth('Zugriff verweigert oder Fehler beim Löschen. Bitte Token prüfen.');
           }
         }
@@ -1852,7 +1866,7 @@
             setRoute(route); currentRouteId = route.id;
 
             if(getToken()){
-              try{ await gasSaveRoute(route); }catch(err){ console.warn('Drive-Save nach Import fehlgeschlagen:', err.message); }
+              try{ await gasSaveRoute(route); }catch(err){ console.warn('Sheets-Save nach Import fehlgeschlagen:', err.message); }
             }
 
             alert('Route importiert und geladen: '+route.name);
@@ -1901,7 +1915,7 @@
       document.getElementById('importAllFile')?.addEventListener('change', function(e){
         var f=e.target.files && e.target.files[0]; if(!f) return;
         var rd=new FileReader();
-        rd.onload=function(){
+        rd.onload=async function(){
           try{
             var incoming=JSON.parse(rd.result||'{}');
             var store=readStore();
@@ -1912,7 +1926,16 @@
             }else{
               Object.keys(src||{}).forEach(function(id){ var r=src[id]; if(!r.id) r.id=id; store.routes[r.id]=r; });
             }
-            writeStore(store); refreshRouteSelect(null); alert('Import abgeschlossen.');
+            writeStore(store); refreshRouteSelect(null);
+            if(getToken()){
+              try{
+                const routesArr = Object.keys(store.routes||{}).map(id => store.routes[id]).filter(Boolean);
+                await gasSaveMany(routesArr, store.travelTimes||{});
+              }catch(err){
+                console.warn('Sheets savemany nach ImportAll fehlgeschlagen:', err.message);
+              }
+            }
+            alert('Import abgeschlossen.');
             if(!document.getElementById('listView').hidden){ renderListView(); }
           }catch(err){ alert('Import fehlgeschlagen: '+err.message); }
         };
