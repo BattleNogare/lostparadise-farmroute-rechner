@@ -68,7 +68,9 @@
     .tag.green{border-color:#0a3; background:#062; color:#c6ffdd}
     .tag.yellow{border-color:#665500; background:#2b2600; color:#ffe58f}
 
-    .grid{display:grid; grid-template-columns:1.2fr .8fr; gap:16px; margin-top:16px}
+    /* 2-Spalten-Layout: Builder breiter als Ergebnis */
+    .grid{display:grid; grid-template-columns:1.6fr .8fr; gap:16px; margin-top:16px}
+
     .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2)}
     .card h2{margin:0 0 6px; font-size:16px}
     .sub{color:#9bb2c9; font-size:13px}
@@ -87,9 +89,11 @@
     .three{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
     .actions{display:flex; gap:8px; flex-wrap:wrap}
 
+    /* Keine Scrollbalken in Listen, einzeilig bleiben */
     .input-list, .output-list, .trade-list, .lager-list{
-      display:grid; gap:6px; max-height:40vh; overflow:auto; padding-right:4px;
+      display:grid; gap:6px; padding-right:0;
     }
+    .trade-row{ align-items:center; }
 
     .between{
       margin:-2px 0 8px 0; padding:8px 10px; border-left:3px solid #0a301f; background:#0c171f; border-radius:10px;
@@ -127,6 +131,7 @@
     #authForm{display:grid; gap:10px}
     #authForm input{width:100%}
 
+    /* LIST VIEW nimmt die ganze Breite */
     #listView{grid-column:1/-1}
     .list-toolbar{display:flex; gap:12px; margin-bottom:8px; align-items:center; flex-wrap:wrap}
 
@@ -210,7 +215,7 @@
     </header>
 
     <main class="wrap grid">
-      <!-- Builder -->
+      <!-- Builder (linke Spalte) -->
       <section class="card" id="builderView">
         <h2>Route zusammenstellen</h2>
 
@@ -239,7 +244,7 @@
 
         <div class="hr"></div>
         <h3 style="margin:0 0 6px 0;font-size:15px">Verkaufsliste (Endprodukte & Preise)</h3>
-        <div id="sellList" class="sell-list" style="max-height:40vh; overflow:auto; padding-right:4px"></div>
+        <div id="sellList" class="sell-list"></div>
         <div class="actions"><button id="addSell" type="button">+ Produkt hinzufügen</button></div>
 
         <div class="hr"></div>
@@ -263,7 +268,7 @@
         </div>
       </section>
 
-      <!-- Result -->
+      <!-- Ergebnis (rechte Spalte) -->
       <aside class="card" id="resultView">
         <h2>Ergebnis &amp; Struktur</h2>
         <div class="kpi">
@@ -278,7 +283,7 @@
         <div class="hr"></div>
         <details open>
           <summary>Preis &amp; Gewinn</summary>
-          <div id="priceTable" style="margin-top:8px; max-height:50vh; overflow:auto; padding-right:4px"></div>
+          <div id="priceTable" style="margin-top:8px;"></div>
           <div class="row" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-top:1px solid var(--border);margin-top:8px">
             <span><strong>Gesamt: Gewinn/Stunde</strong></span> <strong id="sumHourly">–</strong>
           </div>
@@ -485,14 +490,6 @@
     </div>
   </template>
 
-  <template id="tpl-sell-row">
-    <div class="row">
-      <input data-k="pname" type="text" placeholder="Endprodukt-Name (z. B. Aluminiumbarren)">
-      <input data-k="pprice" type="number" step="0.01" placeholder="Preis &euro;/Einheit">
-      <button class="delSell" type="button">✕</button>
-    </div>
-  </template>
-
   <div id="travelModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal">
       <h3>Fahrzeit eintragen</h3>
@@ -532,7 +529,7 @@
 
   <script>
   (function(){
-    /* ===== Sheets Web-App URL (deine neue) ===== */
+    /* ===== Sheets Web-App URL ===== */
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwXqVfkK787fVfLawjUslxaYkvdKNthPGHdatoIjWT6VLgc2cYyVITo1nc4tR2KG3hK/exec';
 
     function qs(s, e){return (e||document).querySelector(s);}
@@ -1598,7 +1595,7 @@
       });
     }
 
-    const DRIVE_AUTO_LOAD = true; // Name bleibt; Funktionalität = Sheets-Auto-Load
+    const DRIVE_AUTO_LOAD = true;
 
     function updateDriveStateTag(connected){
       const el = qs('#driveState');
@@ -1617,12 +1614,10 @@
     function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
     function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
 
-    /* ====== Sheets-API: list/get/save/delete + savemany ====== */
     async function gasListRoutes(){
       const url = GAS_URL + '?action=list&token=' + encodeURIComponent(getToken());
       const data = await jsonp(url);
       if(!data.ok) throw new Error(data.error || 'List failed');
-      // travelTimes global mergen
       const store = readStore();
       store.travelTimes = Object.assign({}, store.travelTimes||{}, data.travelTimes||{});
       writeStore(store);
@@ -1667,7 +1662,7 @@
 
     async function syncFromSheetIntoPage(){
       try{
-        const list = await gasListRoutes(); // holt Metas + travelTimes (schon gemerged)
+        const list = await gasListRoutes();
         const store = readStore();
         if(Array.isArray(list)){
           for(const meta of list){
@@ -1764,13 +1759,12 @@
         var store=readStore(); store.routes[r.id]=r; writeStore(store); 
         refreshRouteSelect(r.id);
         var sel=document.getElementById('routeSelect'); if(sel){ sel.value=r.id; }
-        alert('Route lokal gespeichert.'); /* belassen – nicht Drive-bezogen */
+        alert('Route lokal gespeichert.');
 
         if(getToken()){
           try{
             await gasSaveRoute(r);
             updateDriveStateTag(true);
-            /* Drive-Popup entfernt: keine weitere Meldung */
           }catch(err){
             console.warn('Speichern in Sheets fehlgeschlagen:', err.message);
             updateDriveStateTag(false);
@@ -1789,7 +1783,6 @@
         if(getToken()){
           try{
             await gasDeleteRoute(id);
-            /* Drive-Popup entfernt: keine Meldung "auch in Drive gelöscht" */
           }catch(err){
             console.warn('Sheets-Delete fehlgeschlagen:', err.message);
             showAuth('Zugriff verweigert oder Fehler beim Löschen. Bitte Token prüfen.');
