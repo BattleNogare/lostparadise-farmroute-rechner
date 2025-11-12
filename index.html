@@ -7,7 +7,7 @@
 
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon"
-        href="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/main/Routes-Logo.ico" />
+        href="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/4755eff9d2f03a8171689a9f9a0b2b635a10e903/Routes-Logo.ico" />
 
   <style>
     :root{
@@ -777,7 +777,7 @@
           (s.inputs||[]).forEach(function(inp){
             addInputRow(el);
             var row=listI.lastElementChild;
-            qs('[data-k="name"]',row).value=inp.name||'';
+            qs('[data-k="name"]',row).value=inp.name||';
             qs('[data-k="qty"]',row).value=inp.qty||'';
             qs('[data-k="source"]',row).value=inp.source||'';
           });
@@ -1614,21 +1614,72 @@
     function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
     function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
 
+    /* --------- ROBUSTE SHEETS-API WRAPPER --------- */
     async function gasListRoutes(){
       const url = GAS_URL + '?action=list&token=' + encodeURIComponent(getToken());
-      const data = await jsonp(url);
-      if(!data.ok) throw new Error(data.error || 'List failed');
-      const store = readStore();
-      store.travelTimes = Object.assign({}, store.travelTimes||{}, data.travelTimes||{});
-      writeStore(store);
-      return data.routes || [];
+      const data = await jsonp(url).catch(err => {
+        console.error('[list] JSONP Fehler:', err);
+        throw err;
+      });
+
+      const ok = (data && (data.ok === true || data.status === 'ok' || typeof data === 'object'));
+      if(!ok){
+        console.error('[list] Unerwartetes Schema:', data);
+        throw new Error('List: unexpected schema');
+      }
+
+      try{
+        const store = readStore();
+        store.travelTimes = Object.assign({}, store.travelTimes||{}, data.travelTimes||data.times||{});
+        writeStore(store);
+      }catch(e){ console.warn('[list] travelTimes merge warn:', e); }
+
+      let routes = [];
+      if (Array.isArray(data.routes)) {
+        routes = data.routes;
+      } else if (data.routes && typeof data.routes === 'object') {
+        routes = Object.keys(data.routes).map(id => {
+          const r = data.routes[id] || {};
+          return { id: r.id || id, name: r.name || id, _full: r };
+        });
+      } else if (Array.isArray(data.items)) {
+        routes = data.items;
+      } else if (Array.isArray(data.all)) {
+        routes = data.all;
+      } else {
+        console.warn('[list] Keine routes gefunden; data=', data);
+        routes = [];
+      }
+
+      if (routes.some(r => r && r._full && Array.isArray(r._full.steps))) {
+        const store = readStore();
+        routes.forEach(m => {
+          const full = m._full;
+          if(full && full.id && Array.isArray(full.steps)){
+            store.routes[full.id] = full;
+          }
+        });
+        writeStore(store);
+      }
+
+      console.log('[list] routes:', routes);
+      return routes;
     }
+
     async function gasGetRoute(id){
       const url = GAS_URL + '?action=get&id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(getToken());
-      const data = await jsonp(url);
-      if(!data.ok) throw new Error(data.error || 'Get failed');
-      return data.route;
+      const data = await jsonp(url).catch(err => {
+        console.error('[get] JSONP Fehler:', err);
+        throw err;
+      });
+      let route = data && data.route ? data.route : (data && data.data ? data.data : data);
+      if (!route || !route.steps) {
+        console.error('[get] Route fehlt/ungültig, data=', data);
+        throw new Error('Get: route missing');
+      }
+      return route;
     }
+
     async function gasSaveRoute(route){
       await fetch(GAS_URL, {
         method: 'POST',
@@ -1662,45 +1713,37 @@
 
     async function syncFromSheetIntoPage(){
       try{
-        const list = await gasListRoutes();
+        const metas = await gasListRoutes();
         const store = readStore();
-        if(Array.isArray(list)){
-          for(const meta of list){
-            const id = meta.id;
+
+        const needFetch = (metas||[]).filter(m => !(m && m._full && Array.isArray(m._full.steps)));
+        if (Array.isArray(needFetch) && needFetch.length){
+          for (const meta of needFetch){
+            const id = meta && meta.id;
             if(!id) continue;
-            const route = await gasGetRoute(id);
-            if(route && route.id && Array.isArray(route.steps)){
-              store.routes[route.id] = route;
+            try{
+              const route = await gasGetRoute(id);
+              if(route && route.id && Array.isArray(route.steps)){
+                store.routes[route.id] = route;
+              } else {
+                console.warn('[sync] get returned invalid route for id', id, route);
+              }
+            }catch(e){
+              console.warn('[sync] get failed for', id, e);
             }
           }
-          writeStore(store);
-          refreshRouteSelect(null);
-          renderSummaryAndMaybeList();
         }
+
+        writeStore(store);
+        refreshRouteSelect(null);
+        renderSummaryAndMaybeList();
+        updateDriveStateTag(true);
       }catch(err){
         console.warn('Sheets Sync (load) fehlgeschlagen:', err);
-      }
-    }
-
-    async function tryAuthAndLoad(initial=false){
-      const token = getToken();
-      if(!token){
-        showAuth();
-        return;
-      }
-      try{
-        await gasListRoutes();
-        hideAuth();
-        updateDriveStateTag(true);
-        if(initial && DRIVE_AUTO_LOAD){
-          await syncFromSheetIntoPage();
-        }
-      }catch(err){
-        setToken('');
-        showAuth('Zugriff verweigert – falsches Token.');
         updateDriveStateTag(false);
       }
     }
+    /* ----------------------------------------------- */
 
     function showAuth(msg){
       const overlay=qs('#authOverlay');
@@ -1937,6 +1980,35 @@
 
       document.getElementById('tabBuilder').addEventListener('click', function(){ switchTab('builder'); });
       document.getElementById('tabList').addEventListener('click', function(){ switchTab('list'); });
+
+      function setTaxRateUIFromStore(){
+        var store=readStore(); var v = (store.misc && typeof store.misc.taxRate==='number') ? store.misc.taxRate : 0;
+        var el = qs('#taxRate'); if(el){ el.value = v; }
+      }
+      function setProcessLevelUIFromStore(){
+        var store=readStore(); var v = (store.misc && typeof store.misc.processLevel==='number') ? store.misc.processLevel : 0;
+        var el = qs('#procRate'); if(el){ el.value = v; }
+      }
+
+      async function tryAuthAndLoad(initial=false){
+        const token = getToken();
+        if(!token){
+          showAuth();
+          return;
+        }
+        try{
+          await gasListRoutes();
+          hideAuth();
+          updateDriveStateTag(true);
+          if(initial && DRIVE_AUTO_LOAD){
+            await syncFromSheetIntoPage();
+          }
+        }catch(err){
+          setToken('');
+          showAuth('Zugriff verweigert – falsches Token.');
+          updateDriveStateTag(false);
+        }
+      }
 
       refreshRouteSelect(null);
       setSellList([]);
