@@ -1675,8 +1675,7 @@
         store.routes = store.routes || {};
         writeStore(store);
 
-        // EINMALIG nach Login: alle Routen sequentiell,
-        // aber mit Pause (Rate-Limit vermeiden)
+        // ERSTER PASS: alle Routen einmal laden (mit Delay gegen 429)
         for (const meta of list){
           const id = meta.id;
           if (!id) continue;
@@ -1702,8 +1701,64 @@
             console.warn('Konnte Route nicht laden:', id, e);
           }
 
-          // nach JEDEM Request etwas warten, damit Apps Script kein 429 wirft
-          await sleep(3000);  // ggf. auf 1000 erhöhen, wenn es noch zu eng ist
+          // nach JEDEM Request warten (gegen 429)
+          await sleep(800); // ggf. 4000–5000, wenn nötig
+        }
+
+        // RETRY-PHASEN: alle Routen, die noch leer sind, erneut versuchen
+        const MAX_RETRY_ROUNDS = 3;
+
+        for (let round = 1; round <= MAX_RETRY_ROUNDS; round++){
+          store = readStore();
+          const incompleteIds = [];
+
+          // alle Routen durchgehen und "leere" identifizieren
+          list.forEach(meta => {
+            const id = meta.id;
+            if (!id) return;
+            const r = store.routes && store.routes[id];
+            if (!r || !Array.isArray(r.steps) || r.steps.length === 0){
+              incompleteIds.push(id);
+            }
+          });
+
+          if (incompleteIds.length === 0){
+            // alles vollständig geladen -> fertig
+            break;
+          }
+
+          console.warn(
+            'Retry-Runde', round,
+            '- versuche erneut zu laden:',
+            incompleteIds
+          );
+
+          // In dieser Runde alle noch leeren nacheinander nachladen
+          for (const id of incompleteIds){
+            try{
+              const full = await gasGetRoute(id);
+              if (full && full.id){
+                store = readStore();
+                store.routes = store.routes || {};
+                store.routes[full.id] = full;
+
+                if (full.travelTimes && typeof full.travelTimes === 'object'){
+                  store.travelTimes = Object.assign(
+                    {},
+                    store.travelTimes || {},
+                    full.travelTimes || {}
+                  );
+                }
+
+                writeStore(store);
+              }
+            }catch(e){
+              console.warn('Retry fehlgeschlagen für Route:', id, e);
+            }
+
+            // bei Retries lieber noch etwas mehr Pause
+            await sleep(5000);
+          }
         }
 
         // danach Dropdown und ggf. Listenansicht aktualisieren
@@ -1713,6 +1768,7 @@
         console.warn('Backend Sync (load) fehlgeschlagen:', err);
       }
     }
+
 
 
 
