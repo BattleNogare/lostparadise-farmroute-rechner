@@ -174,12 +174,12 @@
   <div id="authOverlay">
     <div id="authCard">
       <h2>Login</h2>
-      <div class="mini" style="margin-bottom:8px">Bitte gib dein <strong>Token</strong> ein, um die Seite zu entsperren.</div>
+      <div class="mini" style="margin-bottom:8px">Bitte gib dein <strong>Token</strong> ein, um das Sheet-Backend zu nutzen.</div>
       <div id="authError">Zugriff verweigert – falsches Token.</div>
       <form id="authForm">
         <label>Token<br><input id="authToken" type="password" placeholder="●●●●●●●●" autocomplete="current-password" required></label>
         <div class="actions" style="justify-content:space-between">
-          <span class="tag yellow" title="Google Apps Script">Drive-Backend aktiv</span>
+          <span class="tag yellow" title="Google Apps Script">Sheet-Backend aktiv</span>
           <button id="authSubmit" type="submit" class="primary">Entsperren</button>
         </div>
       </form>
@@ -194,7 +194,7 @@
              src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
         <div class="brand">
           <h1>Farmrouten-Preisrechner</h1>
-          <span id="driveState" class="tag yellow" title="Drive-Verbindung">Drive: nicht verbunden</span>
+          <span id="driveState" class="tag yellow" title="Sheet-Verbindung">Sheet: nicht verbunden</span>
         </div>
         <div class="toolbar">
           <div class="tabs">
@@ -294,7 +294,7 @@
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
         <div class="sub">
-          Alle gespeicherten Routen (Drive wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
+          Alle gespeicherten Routen (Sheet-Backend wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
           Der <strong>Steuersatz</strong> wird nur auf Routen ohne „illegal“ im Namen angewendet.  
           Die <strong>Verarbeitungsstufe (%)</strong> reduziert die Dauer pro Verarbeitungsvorgang global für alle Routen.
         </div>
@@ -552,18 +552,16 @@
     function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{},misc:{}}; }catch(e){ return {routes:{},travelTimes:{},misc:{}}; } }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
-    /* ==== NEU: CORS-first + JSONP-Fallback ==== */
+    /* ==== CORS-first + JSONP-Fallback ==== */
     async function requestJSON(url){
-      // 1) Versuch: normaler Fetch mit CORS
       try{
         const res = await fetch(url, { method:'GET', mode:'cors', credentials:'omit' });
         if(res.ok){
-          const data = await res.json(); // kann bei opaque scheitern
+          const data = await res.json();
           return { ok:true, data, via:'cors' };
         }
-      }catch(_){ /* ignoriere und versuche JSONP */ }
+      }catch(_){}
 
-      // 2) JSONP-Fallback
       return new Promise((resolve)=>{
         const cb = 'cb_' + Math.random().toString(36).slice(2);
         const sep = url.includes('?') ? '&' : '?';
@@ -598,6 +596,7 @@
       return false;
     }
 
+    /* ===== Verkaufsliste ===== */
     function addSellRow(pname, price){
       var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
       var list=qs('#sellList'); list.appendChild(row);
@@ -620,6 +619,7 @@
       if((arr||[]).length===0){ addSellRow('', null); }
     }
 
+    /* ===== Step-Templates ===== */
     var TPLS={
       start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
       end: function(){return qs('#tpl-end').content.firstElementChild.cloneNode(true);},
@@ -842,6 +842,7 @@
       recalc();
     }
 
+    /* ===== Fahrzeiten ===== */
     function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
     function openTravelModal(from,to, cb){
       var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
@@ -980,8 +981,8 @@
       var v = Math.max(0, Math.min(100, num(qs('#procRate').value)));
       var store=readStore(); store.misc = store.misc || {}; store.misc.processLevel = v; writeStore(store);
     }
-    /* ============================================================= */
 
+    /* ==== Rechenlogik ==== */
     function kgPerBatchAllInputs(inputs, weights){
       var sum=0;
       inputs.forEach(function(i){
@@ -1460,6 +1461,7 @@
       renderLagerStocks(calc);
     }
 
+    /* ===== UI Routenliste ===== */
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
@@ -1634,17 +1636,18 @@
       });
     }
 
-    const DRIVE_AUTO_LOAD = true;
+    /* ===== Backend / Sheet-Anbindung ===== */
+    const BACKEND_AUTO_LOAD = true;
 
     function updateDriveStateTag(connected){
       const el = qs('#driveState');
       if(!el) return;
       if(connected){
-        el.textContent = 'Drive: verbunden';
+        el.textContent = 'Sheet: verbunden';
         el.classList.remove('yellow'); el.classList.add('green');
-        el.title = 'Web-App verbunden';
+        el.title = 'Sheet-Backend verbunden';
       }else{
-        el.textContent = 'Drive: nicht verbunden';
+        el.textContent = 'Sheet: nicht verbunden';
         el.classList.add('yellow'); el.classList.remove('green');
         el.title = 'Nicht authentifiziert';
       }
@@ -1653,69 +1656,39 @@
     function getToken(){ return sessionStorage.getItem('gas_token') || ''; }
     function setToken(t){ sessionStorage.setItem('gas_token', t||''); }
 
-    /* ==== NEU: GAS-Wrapper mit CORS/JSONP und Token-Logik ==== */
     async function gasListRoutes(){
       const url = GAS_URL + '?action=list&token=' + encodeURIComponent(getToken());
       const res = await requestJSON(url);
       if(!res.ok){
         throw new Error('[list] request failed via ' + res.via + ' (' + (res.error||'unknown') + ')');
       }
-      const data = res.data;
-
+      const data = res.data || {};
       if (serverSaysBadToken(data)) {
         const err = new Error('bad_token');
         err._badToken = true;
         throw err;
       }
 
-      try{
-        const store = readStore();
-        store.travelTimes = Object.assign({}, store.travelTimes||{}, data.travelTimes||data.times||{});
-        writeStore(store);
-      }catch(e){ console.warn('[list] travelTimes merge warn:', e); }
+      const store = readStore();
 
-      let routes = [];
-      if (Array.isArray(data.routes)) routes = data.routes;
-      else if (data.routes && typeof data.routes === 'object') {
-        routes = Object.keys(data.routes).map(id => {
-          const r = data.routes[id] || {};
-          return { id: r.id || id, name: r.name || id, _full: r };
+      if (data.travelTimes && typeof data.travelTimes === 'object') {
+        store.travelTimes = Object.assign({}, store.travelTimes||{}, data.travelTimes||{});
+      }
+
+      if (Array.isArray(data.routes)) {
+        store.routes = store.routes || {};
+        data.routes.forEach(function(r){
+          if(!r) return;
+          var id = r.id || uid();
+          r.id = id;
+          store.routes[id] = r;
         });
-      } else if (Array.isArray(data.items)) routes = data.items;
-      else if (Array.isArray(data.all)) routes = data.all;
-
-      if (routes.some(r => r && r._full && Array.isArray(r._full.steps))) {
-        const store = readStore();
-        routes.forEach(m => {
-          const full = m._full;
-          if(full && full.id && Array.isArray(full.steps)){
-            store.routes[full.id] = full;
-          }
-        });
-        writeStore(store);
+      } else if (data.routes && typeof data.routes === 'object') {
+        store.routes = data.routes;
       }
 
-      return routes;
-    }
-
-    async function gasGetRoute(id){
-      const url = GAS_URL + '?action=get&id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(getToken());
-      const res = await requestJSON(url);
-      if(!res.ok){
-        throw new Error('[get] request failed via ' + res.via + ' (' + (res.error||'unknown') + ')');
-      }
-      const data = res.data;
-      if (serverSaysBadToken(data)) {
-        const err = new Error('bad_token');
-        err._badToken = true;
-        throw err;
-      }
-      let route = data && data.route ? data.route : (data && data.data ? data.data : data);
-      if (!route || !Array.isArray(route.steps)) {
-        console.error('[get] Ungültige Route', data);
-        throw new Error('Get: route missing');
-      }
-      return route;
+      writeStore(store);
+      return store.routes;
     }
 
     async function gasSaveRoute(route){
@@ -1770,27 +1743,13 @@
       return true;
     }
 
-    async function syncFromDriveIntoPage(){
+    async function syncFromBackend(){
       try{
-        const list = await gasListRoutes();
-        if(!Array.isArray(list)) return;
-        const store = readStore();
-        for(const meta of list){
-          const id = (meta.id || '').replace(/\.json$/,'');
-          if(!id) continue;
-          const route = await gasGetRoute(id);
-          if(route && route.id && Array.isArray(route.steps)){
-            if(route.travelTimes && typeof route.travelTimes === 'object'){
-              store.travelTimes = Object.assign({}, store.travelTimes||{}, route.travelTimes||{});
-            }
-            store.routes[route.id] = route;
-          }
-        }
-        writeStore(store);
+        await gasListRoutes();
         refreshRouteSelect(null);
         renderSummaryAndMaybeList();
       }catch(err){
-        console.warn('Drive Sync (load) fehlgeschlagen:', err);
+        console.warn('Sheet-Sync fehlgeschlagen:', err);
       }
     }
 
@@ -1830,8 +1789,8 @@
         await gasListRoutes();
         hideAuth();
         updateDriveStateTag(true);
-        if(initial && DRIVE_AUTO_LOAD){
-          await syncFromDriveIntoPage();
+        if(initial && BACKEND_AUTO_LOAD){
+          await syncFromBackend();
         }
       }catch(err){
         updateDriveStateTag(false);
@@ -1844,6 +1803,7 @@
       }
     }
 
+    /* ===== DOM Ready ===== */
     window.addEventListener('DOMContentLoaded', async function(){
       qs('#authForm').addEventListener('submit', async function(ev){
         ev.preventDefault();
@@ -1882,7 +1842,7 @@
             await gasSaveRoute(r);
             updateDriveStateTag(true);
           }catch(err){
-            console.warn('Speichern nach Drive fehlgeschlagen:', err.message);
+            console.warn('Speichern ins Sheet-Backend fehlgeschlagen:', err.message);
             updateDriveStateTag(false);
             showAuth('Zugriff verweigert oder Fehler beim Speichern. Bitte Token prüfen.');
           }
@@ -1900,7 +1860,7 @@
           try{
             await gasDeleteRoute(id);
           }catch(err){
-            console.warn('Drive-Delete fehlgeschlagen:', err.message);
+            console.warn('Backend-Delete fehlgeschlagen:', err.message);
             showAuth('Zugriff verweigert oder Fehler beim Löschen. Bitte Token prüfen.');
           }
         }
@@ -1975,7 +1935,7 @@
             setRoute(route); currentRouteId = route.id;
 
             if(getToken()){
-              try{ await gasSaveRoute(route); }catch(err){ console.warn('Drive-Save nach Import fehlgeschlagen:', err.message); }
+              try{ await gasSaveRoute(route); }catch(err){ console.warn('Sheet-Save nach Import fehlgeschlagen:', err.message); }
             }
 
             alert('Route importiert und geladen: '+route.name);
