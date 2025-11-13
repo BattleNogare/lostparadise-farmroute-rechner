@@ -70,7 +70,7 @@
 
     .grid{
       display:grid;
-      grid-template-columns:1.2fr .8fr;
+      grid-template-columns:1.4fr 0.9fr; /* Builder breiter als Ergebnis */
       gap:16px;
       margin-top:16px
     }
@@ -167,6 +167,12 @@
       font-size:12px;
       color:#cde6d6;
     }
+
+    /* Trade-Liste: einzeilig, keine Scrollbalken im Standardfall */
+    .trade-list{
+      max-height:none;
+      overflow:visible;
+    }
   </style>
 </head>
 <body>
@@ -174,12 +180,12 @@
   <div id="authOverlay">
     <div id="authCard">
       <h2>Login</h2>
-      <div class="mini" style="margin-bottom:8px">Bitte gib dein <strong>Token</strong> ein, um das Sheet-Backend zu nutzen.</div>
+      <div class="mini" style="margin-bottom:8px">Bitte gib dein <strong>Token</strong> ein, um das <strong>Sheet-Backend</strong> zu nutzen.</div>
       <div id="authError">Zugriff verweigert – falsches Token.</div>
       <form id="authForm">
         <label>Token<br><input id="authToken" type="password" placeholder="●●●●●●●●" autocomplete="current-password" required></label>
         <div class="actions" style="justify-content:space-between">
-          <span class="tag yellow" title="Google Apps Script">Sheet-Backend aktiv</span>
+          <span class="tag yellow" title="Google Sheet Backend aktiv" id="backendState">Sheet: nicht verbunden</span>
           <button id="authSubmit" type="submit" class="primary">Entsperren</button>
         </div>
       </form>
@@ -194,7 +200,7 @@
              src="https://raw.githubusercontent.com/BattleNogare/lostparadise-farmroute-rechner/c91f45a451035b7dfbf09575e72e98bd7afe5689/Routes-Logo.png" />
         <div class="brand">
           <h1>Farmrouten-Preisrechner</h1>
-          <span id="driveState" class="tag yellow" title="Sheet-Verbindung">Sheet: nicht verbunden</span>
+          <!-- backendState wird oben im Login-Card schon als Tag gesetzt -->
         </div>
         <div class="toolbar">
           <div class="tabs">
@@ -202,7 +208,7 @@
             <button class="tab" id="tabList">Routenliste</button>
           </div>
           <div class="menu">
-            <select id="routeSelect" title="Gespeicherte Routen (in dieser Seite)"></select>
+            <select id="routeSelect" title="Gespeicherte Routen (aus Sheet + lokal)"></select>
             <button id="saveBtn">Route speichern</button>
             <button id="deleteBtn" class="danger">Löschen</button>
             <button id="exportCurrentBtn" class="ghost">Export aktuelle Route</button>
@@ -294,7 +300,7 @@
       <section class="card" id="listView" hidden>
         <h2>Routenliste</h2>
         <div class="sub">
-          Alle gespeicherten Routen (Sheet-Backend wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
+          Alle gespeicherten Routen (Sheet wird beim Start synchronisiert). Standardmäßig nach <strong>Gewinn/Stunde (netto)</strong> sortiert.
           Der <strong>Steuersatz</strong> wird nur auf Routen ohne „illegal“ im Namen angewendet.  
           Die <strong>Verarbeitungsstufe (%)</strong> reduziert die Dauer pro Verarbeitungsvorgang global für alle Routen.
         </div>
@@ -552,51 +558,20 @@
     function readStore(){ try{ var n=qs('#app-data'); return n? JSON.parse(n.textContent||'{}') : {routes:{},travelTimes:{},misc:{}}; }catch(e){ return {routes:{},travelTimes:{},misc:{}}; } }
     function writeStore(store){ var n=qs('#app-data'); if(n) n.textContent=JSON.stringify(store); }
 
-    /* ==== CORS-first + JSONP-Fallback ==== */
-    async function requestJSON(url){
-      try{
-        const res = await fetch(url, { method:'GET', mode:'cors', credentials:'omit' });
-        if(res.ok){
-          const data = await res.json();
-          return { ok:true, data, via:'cors' };
-        }
-      }catch(_){}
-
-      return new Promise((resolve)=>{
+    function jsonp(url){
+      return new Promise(function(resolve,reject){
         const cb = 'cb_' + Math.random().toString(36).slice(2);
         const sep = url.includes('?') ? '&' : '?';
         const s = document.createElement('script');
-        const timer = setTimeout(()=>{
-          cleanup();
-          resolve({ ok:false, error:'timeout', via:'jsonp' });
-        }, 8000);
-        function cleanup(){
-          clearTimeout(timer);
-          delete window[cb];
-          if(s.parentNode) s.parentNode.removeChild(s);
-        }
-        window[cb] = function(payload){
-          cleanup();
-          resolve({ ok:true, data:payload, via:'jsonp' });
-        };
-        s.onerror = function(){
-          cleanup();
-          resolve({ ok:false, error:'load_error', via:'jsonp' });
-        };
         s.src = url + sep + 'callback=' + cb;
         s.async = true;
+        window[cb] = function(data){ resolve(data); cleanup(); };
+        s.onerror = function(){ reject(new Error('JSONP load error')); cleanup(); };
+        function cleanup(){ delete window[cb]; if (s.parentNode) s.parentNode.removeChild(s); }
         document.head.appendChild(s);
       });
     }
 
-    function serverSaysBadToken(payload){
-      if(!payload || typeof payload !== 'object') return false;
-      if (payload.ok === false && /token/i.test(String(payload.error||''))) return true;
-      if (String(payload.status||'').toLowerCase()==='error' && /token/i.test(String(payload.message||payload.error||''))) return true;
-      return false;
-    }
-
-    /* ===== Verkaufsliste ===== */
     function addSellRow(pname, price){
       var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
       var list=qs('#sellList'); list.appendChild(row);
@@ -619,7 +594,6 @@
       if((arr||[]).length===0){ addSellRow('', null); }
     }
 
-    /* ===== Step-Templates ===== */
     var TPLS={
       start: function(){return qs('#tpl-start').content.firstElementChild.cloneNode(true);},
       end: function(){return qs('#tpl-end').content.firstElementChild.cloneNode(true);},
@@ -842,7 +816,6 @@
       recalc();
     }
 
-    /* ===== Fahrzeiten ===== */
     function travelKey(a,b){ return (a||'?')+'|'+(b||'?'); }
     function openTravelModal(from,to, cb){
       var m=qs('#travelModal'); qs('#travelFrom').value=from||''; qs('#travelTo').value=to||''; qs('#travelMinutes').value='';
@@ -981,8 +954,8 @@
       var v = Math.max(0, Math.min(100, num(qs('#procRate').value)));
       var store=readStore(); store.misc = store.misc || {}; store.misc.processLevel = v; writeStore(store);
     }
+    /* ============================================================= */
 
-    /* ==== Rechenlogik ==== */
     function kgPerBatchAllInputs(inputs, weights){
       var sum=0;
       inputs.forEach(function(i){
@@ -1017,7 +990,7 @@
 
     function compute(route){
       var backpackKg = route.backpackKg>0? route.backpackKg : 150;
-      var procLevel = getProcessLevel();
+      var procLevel = getProcessLevel(); /* GLOBAL: Verarbeitungsstufe in % */
 
       var lkw = {};
       var storage = {};
@@ -1160,7 +1133,7 @@
             outputs.forEach(function(o){ var w=Math.max(0,num(o.unitWeight)) || (weights[o.name]||1); weights[o.name]=w; });
 
             var durSec = Math.max(0, num(s.duration));
-            var durSecEff = Math.max(0, durSec * (1 - procLevel/100));
+            var durSecEff = Math.max(0, durSec * (1 - procLevel/100)); /* GLOBAL-Stufe anwenden */
             var durMin = durSecEff/60;
 
             var totalInputKgPerBatch = kgPerBatchAllInputs(inputs, weights);
@@ -1461,7 +1434,6 @@
       renderLagerStocks(calc);
     }
 
-    /* ===== UI Routenliste ===== */
     function refreshRouteSelect(selectedId){
       var sel=qs('#routeSelect'); if(!sel) return;
       var store=readStore(); var map=store.routes||{};
@@ -1486,6 +1458,7 @@
       var list=[];
       Object.keys(store.routes||{}).forEach(function(id){
         var r=store.routes[id];
+        if(!r || !Array.isArray(r.steps)) return; // nur echte Routen (keine Meta-only)
         var calc=compute(r);
         var name = r.name || id;
         var isIllegal = /illegal/i.test(name);
@@ -1592,7 +1565,7 @@
         taxEl.addEventListener('input', function(){
           saveTaxRateToStore();
           renderListView();
-          recalc();
+          recalc(); // wirkt global
         });
       }
       var procEl = qs('#procRate');
@@ -1601,7 +1574,7 @@
         procEl.addEventListener('input', function(){
           saveProcessLevelToStore();
           renderListView();
-          recalc();
+          recalc(); // wirkt global
         });
       }
     }
@@ -1636,11 +1609,10 @@
       });
     }
 
-    /* ===== Backend / Sheet-Anbindung ===== */
     const BACKEND_AUTO_LOAD = true;
 
-    function updateDriveStateTag(connected){
-      const el = qs('#driveState');
+    function updateBackendStateTag(connected){
+      const el = qs('#backendState');
       if(!el) return;
       if(connected){
         el.textContent = 'Sheet: verbunden';
@@ -1658,142 +1630,80 @@
 
     async function gasListRoutes(){
       const url = GAS_URL + '?action=list&token=' + encodeURIComponent(getToken());
-      const res = await requestJSON(url);
-      if(!res.ok){
-        throw new Error('[list] request failed via ' + res.via + ' (' + (res.error||'unknown') + ')');
-      }
-      const data = res.data || {};
-      if (serverSaysBadToken(data)) {
-        const err = new Error('bad_token');
-        err._badToken = true;
-        throw err;
-      }
-
-      const store = readStore();
-      store.routes = store.routes || {};
-
-      // travelTimes global vom Backend übernehmen
-      if (data.travelTimes && typeof data.travelTimes === 'object') {
-        store.travelTimes = Object.assign({}, store.travelTimes || {}, data.travelTimes || {});
-      }
-
-      function upsertRoute(raw){
-        if(!raw) return;
-
-        // Basis-ID & Name (aus Sheet-Zeile)
-        let baseId   = raw.id || (raw.route && raw.route.id) || uid();
-        let baseName = raw.name || (raw.route && raw.route.name) || ('Route ' + baseId);
-
-        let routeObj = null;
-
-        // 1) route_json: das ist dein Fall (Spalte route_json in der ROUTES-Tabelle)
-        if (typeof raw.route_json === 'string' && raw.route_json.trim()){
-          try{
-            routeObj = JSON.parse(raw.route_json);
-          }catch(e){
-            console.warn('route_json parse failed for', baseId, e);
-          }
-        }
-
-        // 2) Fallback: falls Backend irgendwann direkt "route" mitschickt
-        if(!routeObj && raw.route && typeof raw.route === 'object'){
-          routeObj = raw.route;
-        }
-
-        // 3) Fallback: falls direkt steps im Objekt sind
-        if(!routeObj && raw.steps){
-          routeObj = raw;
-        }
-
-        // 4) Wenn alles schiefgeht: leeres Grundgerüst
-        if(!routeObj){
-          routeObj = { id: baseId, name: baseName, steps: [] };
-        }
-
-        // ID & Name sicherstellen
-        routeObj.id   = routeObj.id   || baseId;
-        routeObj.name = routeObj.name || baseName;
-
-        // travelTimes aus der Route ins globale travelTimes mergen (falls vorhanden)
-        if (routeObj.travelTimes && typeof routeObj.travelTimes === 'object'){
-          store.travelTimes = Object.assign({}, store.travelTimes || {}, routeObj.travelTimes || {});
-        }
-
-        store.routes[routeObj.id] = routeObj;
-      }
-
-      // routes kann Array oder Objekt sein
-      if (Array.isArray(data.routes)){
-        data.routes.forEach(upsertRoute);
-      } else if (data.routes && typeof data.routes === 'object'){
-        Object.keys(data.routes).forEach(function(key){
-          upsertRoute(data.routes[key]);
-        });
-      }
-
-      writeStore(store);
-      return store.routes;
+      const data = await jsonp(url);
+      if(!data.ok) throw new Error(data.error || 'List failed');
+      return data; // { ok, routes, travelTimes }
     }
-
+    async function gasGetRoute(id){
+      const url = GAS_URL + '?action=get&id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(getToken());
+      const data = await jsonp(url);
+      if(!data.ok) throw new Error(data.error || 'Get failed');
+      return data.route;
+    }
     async function gasSaveRoute(route){
-      try{
-        const res = await fetch(GAS_URL, {
-          method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'save', token: getToken(), route })
-        });
-        try{
-          const data = await res.json();
-          if (serverSaysBadToken(data)) {
-            const err = new Error('bad_token'); err._badToken = true; throw err;
-          }
-        }catch(_){}
-      }catch(e){
-        console.warn('[save] CORS-POST gescheitert, versuche no-cors Blind-POST', e);
-        await fetch(GAS_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'save', token: getToken(), route })
-        });
-      }
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', token: getToken(), route })
+      });
+      // kein zusätzliches Popup, einfach "still" an Sheet senden
       return true;
     }
-
     async function gasDeleteRoute(id){
-      try{
-        const res = await fetch(GAS_URL, {
-          method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'delete', token: getToken(), id })
-        });
-        try{
-          const data = await res.json();
-          if (serverSaysBadToken(data)) {
-            const err = new Error('bad_token'); err._badToken = true; throw err;
-          }
-        }catch(_){}
-      }catch(e){
-        console.warn('[delete] CORS-POST gescheitert, no-cors Fallback', e);
-        await fetch(GAS_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'delete', token: getToken(), id })
-        });
-      }
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', token: getToken(), id })
+      });
       return true;
     }
 
-    async function syncFromBackend(){
+    async function syncFromBackendIntoPage(){
       try{
-        await gasListRoutes();
+        const data = await gasListRoutes();
+        const list = Array.isArray(data.routes) ? data.routes : [];
+        const tt = data.travelTimes || {};
+        const store = readStore();
+        store.travelTimes = Object.assign({}, store.travelTimes || {}, tt);
+
+        store.routes = store.routes || {};
+        list.forEach(function(meta){
+          const id = meta.id;
+          if(!id) return;
+          if(!store.routes[id]){
+            store.routes[id] = { id:id, name:meta.name || id, steps:[] };
+          }else{
+            store.routes[id].name = meta.name || store.routes[id].name || id;
+          }
+        });
+
+        writeStore(store);
         refreshRouteSelect(null);
         renderSummaryAndMaybeList();
       }catch(err){
-        console.warn('Sheet-Sync fehlgeschlagen:', err);
+        console.warn('Backend Sync (load) fehlgeschlagen:', err);
+      }
+    }
+
+    async function tryAuthAndLoad(initial=false){
+      const token = getToken();
+      if(!token){
+        showAuth();
+        return;
+      }
+      try{
+        await gasListRoutes();
+        hideAuth();
+        updateBackendStateTag(true);
+        if(initial && BACKEND_AUTO_LOAD){
+          await syncFromBackendIntoPage();
+        }
+      }catch(err){
+        setToken('');
+        showAuth('Zugriff verweigert – falsches Token.');
+        updateBackendStateTag(false);
       }
     }
 
@@ -1803,7 +1713,7 @@
       if(msg){ err.textContent=msg; err.style.display='block'; } else { err.style.display='none'; }
       overlay.style.display='flex';
       qs('.content').style.visibility='hidden';
-      updateDriveStateTag(false);
+      updateBackendStateTag(false);
       setTimeout(()=>{ qs('#authToken').focus(); }, 50);
     }
     function hideAuth(){
@@ -1823,31 +1733,6 @@
     }
     function renderSummaryAndMaybeList(){ recalc(); if(!document.getElementById('listView').hidden){ renderListView(); } }
 
-    async function tryAuthAndLoad(initial=false){
-      const token = getToken();
-      if(!token){
-        showAuth();
-        return;
-      }
-      try{
-        await gasListRoutes();
-        hideAuth();
-        updateDriveStateTag(true);
-        if(initial && BACKEND_AUTO_LOAD){
-          await syncFromBackend();
-        }
-      }catch(err){
-        updateDriveStateTag(false);
-        if (err && err._badToken){
-          setToken('');
-          showAuth('Zugriff verweigert – falsches Token.');
-        }else{
-          showAuth('Verbindung fehlgeschlagen. Prüfe die Web-App Berechtigungen.');
-        }
-      }
-    }
-
-    /* ===== DOM Ready ===== */
     window.addEventListener('DOMContentLoaded', async function(){
       qs('#authForm').addEventListener('submit', async function(ev){
         ev.preventDefault();
@@ -1876,19 +1761,18 @@
           return;
         }
         if(!r.id) r.id = uid();
-        var store=readStore(); store.routes[r.id]=r; writeStore(store); 
+        var store=readStore(); store.routes[r.id]=r; writeStore(store);
         refreshRouteSelect(r.id);
         var sel=document.getElementById('routeSelect'); if(sel){ sel.value=r.id; }
-        alert('Route lokal gespeichert.');
+        alert('Route gespeichert.');
 
         if(getToken()){
           try{
             await gasSaveRoute(r);
-            updateDriveStateTag(true);
+            updateBackendStateTag(true);
           }catch(err){
-            console.warn('Speichern ins Sheet-Backend fehlgeschlagen:', err.message);
-            updateDriveStateTag(false);
-            showAuth('Zugriff verweigert oder Fehler beim Speichern. Bitte Token prüfen.');
+            console.warn('Speichern ins Sheet fehlgeschlagen:', err.message);
+            updateBackendStateTag(false);
           }
         }
 
@@ -1904,15 +1788,35 @@
           try{
             await gasDeleteRoute(id);
           }catch(err){
-            console.warn('Backend-Delete fehlgeschlagen:', err.message);
-            showAuth('Zugriff verweigert oder Fehler beim Löschen. Bitte Token prüfen.');
+            console.warn('Löschen im Sheet fehlgeschlagen:', err.message);
           }
         }
       });
 
-      document.getElementById('routeSelect')?.addEventListener('change', function(e){
-        var id=e.target.value; if(!id) return;
-        var store=readStore(); var r=store.routes[id]; if(r){ setRoute(r); currentRouteId=id; }
+      // WICHTIG: Beim Auswählen im Dropdown IMMER komplette Route aus Sheet laden
+      document.getElementById('routeSelect')?.addEventListener('change', async function(e){
+        var id = e.target.value;
+        if(!id) return;
+
+        try{
+          var route = await gasGetRoute(id);
+          if(route && route.id && Array.isArray(route.steps)){
+            var store = readStore();
+            store.routes = store.routes || {};
+            store.routes[route.id] = route;
+            if(route.travelTimes && typeof route.travelTimes === 'object'){
+              store.travelTimes = Object.assign({}, store.travelTimes || {}, route.travelTimes || {});
+            }
+            writeStore(store);
+            setRoute(route);
+            currentRouteId = route.id;
+          } else {
+            alert('Diese Route konnte nicht geladen werden (keine Schritte gefunden).');
+          }
+        }catch(err){
+          console.error('Fehler beim Laden der Route', err);
+          alert('Fehler beim Laden der Route aus dem Sheet.');
+        }
       });
 
       document.getElementById('exportCurrentBtn')?.addEventListener('click', function(){
@@ -1996,6 +1900,7 @@
         var reports={};
         Object.keys(store.routes||{}).forEach(function(id){
           var r=store.routes[id];
+          if(!r || !Array.isArray(r.steps)) return;
           var calc=compute(r);
           reports[id]={
             name: r.name || id,
