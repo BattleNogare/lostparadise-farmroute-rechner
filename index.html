@@ -1665,27 +1665,46 @@
         const data = await gasListRoutes();
         const list = Array.isArray(data.routes) ? data.routes : [];
         const tt = data.travelTimes || {};
-        const store = readStore();
+
+        // TravelTimes aus dem Sheet übernehmen
+        let store = readStore();
         store.travelTimes = Object.assign({}, store.travelTimes || {}, tt);
-
         store.routes = store.routes || {};
-        list.forEach(function(meta){
-          const id = meta.id;
-          if(!id) return;
-          if(!store.routes[id]){
-            store.routes[id] = { id:id, name:meta.name || id, steps:[] };
-          }else{
-            store.routes[id].name = meta.name || store.routes[id].name || id;
-          }
-        });
-
         writeStore(store);
+
+        // EINMALIG nach Login: alle Routen nacheinander komplett laden
+        for (const meta of list){
+          const id = meta.id;
+          if (!id) continue;
+          try{
+            const full = await gasGetRoute(id);
+            if (full && full.id){
+              store = readStore();
+              store.routes = store.routes || {};
+              store.routes[full.id] = full;
+
+              if (full.travelTimes && typeof full.travelTimes === 'object'){
+                store.travelTimes = Object.assign(
+                  {},
+                  store.travelTimes || {},
+                  full.travelTimes || {}
+                );
+              }
+              writeStore(store);
+            }
+          }catch(e){
+            console.warn('Konnte Route nicht laden:', id, e);
+          }
+        }
+
+        // Dropdown & evtl. Listenansicht aktualisieren
         refreshRouteSelect(null);
         renderSummaryAndMaybeList();
       }catch(err){
         console.warn('Backend Sync (load) fehlgeschlagen:', err);
       }
     }
+
 
     async function tryAuthAndLoad(initial=false){
       const token = getToken();
