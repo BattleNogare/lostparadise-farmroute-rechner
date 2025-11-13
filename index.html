@@ -572,6 +572,9 @@
       });
     }
 
+    // kleine Pause-Helfer, um nicht ins Rate-Limit zu laufen
+    function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
     function addSellRow(pname, price){
       var row=qs('#tpl-sell-row').content.firstElementChild.cloneNode(true);
       var list=qs('#sellList'); list.appendChild(row);
@@ -1666,16 +1669,18 @@
         const list = Array.isArray(data.routes) ? data.routes : [];
         const tt = data.travelTimes || {};
 
-        // TravelTimes aus dem Sheet übernehmen
+        // TravelTimes aus dem Backend übernehmen
         let store = readStore();
         store.travelTimes = Object.assign({}, store.travelTimes || {}, tt);
         store.routes = store.routes || {};
         writeStore(store);
 
-        // EINMALIG nach Login: alle Routen nacheinander komplett laden
+        // EINMALIG nach Login: alle Routen sequentiell,
+        // aber mit Pause (Rate-Limit vermeiden)
         for (const meta of list){
           const id = meta.id;
           if (!id) continue;
+
           try{
             const full = await gasGetRoute(id);
             if (full && full.id){
@@ -1690,20 +1695,25 @@
                   full.travelTimes || {}
                 );
               }
+
               writeStore(store);
             }
           }catch(e){
             console.warn('Konnte Route nicht laden:', id, e);
           }
+
+          // nach JEDEM Request etwas warten, damit Apps Script kein 429 wirft
+          await sleep(800);  // ggf. auf 1000 erhöhen, wenn es noch zu eng ist
         }
 
-        // Dropdown & evtl. Listenansicht aktualisieren
+        // danach Dropdown und ggf. Listenansicht aktualisieren
         refreshRouteSelect(null);
         renderSummaryAndMaybeList();
       }catch(err){
         console.warn('Backend Sync (load) fehlgeschlagen:', err);
       }
     }
+
 
 
     async function tryAuthAndLoad(initial=false){
