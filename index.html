@@ -1670,21 +1670,65 @@
       }
 
       const store = readStore();
+      store.routes = store.routes || {};
 
+      // travelTimes global vom Backend übernehmen
       if (data.travelTimes && typeof data.travelTimes === 'object') {
-        store.travelTimes = Object.assign({}, store.travelTimes||{}, data.travelTimes||{});
+        store.travelTimes = Object.assign({}, store.travelTimes || {}, data.travelTimes || {});
       }
 
-      if (Array.isArray(data.routes)) {
-        store.routes = store.routes || {};
-        data.routes.forEach(function(r){
-          if(!r) return;
-          var id = r.id || uid();
-          r.id = id;
-          store.routes[id] = r;
+      function upsertRoute(raw){
+        if(!raw) return;
+
+        // Basis-ID & Name (aus Sheet-Zeile)
+        let baseId   = raw.id || (raw.route && raw.route.id) || uid();
+        let baseName = raw.name || (raw.route && raw.route.name) || ('Route ' + baseId);
+
+        let routeObj = null;
+
+        // 1) route_json: das ist dein Fall (Spalte route_json in der ROUTES-Tabelle)
+        if (typeof raw.route_json === 'string' && raw.route_json.trim()){
+          try{
+            routeObj = JSON.parse(raw.route_json);
+          }catch(e){
+            console.warn('route_json parse failed for', baseId, e);
+          }
+        }
+
+        // 2) Fallback: falls Backend irgendwann direkt "route" mitschickt
+        if(!routeObj && raw.route && typeof raw.route === 'object'){
+          routeObj = raw.route;
+        }
+
+        // 3) Fallback: falls direkt steps im Objekt sind
+        if(!routeObj && raw.steps){
+          routeObj = raw;
+        }
+
+        // 4) Wenn alles schiefgeht: leeres Grundgerüst
+        if(!routeObj){
+          routeObj = { id: baseId, name: baseName, steps: [] };
+        }
+
+        // ID & Name sicherstellen
+        routeObj.id   = routeObj.id   || baseId;
+        routeObj.name = routeObj.name || baseName;
+
+        // travelTimes aus der Route ins globale travelTimes mergen (falls vorhanden)
+        if (routeObj.travelTimes && typeof routeObj.travelTimes === 'object'){
+          store.travelTimes = Object.assign({}, store.travelTimes || {}, routeObj.travelTimes || {});
+        }
+
+        store.routes[routeObj.id] = routeObj;
+      }
+
+      // routes kann Array oder Objekt sein
+      if (Array.isArray(data.routes)){
+        data.routes.forEach(upsertRoute);
+      } else if (data.routes && typeof data.routes === 'object'){
+        Object.keys(data.routes).forEach(function(key){
+          upsertRoute(data.routes[key]);
         });
-      } else if (data.routes && typeof data.routes === 'object') {
-        store.routes = data.routes;
       }
 
       writeStore(store);
