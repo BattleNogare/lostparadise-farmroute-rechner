@@ -1706,7 +1706,7 @@
         }
 
         // RETRY-PHASEN: alle Routen, die noch leer sind, erneut versuchen
-        const MAX_RETRY_ROUNDS = 3;
+        const MAX_RETRY_ROUNDS = 5;
 
         for (let round = 1; round <= MAX_RETRY_ROUNDS; round++){
           store = readStore();
